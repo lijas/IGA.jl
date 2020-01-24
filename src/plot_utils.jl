@@ -110,8 +110,8 @@ function _genometry_value(x,y,knot1,knot2,p1,p2, control_points::Vector{Vec{dim,
 	for j in 1:(length(knot2)-p2-1)
 		for i in 1:(length(knot1)-p2-1)
 			counter +=1
-			Nx = BSplines._bspline_basis_value(p1, knot1, i, x)
-			Ny = BSplines._bspline_basis_value(p2, knot2, j, y)
+			Nx = IGA._bspline_basis_value_alg2(p1, knot1, i, x)
+			Ny = IGA._bspline_basis_value_alg2(p2, knot2, j, y)
 			#@show Nx*Ny
 			S += (Nx*Ny)*control_points[counter]
 		end
@@ -129,9 +129,9 @@ function _genometry_value(x,y,z,knot1,knot2,knot3,p1,p2,p3,control_points::Vecto
 		for j in 1:(length(knot2)-p2-1)
 			for i in 1:(length(knot1)-p1-1)
 				counter +=1
-				Nx = BSplines._bspline_basis_value(p1, knot1, i, x)
-				Ny = BSplines._bspline_basis_value(p2, knot2, j, y)
-				Nz = BSplines._bspline_basis_value(p3, knot3, k, z)
+				Nx = IGA._bspline_basis_value_alg2(p1, knot1, i, x)
+				Ny = IGA._bspline_basis_value_alg2(p2, knot2, j, y)
+				Nz = IGA._bspline_basis_value_alg2(p3, knot3, k, z)
 				#@show Nx*Ny
 				S += (Nx*Ny*Nz)*control_points[counter]
 			end

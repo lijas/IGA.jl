@@ -64,6 +64,7 @@ function create_nurbs_mesh2()
 	orders = (2,2)
 
 	mesh = IGA.NURBSMesh{2,dim,T}(knot_vectors, orders, control_points)
+	#IGA.plot_bspline_mesh(mesh)
     return mesh
 
 end
@@ -92,25 +93,20 @@ function solve_2d()
 
 	globaldofs = mesh.IEN[:,1]
 	
-	ecp = mesh.control_points[globaldofs]
+	#ecp = mesh.control_points[globaldofs]
 
-	cellvalues = CellVectorValues(qr,ip)
+	cellvalues = CellScalarValues(qr,ip)
 	
-	#=
-	fig = plot(legend=:none)
+	
+	#=fig = plot(legend=:none, reuse = false)
 	for ie in 1:3
 		
 		globaldofs = reverse(mesh.IEN[:,ie])
-		ecp = mesh.control_points[globaldofs]
+		ecp = mesh.control_points[globaldofs] #element controlponts
 
-		P = zeros(T, length(globaldofs), dim)
-		for i in 1:length(globaldofs)
-			for d in 1:dim
-				P[i,d] = ecp[i][d]
-			end
-		end
-		Pb = Cb[ie]'*P
-		
+		becp = zeros(Vec{dim,T}, length(globaldofs))
+		IGA.bezier_transfrom!(becp, Cb[ie]', ecp)
+
 		#plot ranges
 		knot_plot_range = -1:1:1#[-1:0.5:1 for _ in 1:dim]
 		nplotpoints = length(knot_plot_range)
@@ -137,32 +133,51 @@ function solve_2d()
 			for i in 1:length(globaldofs)
 				N = JuAFEM.value(ip, i, _vec)
 
-				edge[j] += N* Vec{dim,T}((Pb[i,1], Pb[i,2]))
+				edge[j] += N* becp[i]
 				
 			end
 		end
-		@show edge#[getindex.(edge,d) for d in 1:dim]
 		plot!(fig, [getindex.(edge,d) for d in 1:dim]..., color=:black)
 
 	end
-	display(fig)
-	=#
-
+	display(fig)=#
 
 	for ie in 1:3
 		
+		n_basefunctions = getnbasefunctions(cellvalues)*dim
 		globaldofs = reverse(mesh.IEN[:,ie])
-		ecp = mesh.control_points[globaldofs]
+		ecp = mesh.control_points[globaldofs] #element controlponts
 
-		P = zeros(T, length(globaldofs), dim)
-		for i in 1:length(globaldofs)
-			for d in 1:dim
-				P[i,d] = ecp[i][d]
+		becp = zeros(Vec{dim,T}, length(globaldofs))
+		bezier_transfrom!(becp, Cb[ie]', ecp)
+
+		reinit!(cellvalues, becp)
+
+		N    = zeros(eltype(cellvalues.N   ), length(globaldofs))
+		∇ϕa = zero(eltype(cellvalues.dNdx))
+		∇ϕb = zero(eltype(cellvalues.dNdx))
+
+		Ke = zeros(n_basefunctions, n_basefunctions)
+
+		for iqp in 1:getnquadpoints(cellvalues)
+			for a in 1:n_basefunctions
+				for b in 1:n_basefunctions
+					#bezier_transfrom!(N, Cb[ie][a,:], cellvalues.N[:,iqp])
+					bezier_transfrom!(∇ϕa, Cb[ie][a,:], cellvalues.dNdx[:,iqp])
+					bezier_transfrom!(∇ϕb, Cb[ie][a,:], cellvalues.dNdx[:,iqp])
+
+					Ke_e = dotdot(∇ϕa, C, ∇ϕb) * getdetJdV(cellvalues, iqp)
+					for d1 in 1:dim, d2 in 1:dim
+						@show dim*(a-1) + d1
+						@show dim*(b-1) + d2
+						Ke[dim*(a-1) + d1, dim*(b-1) + d2] += Ke_e[d1,d2]
+					end
+				end
 			end
+
 		end
-		Pb = Cb[ie]'*P
 		
-		
+
 	end
 
 
