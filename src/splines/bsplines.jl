@@ -84,10 +84,10 @@ end
 Algorithm for calculating one basis functions value
 From NURBS-book, alg2.4
 """
-function _bspline_basis_value_alg2(p::Int,U::Vector{T},i::Int,u::T) where T
+function _bspline_basis_value_alg2(p::Int,U::Vector{T},i::Int,u::T2) where {T,T2}
 	i -=1
     m = length(U)-1
-    N = zeros(Float64, 10)
+    N = zeros(T2, 10)
     if ((i==0 && u==U[0+1] || (i==m-p-1 && u==U[end])))
         return 1.0
     end

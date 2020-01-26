@@ -39,35 +39,39 @@ function create_nurbs_mesh2()
 
     dim = 2
 	T = Float64
+	L = 10.0
+	h = 0.2
 
-	control_points = [Vec{dim,T}((0.0,0.0)),
-					  Vec{dim,T}((0.0,1.0)),
-					  Vec{dim,T}((0.5,1.2)),
-					  Vec{dim,T}((1.0,1.5)),
-					  Vec{dim,T}((3.0,1.5)),
+	p = 2
+	nbasefunks_x = 30;
+	nknots_x = nbasefunks_x + 1 + p 
+	knot_vector_x = [zeros(T, dim)..., range(zero(T), stop=one(T), length=nknots_x-p*2)..., ones(T, dim)...]
 
-					  Vec{dim,T}((-1.0,0.0)),
-					  Vec{dim,T}((-1.0,2.0)),
-					  Vec{dim,T}((0.0,3.0)),
-					  Vec{dim,T}((1.0,4.0)),
-					  Vec{dim,T}((3.0,4.0)),
+	q = 2
+	nbasefunks_y = 14;
+	nknots_y = nbasefunks_y + 1 + q 
+	knot_vector_y = [zeros(T, dim)..., range(zero(T), stop=one(T), length=nknots_y-q*2)..., ones(T, dim)...]
 
-					  Vec{dim,T}((-2.0,0.0)),
-					  Vec{dim,T}((-2.0,2.0)),
-					  Vec{dim,T}((-1.0,4.0)),
-					  Vec{dim,T}((1.0,5.0)),
-					  Vec{dim,T}((3.0,5.0))]
-	
-	knot_vectors = (T[0,0,0, 0.4,0.5, 1,1,1],
-				   T[0,0,0, 1,1,1])
+	control_points = Vec{dim,T}[]
+	for y in range(0.0, stop=h, length=nbasefunks_y)
+		for x in range(0.0, stop=L, length=nbasefunks_x)
+			push!(control_points, Vec{dim,T}((x,y)))
+		end
+	end
 
-	orders = (2,2)
-
-	mesh = IGA.NURBSMesh{2,dim,T}(knot_vectors, orders, control_points)
-	#IGA.plot_bspline_mesh(mesh)
+	mesh = IGA.NURBSMesh{2,dim,T}((knot_vector_x, knot_vector_y), (p,q), control_points)
+	IGA.plot_bspline_mesh(mesh)
     return mesh
 
 end
+
+	function node_dofs(_lockednodes, dofs)
+		locked_dofs = Int[]
+		for nodeid in _lockednodes
+			append!(locked_dofs, dofs[:,nodeid])
+		end
+		return locked_dofs
+	end
 
 
 function solve_2d()
@@ -90,14 +94,51 @@ function solve_2d()
 	
 	ip = BernsteinBasis{2,2}()
 	qr = QuadratureRule{2,RefCube}(3)
-
-	globaldofs = mesh.IEN[:,1]
 	
 	#ecp = mesh.control_points[globaldofs]
 
 	cellvalues = CellScalarValues(qr,ip)
 	
+	grid = IGA.convert_to_grid_representation(mesh)
+	addnodeset!(grid, "locked", (x)-> x[1] < 0.1)
+	addnodeset!(grid, "force", (x)-> x[1] > 10*0.99) 	
+
+	ndofs = getnbasefunctions(mesh)*dim
+	dofs = reshape(1:ndofs, (dim,convert(Int, ndofs/2)))
+
+	edof = zeros(Int,IGA.get_nbasefuncs_per_cell(mesh)*dim, 0)
+	for ie in 1:IGA.getncells(mesh)
+		control_points = mesh.IEN[:,ie]
+		c = 0
+		_edof = Int[]
+		for icp in control_points
+			for d in 1:dim
+				c+=1
+				push!(_edof, dofs[d,icp])
+			end
+		end
+		edof = hcat(edof, _edof)
+	end
+
+	locked_dofs = node_dofs(getnodeset(grid, "locked"), dofs)
+	force_dofs = node_dofs(getnodeset(grid, "force"), dofs)
+	locked_values = zeros(T, length(locked_dofs))
+	@show force_dofs
+	#dh = DofHandler(grid)
+	#push!(dh, :u, dim, ip)
+	#close!(dh)
+
+	#@show maximum(dh.cell_dofs), length(mesh.control_points)
 	
+	# Boundaryconditions
+	#dbcs = ConstraintHandler(dh)
+	# Add a homogenoush boundary condition on the "clamped" edge
+	#dbc = Dirichlet(:u, getnodeset(grid, "locked"), (x,t) -> [0.0, 0.0], collect(1:dim))
+	#add!(dbcs, dbc)
+	#close!(dbcs)
+	#t = 0.0
+	#update!(dbcs, t)
+
 	#=fig = plot(legend=:none, reuse = false)
 	for ie in 1:3
 		
@@ -141,46 +182,62 @@ function solve_2d()
 
 	end
 	display(fig)=#
+	#create_symmetric_sparsity_pattern(dh)
+	#fill!(K.data.nzval, 1.0);
+	#spy(K.data)
 
-	for ie in 1:3
-		
-		n_basefunctions = getnbasefunctions(cellvalues)*dim
-		globaldofs = reverse(mesh.IEN[:,ie])
-		ecp = mesh.control_points[globaldofs] #element controlponts
+	f = fill(0.0, ndofs)#ndofs(dh))#zeros(ndofs(dh))
+	assembler = start_assemble(ndofs)
+	becp = zeros(Vec{dim,T}, length(mesh.IEN[:,1]))
+	n_basefunctions = getnbasefunctions(cellvalues)
 
-		becp = zeros(Vec{dim,T}, length(globaldofs))
+	Ke = zeros(n_basefunctions*dim, n_basefunctions*dim)
+	for ie in 1:nbe
+	
+		globalnodes = reverse(mesh.IEN[:,ie])
+		ecp = mesh.control_points[globalnodes] #element controlponts
+
 		bezier_transfrom!(becp, Cb[ie]', ecp)
 
 		reinit!(cellvalues, becp)
 
-		N    = zeros(eltype(cellvalues.N   ), length(globaldofs))
-		∇ϕa = zero(eltype(cellvalues.dNdx))
-		∇ϕb = zero(eltype(cellvalues.dNdx))
-
-		Ke = zeros(n_basefunctions, n_basefunctions)
-
+		fill!(Ke, 0.0)
 		for iqp in 1:getnquadpoints(cellvalues)
 			for a in 1:n_basefunctions
 				for b in 1:n_basefunctions
-					#bezier_transfrom!(N, Cb[ie][a,:], cellvalues.N[:,iqp])
-					bezier_transfrom!(∇ϕa, Cb[ie][a,:], cellvalues.dNdx[:,iqp])
-					bezier_transfrom!(∇ϕb, Cb[ie][a,:], cellvalues.dNdx[:,iqp])
+
+					∇ϕa = bezier_transfrom(Cb[ie][a,:], cellvalues.dNdx[:,iqp])
+					∇ϕb = bezier_transfrom(Cb[ie][b,:], cellvalues.dNdx[:,iqp])
 
 					Ke_e = dotdot(∇ϕa, C, ∇ϕb) * getdetJdV(cellvalues, iqp)
+					
 					for d1 in 1:dim, d2 in 1:dim
-						@show dim*(a-1) + d1
-						@show dim*(b-1) + d2
 						Ke[dim*(a-1) + d1, dim*(b-1) + d2] += Ke_e[d1,d2]
 					end
 				end
 			end
-
 		end
-		
+		#@show edof[:,ie]
+		assemble!(assembler, (edof[:,ie]), Ke)
 
 	end
+	f[force_dofs[2]] = -200000.0
+	#@show f[force_dofs[2:2:end]]
+	u = zeros(T, ndofs)
 
+	K = end_assemble(assembler)
+	#Solve
+	all_dofs = 1:ndofs
+	free_dofs = setdiff(all_dofs, locked_dofs)
 
+	u_free = K[free_dofs,free_dofs]\(f[free_dofs] - K[free_dofs,locked_dofs]*u[locked_dofs])
+	u[free_dofs] .= u_free
+	@show maximum(abs.(u))
+	uvec = reinterpret(Vec{dim,T}, u)
+	
+	IGA.plot_bspline_mesh(mesh, uvec)
+
+	#return u
 end
 
 	#dh = DofHandler(mesh)

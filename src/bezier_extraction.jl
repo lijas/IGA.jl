@@ -1,5 +1,5 @@
 
-export bezier_transfrom!, compute_bezier_extraction_operators
+export bezier_transfrom, bezier_transfrom!, compute_bezier_extraction_operators
 
 function compute_bezier_points(Ce::Matrix{T}, control_points::Vector{Vec{sdim,T}}) where {T,sdim}
 
@@ -19,20 +19,22 @@ function bezier_transfrom!(bezier::Vector{TENSOR}, Ce::AbstractMatrix, control_p
 	n_new_points = size(Ce,2)
 	#bezier = zeros(TENSOR, n_new_points)
 	for i in 1:n_new_points
+		_new_point = zero(TENSOR)
 		for (ic, p) in enumerate(control_points)
-			bezier[i] += Ce[i, ic]*p
+			 _new_point += Ce[i, ic]*p
 		end
+		bezier[i] = _new_point
 	end
 	#return bezierpoints
 
 end
 
-function bezier_transfrom!(bezier::TENSOR, Ce::AbstractVector, control_points::Vector{TENSOR}) where {T,sdim,TENSOR}
-
+function bezier_transfrom(Ce::AbstractVector, control_points::Vector{TENSOR}) where {T,sdim,TENSOR}
+	_tensor = zero(TENSOR)
 	for (ic, p) in enumerate(control_points)
-		bezier += Ce[ic]*p
+		_tensor += Ce[ic]*p
 	end
-
+	return _tensor
 end
 
 compute_bezier_extraction_operators(o::NTuple{pdim,Int}, U::NTuple{pdim,Vector{T}}) where {pdim,T} = 

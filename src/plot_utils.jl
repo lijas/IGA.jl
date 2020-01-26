@@ -142,13 +142,13 @@ function _genometry_value(x,y,z,knot1,knot2,knot3,p1,p2,p3,control_points::Vecto
 
 end
 
-function plot_bspline_mesh(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
+function plot_bspline_mesh(mesh::NURBSMesh{pdim,sdim,T}, u::AbstractVector = [zero(Vec{sdim,T}) for _ in 1:length(mesh.control_points)]) where {pdim,sdim,T}
 
 	knot_vectors = mesh.knot_vectors; orders = mesh.orders
 	INN = mesh.INN
 	IEN = mesh.IEN
 	
-	fig=Plots.plot(reuse=false,legend=:none)
+	fig=Plots.plot(reuse=false,legend=:none, axis_ratio=:equal)
 
 	for ie in 1:size(IEN,2) #Loop over all elements
 
@@ -184,12 +184,14 @@ function plot_bspline_mesh(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
 		for _funks in _range_funcs
 			_ranges = [_funks[d](knot_plot_ranges[d]) for d in 1:pdim]
 			ref_knot_vectors = [Ref(knot_vectors[d]) for d in 1:pdim]
-			edge = _genometry_value.(_ranges..., ref_knot_vectors..., orders..., Ref(mesh.control_points))
+			edge = _genometry_value.(_ranges..., ref_knot_vectors..., orders..., Ref(mesh.control_points .+ u))
 			#plot!(fig, getindex.(edge,1), getindex.(edge,2), getindex.(edge,3), color=:black)
 			plot!(fig, [getindex.(edge,i) for i in 1:sdim]..., color=:black)
 		end
 
-		scatter!(fig, [getindex.(mesh.control_points[basefuncs],i) for i in 1:sdim]..., marker=:circle, color=:red)
+		newpoints = mesh.control_points .+ u
+		scatter!(fig, [getindex.(newpoints[basefuncs],i) for i in 1:sdim]..., marker=:circle, color=:red)
+		scatter!(fig, [getindex.(mesh.control_points[basefuncs],i) for i in 1:sdim]..., marker=:circle, color=:green)
 
 	end
 	display(fig)

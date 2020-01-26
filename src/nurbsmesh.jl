@@ -1,4 +1,4 @@
-
+export getnbasefunctions, NURBSMesh
 
 struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 	knot_vectors::NTuple{pdim,Vector{T}}
@@ -15,6 +15,8 @@ struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 		nbasefuncs = length.(knot_vectors) .- orders .- 1
 		nel, nnp, nen, INN, IEN = get_nurbs_meshdata(orders, nbasefuncs)
 		
+		@assert(prod(nbasefuncs)==maximum(IEN))
+
 		#Remove elements which are zero length
 		to_remove = Int[]
 		for e in 1:nel
@@ -26,12 +28,26 @@ struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 				end
 			end
 		end
-		to_keep = setdiff(collect(1:nel), to_remove)
-		@show IEN
-		IEN = IEN[:, to_keep] #IEN = IEN[end:-1:1, to_keep]
-		@show IEN
+		#to_keep = setdiff(collect(1:nel), to_remove)
+		#IEN = IEN[:, to_keep] #IEN = IEN[end:-1:1, to_keep]
 		new{pdim,sdim,T}(knot_vectors,orders,control_points,IEN,INN)
 	end
+
+end
+
+getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
+get_nbasefuncs_per_cell(mesh::NURBSMesh) = length(mesh.IEN[:,1])
+JuAFEM.getnbasefunctions(mesh::NURBSMesh) = maximum(mesh.IEN)
+
+function convert_to_grid_representation(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
+
+	ncontrolpoints = length(mesh.IEN[:,1])
+	nodes = [JuAFEM.Node(x) for x in mesh.control_points]
+
+	_BezierCell = BezierCell{2,ncontrolpoints,mesh.orders[1]}
+	cells = [_BezierCell(Tuple(reverse(mesh.IEN[:,ie]))) for ie in 1:getncells(mesh)]
+
+	return JuAFEM.Grid(cells, nodes)
 
 end
 
