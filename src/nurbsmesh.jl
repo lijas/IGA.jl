@@ -51,6 +51,34 @@ function convert_to_grid_representation(mesh::NURBSMesh{pdim,sdim,T}) where {pdi
 
 end
 
+function generate_nurbsmesh(nbasefuncs::Tuple{Int,Int}, order::Tuple{Int,Int}, _size::Tuple{T,T}) where T
+
+    dim = 2
+	#T = Float64
+
+	L,h = _size
+	p,q = order
+	nbasefunks_x, nbasefunks_y = nbasefuncs
+
+	nknots_x = nbasefunks_x + 1 + p 
+	knot_vector_x = [zeros(T, dim)..., range(zero(T), stop=one(T), length=nknots_x-p*2)..., ones(T, dim)...]
+
+	nknots_y = nbasefunks_y + 1 + q 
+	knot_vector_y = [zeros(T, dim)..., range(zero(T), stop=one(T), length=nknots_y-q*2)..., ones(T, dim)...]
+
+	control_points = Vec{dim,T}[]
+	for y in range(0.0, stop=h, length=nbasefunks_y)
+		for x in range(0.0, stop=L, length=nbasefunks_x)
+			push!(control_points, Vec{dim,T}((x,y)))
+		end
+	end
+
+	mesh = IGA.NURBSMesh{2,dim,T}((knot_vector_x, knot_vector_y), (p,q), control_points)
+	
+    return mesh
+
+end
+
 function get_nurbs_meshdata(order::NTuple{2,Int}, nbf::NTuple{2,Int})
 
 	T = Float64

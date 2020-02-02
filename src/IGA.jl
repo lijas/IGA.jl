@@ -19,6 +19,7 @@ JuAFEM.faces(c::BezierCell) = error("idk of bezier elements have faces")
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
 JuAFEM.default_interpolation(::Type{BezierCell{2,9,2}}) = BernsteinBasis{2,2}()
+JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"
 
 function JuAFEM.reference_coordinates(::BernsteinBasis{2,2})
     coord = -1:1:1
