@@ -1,5 +1,8 @@
 export BernsteinBasis, value
 
+"""
+BernsteinBasis subtype of JuAFEM:s interpolation struct
+"""  
 struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order} end
 
 function JuAFEM.value(b::BernsteinBasis{1,order}, i, xi) where {order}
@@ -34,7 +37,53 @@ function _bernstein_basis_recursive(p::Int, i::Int, xi::T) where T
     end
 end
 
-##
+"""
+In isogeometric analysis, one can use the bezier basefunction together with a bezier-extraction operator to 
+evaluate the bspline basis functions. However, they will be different for each element, so subtype `CellValues`
+in order to be able to update the bezier extraction operator for each element
+"""
+
+struct BezierCellVectorValues{dim,T<:Real,M} <: JuAFEM.CellValues{dim,T,JuAFEM.RefCube}
+    cv::JuAFEM.CellVectorValues{dim,T,JuAFEM.RefCube,M}
+    current_cellid::Ref{Int}
+    extraction_operators::Vector{Matrix{T}}
+end
+
+JuAFEM.getnbasefunctions(bcv::BezierCellVectorValues) = size(bcv.cv.N, 1)
+JuAFEM.getngeobasefunctions(bcv::BezierCellVectorValues) = size(bcv.cv.M, 1)
+JuAFEM.getnquadpoints(bcv::BezierCellVectorValues) = length(bcv.cv.qr_weights)
+JuAFEM.getdetJdV(bcv::BezierCellVectorValues, i::Int) = bcv.cv.detJdV[i]
+JuAFEM.shape_value(bcv::BezierCellVectorValues, qp::Int, i::Int) = bcv.cv.N[i, qp]
+
+set_current_cellid!(bcv::BezierCellVectorValues, ie::Int) = bcv.current_cellid[]=ie
+
+function JuAFEM.reinit!(bcv::BezierCellVectorValues, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+    JuAFEM.reinit!(bcv.cv, x) #call the normal reinit function first
+
+    Cb = bcv.extraction_operators
+    ie = bcv.current_cellid[]
+    cv = bcv.cv
+    #calculate the derivatives of the nurbs/bspline basis using the bezier-extraction operator
+    
+    dBdx = copy(cv.dNdx) # The derivatives of the bezier element
+    B    = copy(cv.N)
+    for iq in 1:length(cv.qr_weights)
+        for ib in 1:JuAFEM.getnbasefunctions(cv)
+            d = ((ib-1)%dim) +1
+            a = convert(Int, ceil(ib/dim))
+
+            dNdx = bezier_transfrom(Cb[ie][a,:], dBdx[d:dim:end,iq])
+            cv.dNdx[ib, iq] = dNdx
+
+            N = bezier_transfrom(Cb[ie][a,:], B[d:dim:end,iq])
+            cv.N[ib, iq] = N
+        end
+    end
+end
+
+"""
+Bsplines sutyping JuAFEM interpolation
+"""
 struct BSplineInterpolation{dim,T} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,1} 
     INN::Matrix{Int}
     IEN::Matrix{Int}
