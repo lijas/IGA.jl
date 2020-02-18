@@ -3,25 +3,45 @@ export BernsteinBasis, value
 """
 BernsteinBasis subtype of JuAFEM:s interpolation struct
 """  
-struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order} end
+struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order} 
+
+    function BernsteinBasis{dim,order}() where {dim,order} 
+         @assert(length(order)==dim)
+         return new{dim,order}()
+    end
+
+end
 
 function JuAFEM.value(b::BernsteinBasis{1,order}, i, xi) where {order}
     @assert(0 < i < order+2)
-    return _bernstein_basis_recursive(order, i, xi)
+    return _bernstein_basis_recursive(order, i, xi[1])
 end
 
-function JuAFEM.value(b::BernsteinBasis{2,order}, i, xi) where {order}
+#=function JuAFEM.value(b::BernsteinBasis{2,order}, i, xi) where {order}
     n = order+1
     ix,iy = Tuple(CartesianIndices((n,n))[i])
     x = _bernstein_basis_recursive(order, ix, xi[1])
     y = _bernstein_basis_recursive(order, iy, xi[2])
     return x*y
+end=#
+
+function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi) where {dim,order}
+
+    _n = order.+1
+
+    coord = Tuple(CartesianIndices(_n)[i])
+
+    val = 1.0
+    for i in 1:dim
+        val *= IGA._bernstein_basis_recursive(order[i], coord[i], xi[i])
+    end
+    return val
 end
 
 JuAFEM.faces(::BernsteinBasis{2,order}) where order = ((1,2),)
 JuAFEM.faces(::BernsteinBasis{2,2}) = ((1,2,3),(3,6,9),(9,8,7),(7,5,1))
 
-JuAFEM.getnbasefunctions(b::BernsteinBasis{dim,order}) where {dim,order} = (order+1)^dim
+JuAFEM.getnbasefunctions(b::BernsteinBasis{dim,order}) where {dim,order} = prod(order.+1)#(order+1)^dim
 JuAFEM.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
 JuAFEM.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
 JuAFEM.nfacedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
