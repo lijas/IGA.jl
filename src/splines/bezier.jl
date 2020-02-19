@@ -1,4 +1,4 @@
-export BernsteinBasis, value
+export BernsteinBasis, BezierCellVectorValues, value
 
 """
 BernsteinBasis subtype of JuAFEM:s interpolation struct
@@ -68,6 +68,12 @@ struct BezierCellVectorValues{dim,T<:Real,M} <: JuAFEM.CellValues{dim,T,JuAFEM.R
     current_cellid::Ref{Int}
     extraction_operators::Vector{Matrix{T}}
 end
+
+function BezierCellVectorValues(qr::JuAFEM.QuadratureRule{dim}, ip::JuAFEM.Interpolation, Ce::Vector{Matrix{T}}) where {dim,T}
+    cv = JuAFEM.CellVectorValues(qr,ip)
+    return BezierCellVectorValues(cv, Ref(-1), Ce)
+end
+
 
 JuAFEM.getnbasefunctions(bcv::BezierCellVectorValues) = size(bcv.cv.N, 1)
 JuAFEM.getngeobasefunctions(bcv::BezierCellVectorValues) = size(bcv.cv.M, 1)
