@@ -55,6 +55,17 @@ JuAFEM.getnquadpoints(bcv::BezierCellVectorValues) = length(bcv.cv.qr_weights)
 JuAFEM.getdetJdV(bcv::BezierCellVectorValues, i::Int) = bcv.cv.detJdV[i]
 JuAFEM.shape_value(bcv::BezierCellVectorValues, qp::Int, i::Int) = bcv.cv.N[i, qp]
 
+function JuAFEM.function_gradient(fe_v::BezierCellVectorValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+    return JuAFEM.function_gradient(fe_v.cv, q_point, u)
+end
+
+JuAFEM.shape_gradient(bcv::BezierCellVectorValues, q_point::Int, base_func::Int) = bcv.cv.dNdx[base_func, q_point]
+#JuAFEM._gradienttype(bcv::BezierCellVectorValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
+#Note this is wrong, it should not be multiplied with dim
+#However, function_gradient! in common_values.jl checks if bcv is a 
+#CellVectorValues, which it is, but I can subtype vector_values...
+#JuAFEM.getn_scalarbasefunctions(bcv::BezierCellVectorValues{dim}) where dim = dim*JuAFEM.getn_scalarbasefunctions(bcv.cv)
+
 set_current_cellid!(bcv::BezierCellVectorValues, ie::Int) = bcv.current_cellid[]=ie
 
 function JuAFEM.reinit!(bcv::BezierCellVectorValues, x::AbstractVector{Vec{dim,T}}) where {dim,T}

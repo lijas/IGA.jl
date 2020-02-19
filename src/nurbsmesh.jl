@@ -51,29 +51,32 @@ function convert_to_grid_representation(mesh::NURBSMesh{pdim,sdim,T}) where {pdi
 
 end
 
-function generate_nurbsmesh(nbasefuncs::Tuple{Int,Int}, order::Tuple{Int,Int}, _size::Tuple{T,T}) where T
+function generate_nurbsmesh(nbasefuncs::NTuple{2,Int}, order::NTuple{2,Int}, _size::NTuple{2,T}, sdim::Int=2) where T
 
-    dim = 2
-	#T = Float64
+	pdim = 2
 
 	L,h = _size
 	p,q = order
 	nbasefunks_x, nbasefunks_y = nbasefuncs
 
 	nknots_x = nbasefunks_x + 1 + p 
-	knot_vector_x = [zeros(T, dim)..., range(zero(T), stop=one(T), length=nknots_x-p*2)..., ones(T, dim)...]
+	knot_vector_x = [zeros(T, p+1)..., range(zero(T), stop=one(T), length=nknots_x-(p+1)*2)..., ones(T, p+1)...]
 
 	nknots_y = nbasefunks_y + 1 + q 
-	knot_vector_y = [zeros(T, dim)..., range(zero(T), stop=one(T), length=nknots_y-q*2)..., ones(T, dim)...]
+	knot_vector_y = [zeros(T, q+1)..., range(zero(T), stop=one(T), length=nknots_y-(q+1)*2)..., ones(T, q+1)...]
 
-	control_points = Vec{dim,T}[]
+	control_points = Vec{sdim,T}[]
 	for y in range(0.0, stop=h, length=nbasefunks_y)
 		for x in range(0.0, stop=L, length=nbasefunks_x)
-			push!(control_points, Vec{dim,T}((x,y)))
+			_v = [x,y]
+			if sdim == 3
+				push!(_v, zero(T))
+			end
+			push!(control_points, Vec{sdim,T}((_v...,)))
 		end
 	end
 
-	mesh = IGA.NURBSMesh{2,dim,T}((knot_vector_x, knot_vector_y), (p,q), control_points)
+	mesh = IGA.NURBSMesh{pdim,sdim,T}((knot_vector_x, knot_vector_y), (p,q), control_points)
 	
     return mesh
 
