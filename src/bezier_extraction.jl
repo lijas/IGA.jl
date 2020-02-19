@@ -40,6 +40,23 @@ end
 compute_bezier_extraction_operators(o::NTuple{pdim,Int}, U::NTuple{pdim,Vector{T}}) where {pdim,T} = 
 	compute_bezier_extraction_operators(o...,U...)
 
+function compute_bezier_extraction_operators(p::Int, q::Int, r::Int, knot1::Vector{T}, knot2::Vector{T}, knot3::Vector{T}) where T
+
+	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
+	Ce2, nbe2 = compute_bezier_extraction_operators(q, knot2)
+	Ce3, nbe3 = compute_bezier_extraction_operators(r, knot3)
+	C = Vector{Matrix{T}}()
+	for k in 1:nbe3
+		for j in 1:nbe2
+			for i in 1:nbe1
+				_C = kron(Ce3[k], Ce2[j],Ce1[i])
+				push!(C,_C)
+			end
+		end
+	end
+	return C, nbe1*nbe2
+end
+
 function compute_bezier_extraction_operators(p::Int, q::Int, knot1::Vector{T}, knot2::Vector{T}) where T
 
 	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
