@@ -78,7 +78,7 @@ evaluate the bspline basis functions. However, they will be different for each e
 in order to be able to update the bezier extraction operator for each element
 """
 
-struct BezierCellVectorValues{dim,T<:Real} <: JuAFEM.CellValues{dim,T,JuAFEM.RefCube}
+struct BezierCellVectorValues{dim,T<:Real,M} <: JuAFEM.CellValues{dim,T,JuAFEM.RefCube}
     # cv contains the bezier interpolation basis functions
     cv::JuAFEM.CellVectorValues{dim,T,JuAFEM.RefCube} 
 
