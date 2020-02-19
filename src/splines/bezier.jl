@@ -78,9 +78,9 @@ evaluate the bspline basis functions. However, they will be different for each e
 in order to be able to update the bezier extraction operator for each element
 """
 
-struct BezierCellVectorValues{dim,T<:Real,M} <: JuAFEM.CellValues{dim,T,JuAFEM.RefCube}
+struct BezierCellVectorValues{dim,T<:Real} <: JuAFEM.CellValues{dim,T,JuAFEM.RefCube}
     # cv contains the bezier interpolation basis functions
-    cv::JuAFEM.CellVectorValues{dim,T,JuAFEM.RefCube,M} 
+    cv::JuAFEM.CellVectorValues{dim,T,JuAFEM.RefCube} 
 
     #Also add second derivatives because it is sometimes needed in IGA analysis
     #These are the scalar version of the basisfunctions (dM²dξ², not dN²dξ²)
@@ -88,8 +88,8 @@ struct BezierCellVectorValues{dim,T<:Real,M} <: JuAFEM.CellValues{dim,T,JuAFEM.R
 
     # N, dNdx etc are the bsplines/nurbs basis functions (transformed from the bezier basis using the extraction operator)
     N   ::Matrix{Vec{dim,T}}
-    dNdx::Matrix{Tensor{2,dim,T,M}}
-    dNdξ::Matrix{Tensor{2,dim,T,M}}
+    dNdx::Matrix{Tensor{2,dim,T}}
+    dNdξ::Matrix{Tensor{2,dim,T}}
 
     #Store the scalar values aswell...
     M     ::Matrix{T}
@@ -120,7 +120,7 @@ function BezierCellVectorValues(qr::JuAFEM.QuadratureRule{dim}, ip::JuAFEM.Inter
         end
     end
 
-    return BezierCellVectorValues{dim,T,4}(cv, dB²dξ², N, dNdx, dNdξ, similar(B), similar(dBdξ), similar(dB²dξ²), Ref(-1), Ce)
+    return BezierCellVectorValues{dim,T}(cv, dB²dξ², N, dNdx, dNdξ, similar(B), similar(dBdξ), similar(dB²dξ²), Ref(-1), Ce)
 end
 
 
