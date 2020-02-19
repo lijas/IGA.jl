@@ -57,6 +57,21 @@ function _bernstein_basis_recursive(p::Int, i::Int, xi::T) where T
     end
 end
 
+function JuAFEM.reference_coordinates(::BernsteinBasis{2,order}) where {order}
+    dim = 2
+    T = Float64
+
+    ranges = [range(-1.0, stop=1.0, length=order[i]+1) for i in 1:dim]
+
+    coords = Vec{dim,T}[]
+    for y in ranges[2]
+        for x in ranges[1]
+            push!(coords, Vec{dim,T}((x,y)))
+        end
+    end
+    return coords
+end
+
 """
 In isogeometric analysis, one can use the bezier basefunction together with a bezier-extraction operator to 
 evaluate the bspline basis functions. However, they will be different for each element, so subtype `CellValues`
@@ -64,14 +79,48 @@ in order to be able to update the bezier extraction operator for each element
 """
 
 struct BezierCellVectorValues{dim,T<:Real,M} <: JuAFEM.CellValues{dim,T,JuAFEM.RefCube}
-    cv::JuAFEM.CellVectorValues{dim,T,JuAFEM.RefCube,M}
+    # cv contains the bezier interpolation basis functions
+    cv::JuAFEM.CellVectorValues{dim,T,JuAFEM.RefCube,M} 
+
+    #Also add second derivatives because it is sometimes needed in IGA analysis
+    #These are the scalar version of the basisfunctions (dM²dξ², not dN²dξ²)
+    dB²dξ²::Matrix{Tensor{2,dim,T}}
+
+    # N, dNdx etc are the bsplines/nurbs basis functions (transformed from the bezier basis using the extraction operator)
+    N   ::Matrix{Vec{dim,T}}
+    dNdx::Matrix{Tensor{2,dim,T,M}}
+    dNdξ::Matrix{Tensor{2,dim,T,M}}
+
+    #Store the scalar values aswell...
+    M     ::Matrix{T}
+    dMdξ  ::Matrix{Vec{dim,T}}
+    dM²dξ²::Matrix{Tensor{2,dim,T}}
+
     current_cellid::Ref{Int}
     extraction_operators::Vector{Matrix{T}}
 end
 
 function BezierCellVectorValues(qr::JuAFEM.QuadratureRule{dim}, ip::JuAFEM.Interpolation, Ce::Vector{Matrix{T}}) where {dim,T}
     cv = JuAFEM.CellVectorValues(qr,ip)
-    return BezierCellVectorValues(cv, Ref(-1), Ce)
+
+    dNdx = similar(cv.dNdx)
+    dNdξ = similar(cv.dNdξ)
+    N = similar(cv.N)
+
+    n_qpoints = length(JuAFEM.getweights(qr))
+    n_geom_basefuncs = JuAFEM.getnbasefunctions(ip)
+
+    B      = fill(zero(T)               * T(NaN), n_geom_basefuncs, n_qpoints)
+    dBdξ   = fill(zero(Vec{dim,T})      * T(NaN), n_geom_basefuncs, n_qpoints)
+    dB²dξ² = fill(zero(Tensor{2,dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
+
+    for (qp, ξ) in enumerate(qr.points)
+        for basefunc in 1:n_geom_basefuncs
+            dB²dξ²[basefunc, qp] = hessian(ξ -> JuAFEM.value(ip, basefunc, ξ), ξ)
+        end
+    end
+
+    return BezierCellVectorValues{dim,T,4}(cv, dB²dξ², N, dNdx, dNdξ, similar(B), similar(dBdξ), similar(dB²dξ²), Ref(-1), Ce)
 end
 
 
@@ -88,21 +137,39 @@ function JuAFEM.reinit!(bcv::BezierCellVectorValues, x::AbstractVector{Vec{dim,T
 
     Cb = bcv.extraction_operators
     ie = bcv.current_cellid[]
-    cv = bcv.cv
+
     #calculate the derivatives of the nurbs/bspline basis using the bezier-extraction operator
     
-    dBdx = copy(cv.dNdx) # The derivatives of the bezier element
-    B    = copy(cv.N)
-    for iq in 1:length(cv.qr_weights)
-        for ib in 1:JuAFEM.getnbasefunctions(cv)
+    dBdx   = copy(bcv.cv.dNdx) # The derivatives of the bezier element
+    dBdξ   = copy(bcv.cv.dNdξ)
+    B    = copy(bcv.cv.N)
+   
+    for iq in 1:length(bcv.cv.qr_weights)
+        for ib in 1:JuAFEM.getnbasefunctions(bcv.cv)
             d = ((ib-1)%dim) +1
             a = convert(Int, ceil(ib/dim))
+            
+            N = bezier_transfrom(Cb[ie][a,:], B[d:dim:end,iq])
+            bcv.N[ib, iq] = N
 
             dNdx = bezier_transfrom(Cb[ie][a,:], dBdx[d:dim:end,iq])
-            cv.dNdx[ib, iq] = dNdx
+            bcv.dNdx[ib, iq] = dNdx
 
-            N = bezier_transfrom(Cb[ie][a,:], B[d:dim:end,iq])
-            cv.N[ib, iq] = N
+            dNdξ = bezier_transfrom(Cb[ie][a,:], dBdξ[d:dim:end,iq])
+            bcv.dNdξ[ib, iq] = dNdξ
+        end
+
+        for ib in 1:(JuAFEM.getnbasefunctions(bcv.cv) ÷ dim)
+            a = ib
+            
+            dM²dξ² = bezier_transfrom(Cb[ie][a,:], bcv.dB²dξ²[:,iq])
+            bcv.dM²dξ²[ib, iq] = dM²dξ²
+
+            dMdξ = bezier_transfrom(Cb[ie][a,:], bcv.cv.dMdξ[:,iq])
+            bcv.dMdξ[ib, iq] = dMdξ
+
+            M = bezier_transfrom(Cb[ie][a,:], bcv.cv.M[:,iq])
+            bcv.M[ib, iq] = M
         end
     end
 end
