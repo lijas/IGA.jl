@@ -7,13 +7,17 @@ struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,orde
 
     function BernsteinBasis{dim,order}() where {dim,order} 
          @assert(length(order)==dim)
-         return new{dim,order}()
+         _order = order
+         if dim==1 #if order is a tuple and of dim==1, make it in to Int
+            _order = order[1]
+         end
+         return new{dim,_order}()
     end
 
 end
 
 function JuAFEM.value(b::BernsteinBasis{1,order}, i, xi) where {order}
-    @assert(0 < i < order+2)
+    @assert(0 < i < order.+2)
     return _bernstein_basis_recursive(order, i, xi[1])
 end
 
@@ -27,7 +31,7 @@ end=#
 
 function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi) where {dim,order}
 
-    _n = order.+1
+    _n = order+1
 
     coord = Tuple(CartesianIndices(_n)[i])
 
@@ -143,8 +147,8 @@ JuAFEM.shape_gradient(bcv::BezierCellVectorValues, q_point::Int, base_func::Int)
 
 set_current_cellid!(bcv::BezierCellVectorValues, ie::Int) = bcv.current_cellid[]=ie
 
-function JuAFEM.reinit!(bcv::BezierCellVectorValues, x::AbstractVector{Vec{dim,T}}) where {dim,T}
-    JuAFEM.reinit!(bcv.cv, x) #call the normal reinit function first
+function JuAFEM.reinit!(bcv::BezierCellVectorValues, x::AbstractVector{Vec{dim,T}}; update_physical::Bool=true) where {dim,T}
+    update_physical && JuAFEM.reinit!(bcv.cv, x) #call the normal reinit function first
 
     Cb = bcv.extraction_operators
     ie = bcv.current_cellid[]
@@ -163,8 +167,10 @@ function JuAFEM.reinit!(bcv::BezierCellVectorValues, x::AbstractVector{Vec{dim,T
             N = bezier_transfrom(Cb[ie][a,:], B[d:dim:end,iq])
             bcv.N[ib, iq] = N
 
-            dNdx = bezier_transfrom(Cb[ie][a,:], dBdx[d:dim:end,iq])
-            bcv.dNdx[ib, iq] = dNdx
+            if update_physical
+                dNdx = bezier_transfrom(Cb[ie][a,:], dBdx[d:dim:end,iq])
+                bcv.dNdx[ib, iq] = dNdx
+            end
 
             dNdξ = bezier_transfrom(Cb[ie][a,:], dBdξ[d:dim:end,iq])
             bcv.dNdξ[ib, iq] = dNdξ
@@ -175,7 +181,7 @@ function JuAFEM.reinit!(bcv::BezierCellVectorValues, x::AbstractVector{Vec{dim,T
             
             dM²dξ² = bezier_transfrom(Cb[ie][a,:], bcv.dB²dξ²[:,iq])
             bcv.dM²dξ²[ib, iq] = dM²dξ²
-
+            
             dMdξ = bezier_transfrom(Cb[ie][a,:], bcv.cv.dMdξ[:,iq])
             bcv.dMdξ[ib, iq] = dMdξ
 

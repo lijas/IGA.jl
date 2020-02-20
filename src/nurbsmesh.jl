@@ -44,7 +44,7 @@ function convert_to_grid_representation(mesh::NURBSMesh{pdim,sdim,T}) where {pdi
 	ncontrolpoints = length(mesh.IEN[:,1])
 	nodes = [JuAFEM.Node(x) for x in mesh.control_points]
 
-	_BezierCell = BezierCell{2,ncontrolpoints,mesh.orders[1]}
+	_BezierCell = BezierCell{sdim,ncontrolpoints,mesh.orders[1]}
 	cells = [_BezierCell(Tuple(reverse(mesh.IEN[:,ie]))) for ie in 1:getncells(mesh)]
 
 	return JuAFEM.Grid(cells, nodes)
@@ -60,10 +60,10 @@ function generate_nurbsmesh(nbasefuncs::NTuple{2,Int}, order::NTuple{2,Int}, _si
 	nbasefunks_x, nbasefunks_y = nbasefuncs
 
 	nknots_x = nbasefunks_x + 1 + p 
-	knot_vector_x = [zeros(T, p+1)..., range(zero(T), stop=one(T), length=nknots_x-(p+1)*2)..., ones(T, p+1)...]
+	knot_vector_x = [zeros(T, p)..., range(zero(T), stop=one(T), length=nknots_x-(p)*2)..., ones(T, p)...]
 
 	nknots_y = nbasefunks_y + 1 + q 
-	knot_vector_y = [zeros(T, q+1)..., range(zero(T), stop=one(T), length=nknots_y-(q+1)*2)..., ones(T, q+1)...]
+	knot_vector_y = [zeros(T, q)..., range(zero(T), stop=one(T), length=nknots_y-(q)*2)..., ones(T, q)...]
 
 	control_points = Vec{sdim,T}[]
 	for y in range(0.0, stop=h, length=nbasefunks_y)
@@ -80,6 +80,69 @@ function generate_nurbsmesh(nbasefuncs::NTuple{2,Int}, order::NTuple{2,Int}, _si
 	
     return mesh
 
+end
+
+function generate_nurbsmesh(nbasefuncs::NTuple{1,Int}, order::NTuple{1,Int}, _size::NTuple{1,T}, sdim::Int=1) where T
+
+	pdim = 1
+
+	L = _size[1]
+	p = order[1]
+	nbasefunks_x = nbasefuncs[1]
+
+	nknots_x = nbasefunks_x + 1 + p 
+	knot_vector_x = [zeros(T, p)..., range(zero(T), stop=one(T), length=nknots_x-(p)*2)..., ones(T, p)...]
+
+	control_points = Vec{sdim,T}[]
+
+		for x in range(0.0, stop=L, length=nbasefunks_x)
+			_v = [x]
+			if sdim == 2
+				push!(_v, zero(T))
+			end
+			push!(control_points, Vec{sdim,T}((_v...,)))
+		end
+
+
+	mesh = IGA.NURBSMesh{pdim,sdim,T}((knot_vector_x,), (p,), control_points)
+	
+    return mesh
+
+end
+
+function get_nurbs_meshdata(order::NTuple{1,Int}, nbf::NTuple{1,Int})
+
+	T = Float64
+	n = nbf[1]
+	p,= order[1]
+
+	nel = (n-p)
+	nnp = n
+	nen = (p+1)
+
+	INN = zeros(Int ,nnp,1)
+	IEN = zeros(Int, nen, nel)
+
+	A = 0; e = 0
+
+		for i in 1:n
+			A += 1
+
+			INN[A,1] = i
+
+			if i >= (p+1) 
+				e += 1	
+
+					for iloc in 0:p
+						B = A - iloc
+						b = iloc+1
+						IEN[b,e] = B
+					end
+
+			end
+		end
+
+	return nel, nnp, nen, INN, IEN
 end
 
 function get_nurbs_meshdata(order::NTuple{2,Int}, nbf::NTuple{2,Int})
