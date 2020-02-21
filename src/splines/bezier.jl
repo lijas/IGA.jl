@@ -147,7 +147,7 @@ JuAFEM.shape_gradient(bcv::BezierCellVectorValues, q_point::Int, base_func::Int)
 
 set_current_cellid!(bcv::BezierCellVectorValues, ie::Int) = bcv.current_cellid[]=ie
 
-function JuAFEM.reinit!(bcv::BezierCellVectorValues, x::AbstractVector{Vec{dim,T}}; update_physical::Bool=true) where {dim,T}
+function JuAFEM.reinit!(bcv::BezierCellVectorValues{dim_p}, x::AbstractVector{Vec{dim_s,T}}; update_physical::Bool=true) where {dim_p,dim_s,T}
     update_physical && JuAFEM.reinit!(bcv.cv, x) #call the normal reinit function first
 
     Cb = bcv.extraction_operators
@@ -155,28 +155,28 @@ function JuAFEM.reinit!(bcv::BezierCellVectorValues, x::AbstractVector{Vec{dim,T
 
     #calculate the derivatives of the nurbs/bspline basis using the bezier-extraction operator
     
-    dBdx   = copy(bcv.cv.dNdx) # The derivatives of the bezier element
-    dBdξ   = copy(bcv.cv.dNdξ)
-    B    = copy(bcv.cv.N)
-   
+    dBdx   = bcv.cv.dNdx # The derivatives of the bezier element
+    dBdξ   = bcv.cv.dNdξ
+    B    = bcv.cv.N
+    
     for iq in 1:length(bcv.cv.qr_weights)
         for ib in 1:JuAFEM.getnbasefunctions(bcv.cv)
-            d = ((ib-1)%dim) +1
-            a = convert(Int, ceil(ib/dim))
+            d = ((ib-1)%dim_s) +1
+            a = convert(Int, ceil(ib/dim_s))
             
-            N = bezier_transfrom(Cb[ie][a,:], B[d:dim:end,iq])
+            N = bezier_transfrom(Cb[ie][a,:], B[d:dim_s:end,iq])
             bcv.N[ib, iq] = N
 
             if update_physical
-                dNdx = bezier_transfrom(Cb[ie][a,:], dBdx[d:dim:end,iq])
+                dNdx = bezier_transfrom(Cb[ie][a,:], dBdx[d:dim_s:end,iq])
                 bcv.dNdx[ib, iq] = dNdx
             end
 
-            dNdξ = bezier_transfrom(Cb[ie][a,:], dBdξ[d:dim:end,iq])
+            dNdξ = bezier_transfrom(Cb[ie][a,:], dBdξ[d:dim_s:end,iq])
             bcv.dNdξ[ib, iq] = dNdξ
         end
 
-        for ib in 1:(JuAFEM.getnbasefunctions(bcv.cv) ÷ dim)
+        for ib in 1:(JuAFEM.getnbasefunctions(bcv) ÷ dim_p)
             a = ib
             
             dM²dξ² = bezier_transfrom(Cb[ie][a,:], bcv.dB²dξ²[:,iq])
