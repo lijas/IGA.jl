@@ -31,7 +31,7 @@ end=#
 
 function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi) where {dim,order}
 
-    _n = order+1
+    _n = order.+1
 
     coord = Tuple(CartesianIndices(_n)[i])
 
