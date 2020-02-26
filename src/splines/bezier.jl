@@ -132,13 +132,27 @@ JuAFEM.getnbasefunctions(bcv::BezierCellVectorValues) = size(bcv.cv.N, 1)
 JuAFEM.getngeobasefunctions(bcv::BezierCellVectorValues) = size(bcv.cv.M, 1)
 JuAFEM.getnquadpoints(bcv::BezierCellVectorValues) = length(bcv.cv.qr_weights)
 JuAFEM.getdetJdV(bcv::BezierCellVectorValues, i::Int) = bcv.cv.detJdV[i]
-JuAFEM.shape_value(bcv::BezierCellVectorValues, qp::Int, i::Int) = bcv.cv.N[i, qp]
+JuAFEM.shape_value(bcv::BezierCellVectorValues, qp::Int, i::Int) = bcv.N[i, qp]
+JuAFEM.getn_scalarbasefunctions(bcv::BezierCellVectorValues) = JuAFEM.getn_scalarbasefunctions(bcv.cv)
+JuAFEM._gradienttype(::BezierCellVectorValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
+#function JuAFEM.function_gradient(fe_v::BezierCellVectorValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+#    return JuAFEM.function_gradient(fe_v.cv, q_point, u)
+#end
 
 function JuAFEM.function_gradient(fe_v::BezierCellVectorValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
-    return JuAFEM.function_gradient(fe_v.cv, q_point, u)
+    n_base_funcs = JuAFEM.getn_scalarbasefunctions(fe_v)
+    n_base_funcs *= dim
+    @assert length(dof_range) == n_base_funcs
+    @boundscheck checkbounds(u, dof_range)
+    grad = zero(JuAFEM._gradienttype(fe_v, u))
+    @inbounds for (i, j) in enumerate(dof_range)
+        grad += JuAFEM.shape_gradient(fe_v, q_point, i) * u[j]
+    end
+    return grad
 end
 
-JuAFEM.shape_gradient(bcv::BezierCellVectorValues, q_point::Int, base_func::Int) = bcv.cv.dNdx[base_func, q_point]
+
+JuAFEM.shape_gradient(bcv::BezierCellVectorValues, q_point::Int, base_func::Int) = bcv.dNdx[base_func, q_point]
 #JuAFEM._gradienttype(bcv::BezierCellVectorValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
 #Note this is wrong, it should not be multiplied with dim
 #However, function_gradient! in common_values.jl checks if bcv is a 
@@ -152,7 +166,6 @@ function JuAFEM.reinit!(bcv::BezierCellVectorValues{dim_p}, x::AbstractVector{Ve
 
     Cb = bcv.extraction_operators
     ie = bcv.current_cellid[]
-
     #calculate the derivatives of the nurbs/bspline basis using the bezier-extraction operator
     
     dBdx   = bcv.cv.dNdx # The derivatives of the bezier element
