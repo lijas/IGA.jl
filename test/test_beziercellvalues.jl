@@ -14,4 +14,19 @@
     
     #If the bezier extraction operator is diagonal(ones), then the bezier basis functions is the same as the bsplines
     @test all(bcv.N .== bcv.cv.N)
+
+    
+end
+
+@testset "bezier" begin
+
+    b1 = BernsteinBasis{1, (2)}()
+    coords = IGA.JuAFEM.reference_coordinates(b1)
+    @test all( coords .== [Vec((-1.0,)), Vec((0.0,)), Vec((1.0,))])
+
+    
+    b2 = BernsteinBasis{2, (1,1)}()
+    coords = IGA.JuAFEM.reference_coordinates(b2)
+    @test all( coords .== [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((-1.0,1.0)), Vec((1.0,1.0))])
+
 end

@@ -1,4 +1,4 @@
-export BernsteinBasis, BezierCellVectorValues, value
+export BernsteinBasis, BezierCellVectorValues, value, reference_coordinates
 
 """
 BernsteinBasis subtype of JuAFEM:s interpolation struct
@@ -61,18 +61,27 @@ function _bernstein_basis_recursive(p::Int, i::Int, xi::T) where T
     end
 end
 
-function JuAFEM.reference_coordinates(::BernsteinBasis{2,order}) where {order}
-    dim = 2
+function JuAFEM.reference_coordinates(::BernsteinBasis{dim,order}) where {dim,order}
+    #dim = 2
     T = Float64
 
-    ranges = [range(-1.0, stop=1.0, length=order[i]+1) for i in 1:dim]
+    _n = order.+1
+    _n = (_n...,) #if dim is 1d, make it into tuple
+
+    ranges = [range(-1.0, stop=1.0, length=_n[i]) for i in 1:dim]
 
     coords = Vec{dim,T}[]
-    for y in ranges[2]
-        for x in ranges[1]
-            push!(coords, Vec{dim,T}((x,y)))
+
+    #algo independent of dimensions
+    inds = CartesianIndices(_n)[:]
+    for ind in inds
+        _vec = T[]
+        for d in 1:dim
+            push!(_vec, ranges[d][ind[d]])
         end
+        push!(coords, Vec(Tuple(_vec)))
     end
+
     return coords
 end
 
