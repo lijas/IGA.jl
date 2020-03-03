@@ -7,7 +7,7 @@
     
     b1 = BernsteinBasis{dim, order}()
     qr = JuAFEM.QuadratureRule{dim,JuAFEM.RefCube}(2)
-    bcv = BezierCellVectorValues(qr, b1, C)
+    bcv = BezierCellVectorValues(C, qr, b1)
 
     IGA.set_current_cellid!(bcv, 1)
     JuAFEM.reinit!(bcv, JuAFEM.reference_coordinates(b1))

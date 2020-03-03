@@ -6,6 +6,8 @@ using Reexport
 @reexport using Tensors
 using LinearAlgebra
 
+using StaticArrays
+
 import JuAFEM
 
 include("splines/bsplines.jl")
