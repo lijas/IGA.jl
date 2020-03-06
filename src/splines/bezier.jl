@@ -1,4 +1,4 @@
-export BernsteinBasis, BezierCellVectorValues, value, reference_coordinates
+export BernsteinBasis, BezierCellVectorValues, value, reference_coordinates, set_current_cellid!
 
 """
 BernsteinBasis subtype of JuAFEM:s interpolation struct
@@ -16,11 +16,6 @@ struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,orde
 
 end
 
-function JuAFEM.value(b::BernsteinBasis{1,order}, i, xi) where {order}
-    @assert(0 < i < order.+2)
-    return _bernstein_basis_recursive(order, i, xi[1])
-end
-
 #=function JuAFEM.value(b::BernsteinBasis{2,order}, i, xi) where {order}
     n = order+1
     ix,iy = Tuple(CartesianIndices((n,n))[i])
@@ -29,10 +24,11 @@ end
     return x*y
 end=#
 
-function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi) where {dim,order}
+function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi::Vec{dim}) where {dim,order}
 
     _n = order.+1
-
+    _n = (_n...,) # make _n tuple in 1d
+    
     coord = Tuple(CartesianIndices(_n)[i])
 
     val = 1.0
@@ -97,59 +93,79 @@ struct BezierCellVectorValues{dim,T<:Real,M2,CV<:JuAFEM.CellValues} <: JuAFEM.Ce
 
     #Also add second derivatives because it is sometimes needed in IGA analysis
     # This will be a third order tensor
-    dB²dξ²::Matrix{Array{T,3}}
+    dB²dξ²::Matrix{SArray{Tuple{dim,dim,dim},T}}
+
+    #Scalar version of the bernstein splines
+    A     ::Matrix{T}
+    dAdξ  ::Matrix{Vec{dim,T}}
+    dA²dξ²::Matrix{Tensor{2,dim,T}}
 
     # N, dNdx etc are the bsplines/nurbs basis functions (transformed from the bezier basis using the extraction operator)
     N   ::Matrix{Vec{dim,T}}
     dNdx::Matrix{Tensor{2,dim,T}}
     dNdξ::Matrix{Tensor{2,dim,T}}
-    dN²dξ²::Matrix{SArray{Tuple{dim,dim,3},T}} # "3rd order tensor", Size: dim x dim x dim
+    dN²dξ²::Matrix{SArray{Tuple{dim,dim,dim},T}} # "3rd order tensor", Size: dim x dim x dim
+
+    #Store the scalar values aswell...
+    S     ::Matrix{T}
+    #dSdx ::Matrix{Vec{dim,T}} #dont need right now
+    dSdξ  ::Matrix{Vec{dim,T}}
+    dS²dξ²::Matrix{Tensor{2,dim,T}}
 
     current_cellid::Ref{Int}
-    extraction_operators::Vector{Matrix{T}}
+    extraction_operators::Vector{SparseArrays.SparseMatrixCSC{T,Int}}
     compute_second_derivative::Bool
 end
 
 
-function BezierCellVectorValues(Ce::Vector{Matrix{T}}, qr::JuAFEM.QuadratureRule{dim}, func_ip::JuAFEM.Interpolation, geom_ip::JuAFEM.Interpolation=func_ip; compute_second_derivative::Bool=false,CVType::Type{CV}=JuAFEM.CellVectorValues) where {dim,T,CV}
+function BezierCellVectorValues(Ce::Vector{<:AbstractMatrix{T}}, qr::JuAFEM.QuadratureRule{dim}, func_ip::JuAFEM.Interpolation, geom_ip::JuAFEM.Interpolation=func_ip; compute_second_derivative::Bool=false,cv::CV=JuAFEM.CellVectorValues(qr,func_ip,geom_ip)) where {dim,T,CV}
     
     #create cellvalues, for example CellVectorValues(...)
-    cv = CVType(qr,func_ip,geom_ip)
 
     n_qpoints = length(JuAFEM.getweights(qr))
     n_geom_basefuncs = JuAFEM.getnbasefunctions(geom_ip)
     n_func_basefuncs = JuAFEM.getnbasefunctions(func_ip)*dim
 
-    #Add second derivatives
-    dB²dξ² = fill( @SArray(zeros(T,dim,dim,dim)*T(NaN)), n_func_basefuncs, n_qpoints)
+    #Scalar version of the nurbs-splines
+    A      = fill(zero(T)               * T(NaN), n_func_basefuncs ÷ dim, n_qpoints)
+    dAdξ   = fill(zero(Tensor{1,dim,T}) * T(NaN), n_func_basefuncs ÷ dim, n_qpoints)
+    dA²dξ² = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs ÷ dim, n_qpoints)
 
+    #Add second derivatives
+    dB²dξ² = fill( @SArray(zeros(T,dim,dim,dim)), n_func_basefuncs, n_qpoints)
+    
     #The tensors where the bezier-transformed basefunctions will be stored
-    dNdx = similar(cv.dNdx)
+    
+    dNdx = similar(cv.dNdξ)
     dNdξ = similar(cv.dNdξ)
-    dN²dξ² = copy(dB²dξ²)
     N = similar(cv.N)
 
-    if compute_second_derivative
-        for (qp, ξ) in enumerate(qr.points)
-            for basefunc in 1:n_geom_basefuncs
-                dN2_temp = hessian(ξ -> JuAFEM.value(func_ip, basefunc, ξ), ξ)
-                for comp in 1:dim
-                    dN2_comp = zeros(T, dim,dim,dim)
-                    dN2_comp[comp, :, :] = dN2_temp
-                    dB²dξ²[basefunc, qp] = dN2_comp
-                end
-
+    for (qp, ξ) in enumerate(qr.points)
+        basefunc_count = 1
+        for basefunc in 1:n_func_basefuncs ÷ dim
+            dN2_temp, dN_temp, N_temp = hessian(ξ -> JuAFEM.value(func_ip, basefunc, ξ), ξ, :all)
+            for comp in 1:dim
+                dN2_comp = zeros(T, dim,dim,dim)
+                dN2_comp[comp, :, :] = dN2_temp
+                dB²dξ²[basefunc_count, qp] = SArray{Tuple{dim,dim,dim}}(dN2_comp)
+                basefunc_count += 1
             end
         end
+        for basefunc in 1:n_func_basefuncs ÷ dim
+            dA²dξ²[basefunc,qp], dAdξ[basefunc, qp], A[basefunc, qp] = hessian(ξ -> JuAFEM.value(func_ip, basefunc, ξ), ξ, :all)
+        end
     end
+    
+    #Convert to static array
+    dN²dξ² = copy(dB²dξ²)
 
-    return BezierCellVectorValues{dim,T,4,typeof(cv)}(cv, dB²dξ², N, dNdx, dNdξ, dN²dξ², Ref(-1), Ce, compute_second_derivative)
+    return BezierCellVectorValues{dim,T,4,typeof(cv)}(cv, dB²dξ², A, dAdξ, dA²dξ², N, dNdx, dNdξ, dN²dξ², similar(A), similar(dAdξ), similar(dA²dξ²), Ref(-1), Ce, compute_second_derivative)
 end
 
 
 JuAFEM.getnbasefunctions(bcv::BezierCellVectorValues) = size(bcv.cv.N, 1)
 JuAFEM.getngeobasefunctions(bcv::BezierCellVectorValues) = size(bcv.cv.M, 1)
-JuAFEM.getnquadpoints(bcv::BezierCellVectorValues) = length(bcv.cv.qr_weights)
+JuAFEM.getnquadpoints(bcv::BezierCellVectorValues) = JuAFEM.getnquadpoints(bcv.cv)
 JuAFEM.getdetJdV(bcv::BezierCellVectorValues, i::Int) = bcv.cv.detJdV[i]
 JuAFEM.shape_value(bcv::BezierCellVectorValues, qp::Int, i::Int) = bcv.N[i, qp]
 JuAFEM.getn_scalarbasefunctions(bcv::BezierCellVectorValues) = JuAFEM.getn_scalarbasefunctions(bcv.cv)
@@ -192,7 +208,7 @@ function JuAFEM.reinit!(bcv::BezierCellVectorValues{dim_p}, x::AbstractVector{Ve
     dBdξ   = bcv.cv.dNdξ
     B    = bcv.cv.N
     
-    for iq in 1:length(bcv.cv.qr_weights)
+    for iq in 1:JuAFEM.getnquadpoints(bcv)
         for ib in 1:JuAFEM.getnbasefunctions(bcv.cv)
             d = ((ib-1)%dim_s) +1
             a = convert(Int, ceil(ib/dim_s))
@@ -213,6 +229,22 @@ function JuAFEM.reinit!(bcv::BezierCellVectorValues{dim_p}, x::AbstractVector{Ve
                 bcv.dN²dξ²[ib, iq] = dN²dξ²
             end
         end
+
+        for ib in 1:(JuAFEM.getnbasefunctions(bcv) ÷ dim_p)
+            a = ib
+            
+            if bcv.compute_second_derivative
+                dS²dξ² = bezier_transfrom(Cb[ie][a,:], bcv.dA²dξ²[:,iq])
+                bcv.dS²dξ²[ib, iq] = dS²dξ²
+            end
+
+            dSdξ = bezier_transfrom(Cb[ie][a,:], bcv.dAdξ[:,iq])
+            bcv.dSdξ[ib, iq] = dSdξ
+
+            S = bezier_transfrom(Cb[ie][a,:], bcv.A[:,iq])
+            bcv.S[ib, iq] = S
+        end
+
     end
 end
 
@@ -227,17 +259,19 @@ struct BSplineInterpolation{dim,T} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,1}
     current_element::Ref{Int}
 end
 
-function BSplineInterpolation(INN::AbstractMatrix, IEN::AbstractMatrix, knot_vectors::NTuple{dim,Vector{T}}, orders::NTuple{dim,T}) where{dim,T}
-    return BSplineInterpolation{dim,T}(IEN, INN, knot_vectors, orders, Ref(1))
+function BSplineInterpolation{dim,T}(INN::AbstractMatrix, IEN::AbstractMatrix, knot_vectors::NTuple{dim,Vector{T}}, orders::NTuple{dim,Int}) where{dim,T}
+    return BSplineInterpolation{dim,T}(INN, IEN, knot_vectors, orders, Ref(1))
 end
 JuAFEM.getnbasefunctions(b::BSplineInterpolation) = prod(b.orders.+1)
 
-set_current_element!(b::BSplineInterpolation, iel::Int) = (b.current_element[] = iel)
+set_current_cellid!(b::BSplineInterpolation, iel::Int) = (b.current_element[] = iel)
 
 function JuAFEM.value(b::BSplineInterpolation{2,T}, i, xi) where {T}
+
     global_basefunk = b.IEN[i,b.current_element[]]
 
     _ni,_nj = b.INN[b.IEN[1,b.current_element[]],:] #The first basefunction defines the element span
+
     ni,nj = b.INN[global_basefunk,:] # Defines the basis functions nurbs coord
 
     gp = xi

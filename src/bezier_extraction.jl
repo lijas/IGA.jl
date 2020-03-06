@@ -1,7 +1,7 @@
 
 export bezier_transfrom, bezier_transfrom!, compute_bezier_extraction_operators
 
-function compute_bezier_points(Ce::Matrix{T}, control_points::AbstractVector{Vec{sdim,T}}) where {T,sdim}
+function compute_bezier_points(Ce::AbstractMatrix{T}, control_points::AbstractVector{Vec{sdim,T}}) where {T,sdim}
 
 	n_new_points = size(Ce,2)
 	bezierpoints = zeros(Vec{sdim,T}, n_new_points)
@@ -45,7 +45,7 @@ function compute_bezier_extraction_operators(p::Int, q::Int, r::Int, knot1::Vect
 	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
 	Ce2, nbe2 = compute_bezier_extraction_operators(q, knot2)
 	Ce3, nbe3 = compute_bezier_extraction_operators(r, knot3)
-	C = Vector{Matrix{T}}()
+	C = Vector{eltype(Ce1)}()
 	for k in 1:nbe3
 		for j in 1:nbe2
 			for i in 1:nbe1
@@ -61,7 +61,7 @@ function compute_bezier_extraction_operators(p::Int, q::Int, knot1::Vector{T}, k
 
 	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
 	Ce2, nbe2 = compute_bezier_extraction_operators(q, knot2)
-	C = Vector{Matrix{T}}()
+	C = Vector{eltype(Ce1)}()
 	for j in 1:nbe2
 		for i in 1:nbe1
 			_C = kron(Ce2[j],Ce1[i])
@@ -115,6 +115,6 @@ function compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
 
 	#The last C-matrix is not used
 	#pop!(C)
-	C = C[1:nb]
+	C = SparseArrays.sparse.(C[1:nb])
 	return C, nb
 end

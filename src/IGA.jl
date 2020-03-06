@@ -5,7 +5,7 @@ using Reexport
 
 @reexport using Tensors
 using LinearAlgebra
-
+import SparseArrays
 using StaticArrays
 
 import JuAFEM
