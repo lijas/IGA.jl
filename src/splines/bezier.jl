@@ -249,6 +249,89 @@ function JuAFEM.reinit!(bcv::BezierCellVectorValues{dim_p}, x::AbstractVector{Ve
 end
 
 """
+Second try for bezier cellvalues
+"""
+
+struct BezierValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}
+    cv_bezier::CV
+    cv_store::CV
+
+    current_cellid::Ref{Int}
+    extraction_operators::Vector{Vector{SparseArrays.SparseVector{T,Int}}} #Yikes... 
+    compute_second_derivative::Bool
+end
+
+function BezierValues(Ce::Array{Array{SparseArrays.SparseVector{T,Int64},1},1}, cv::JuAFEM.CellValues{dim_s}, compute_second_derivative=false) where {T,dim_s}
+    BezierValues(dim_s, Ce, cv) 
+end
+
+function BezierValues(dim_s::Int, Ce::Array{Array{SparseArrays.SparseVector{T2,Int64},1},1}, cv, compute_second_derivative=false) where T2
+    @assert(length(first(Ce)) == JuAFEM.getnbasefunctions(cv))
+    return BezierValues{dim_s,T2,typeof(cv)}(cv, deepcopy(cv), Ref(-1), Ce, compute_second_derivative)
+end
+
+JuAFEM.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
+JuAFEM.getngeobasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.M, 1)
+JuAFEM.getnquadpoints(bcv::BezierValues) = JuAFEM.getnquadpoints(bcv.cv_bezier)
+JuAFEM.getdetJdV(bcv::BezierValues, i::Int) = bcv.cv_bezier.detJdV[i]
+JuAFEM.shape_value(bcv::BezierValues, qp::Int, i::Int) = bcv.cv_store.N[i, qp]
+JuAFEM.getn_scalarbasefunctions(bcv::BezierValues) = JuAFEM.getn_scalarbasefunctions(bcv.cv)
+JuAFEM._gradienttype(::BezierValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
+JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T} = JuAFEM.function_gradient(fe_v.cv_store, q_point, u)
+
+#=function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+    n_base_funcs = JuAFEM.getn_scalarbasefunctions(fe_v)
+    n_base_funcs *= dim
+    @assert length(dof_range) == n_base_funcs
+    @boundscheck checkbounds(u, dof_range)
+    grad = zero(JuAFEM._gradienttype(fe_v, u))
+    @inbounds for (i, j) in enumerate(dof_range)
+        grad += JuAFEM.shape_gradient(fe_v, q_point, i) * u[j]
+    end
+    return grad
+end=#
+
+
+JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = bcv.cv_store.dNdx[base_func, q_point]
+set_current_cellid!(bcv::BezierValues, ie::Int) = bcv.current_cellid[]=ie
+
+function JuAFEM.reinit!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T}}; update_physical::Bool=true) where {dim_s,T}
+    update_physical && JuAFEM.reinit!(bcv.cv, x) #call the normal reinit function first
+
+    cv_store = bcv.cv_store
+
+    Cb = bcv.extraction_operators
+    ie = bcv.current_cellid[]
+
+    dBdx   = bcv.cv_bezier.dNdx # The derivatives of the bezier element
+    dBdξ   = bcv.cv_bezier.dNdξ
+    B      = bcv.cv_bezier.N
+    
+    for iq in 1:JuAFEM.getnquadpoints(bcv)
+        for ib in 1:JuAFEM.getnbasefunctions(bcv.cv_bezier)
+            #d = ((ib-1)%dim_s) +1
+            #a = convert(Int, ceil(ib/dim_s))
+            
+            N = bezier_transfrom(Cb[ie][ib], B[:, iq])
+            cv_store.N[ib, iq] = N
+
+            dNdξ = bezier_transfrom(Cb[ie][ib], dBdξ[:, iq])
+            cv_store.dNdξ[ib, iq] = dNdξ
+
+            if update_physical
+                dNdx = bezier_transfrom(Cb[ie][ib], dBdx[:, iq])
+                cv_store.dNdx[ib, iq] = dNdx
+            end
+
+            if bcv.compute_second_derivative
+                dN²dξ² = bezier_transfrom(Cb[ie][ib], dB²dξ²[:, iq])
+                cv_store.dN²dξ²[ib, iq] = dN²dξ²
+            end
+        end
+    end
+end
+
+"""
 Bsplines sutyping JuAFEM interpolation
 """
 struct BSplineInterpolation{dim,T} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,1} 

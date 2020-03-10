@@ -56,3 +56,55 @@ end
     @test all( coords .== [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((-1.0,1.0)), Vec((1.0,1.0))])
 
 end
+
+@testset "bezier_cellvalues2" begin
+    dim = 2
+    T = Float64
+
+    order = (2,2)
+    knots = (Float64[0,0,0,1,1,1],Float64[0,0,0,1,1,1])
+
+    #Check if nurbs splines are equal to C*B
+    mesh = IGA.generate_nurbsmesh((10,10), order, (1.0,1.0), 2)
+    bspline_ip = IGA.BSplineInterpolation{2,Float64}(mesh.INN, mesh.IEN, mesh.knot_vectors, mesh.orders)
+    bern_ip = BernsteinBasis{2, mesh.orders}()
+
+    C,nbe = IGA.compute_bezier_extraction_operators(mesh.orders..., mesh.knot_vectors...)
+    qr = JuAFEM.QuadratureRule{2,JuAFEM.RefCube}(2)
+    cv = JuAFEM.CellVectorValues(qr, bern_ip)
+
+    Cvecs = [Vector{SparseArrays.SparseVector{T,Int}}() for _ in 1:nbe]
+    for ie in 1:nbe
+        for r in 1:size(C[ie],1)
+                ce = C[ie][r,:]
+
+                #Interleave ce with with zeros
+                new_ce1 = collect(Iterators.flatten(zip(ce, zeros(T, length(ce)))))
+                new_ce2 = collect(Iterators.flatten(zip(zeros(T, length(ce)), ce)))
+
+                push!(Cvecs[ie], sparsevec(new_ce1))
+                push!(Cvecs[ie], sparsevec(new_ce2))
+        end
+        
+    end
+    @show typeof(Cvecs)
+    bern_cv = IGA.BezierValues(Cvecs, cv)
+    
+    random_coords = zeros(Vec{2,T}, getnbasefunctions(bern_cv) ) #since we dont update "physcial" dNdX, coords can be random
+
+    for ie in [1,3,6,7] #for all elements
+        IGA.set_current_cellid!(bern_cv, ie)
+        IGA.set_current_cellid!(bspline_ip, ie)
+
+        reinit!(bern_cv, random_coords, update_physical = false)
+        for qp in 1:getnquadpoints(bern_cv)
+            N_bspline = JuAFEM.value(bspline_ip, qr.points[qp])
+
+            #Since a bern_cv.cv_store.N are vector values, extract 1:dim:end to get the scalar values
+            a = [a[1] for a in bern_cv.cv_store.N[1:2:end,qp]]
+            N_bern = reverse(a) #hmm, reverse
+            @test all(N_bern .≈ N_bspline)
+        end
+    end
+    
+end
