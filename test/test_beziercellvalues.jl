@@ -73,21 +73,8 @@ end
     qr = JuAFEM.QuadratureRule{2,JuAFEM.RefCube}(2)
     cv = JuAFEM.CellVectorValues(qr, bern_ip)
 
-    Cvecs = [Vector{SparseArrays.SparseVector{T,Int}}() for _ in 1:nbe]
-    for ie in 1:nbe
-        for r in 1:size(C[ie],1)
-                ce = C[ie][r,:]
+    Cvecs = IGA.bezier_extraction_to_vectors(C, pad=dim)
 
-                #Interleave ce with with zeros
-                new_ce1 = collect(Iterators.flatten(zip(ce, zeros(T, length(ce)))))
-                new_ce2 = collect(Iterators.flatten(zip(zeros(T, length(ce)), ce)))
-
-                push!(Cvecs[ie], sparsevec(new_ce1))
-                push!(Cvecs[ie], sparsevec(new_ce2))
-        end
-        
-    end
-    @show typeof(Cvecs)
     bern_cv = IGA.BezierValues(Cvecs, cv)
     
     random_coords = zeros(Vec{2,T}, getnbasefunctions(bern_cv) ) #since we dont update "physcial" dNdX, coords can be random
@@ -100,7 +87,7 @@ end
         for qp in 1:getnquadpoints(bern_cv)
             N_bspline = JuAFEM.value(bspline_ip, qr.points[qp])
 
-            #Since a bern_cv.cv_store.N are vector values, extract 1:dim:end to get the scalar values
+            #Since bern_cv.cv_store.N are vector values, extract 1:dim:end to get the scalar values
             a = [a[1] for a in bern_cv.cv_store.N[1:2:end,qp]]
             N_bern = reverse(a) #hmm, reverse
             @test all(N_bern .≈ N_bspline)

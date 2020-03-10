@@ -10,11 +10,13 @@ using StaticArrays
 
 import JuAFEM
 
+include("utils.jl")
 include("splines/bsplines.jl")
 include("nurbsmesh.jl")
 include("bezier_extraction.jl")
 include("splines/bezier.jl")
 include("plot_utils.jl")
+
 
 const BezierCell{dim,N,order} = JuAFEM.Cell{dim,N,order}
 JuAFEM.faces(c::BezierCell) = error("idk of bezier elements have faces")
