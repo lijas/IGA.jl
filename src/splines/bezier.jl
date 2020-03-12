@@ -38,8 +38,8 @@ function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi::Vec{dim}) where {dim,
     return val
 end
 
-JuAFEM.faces(::BernsteinBasis{2,order}) where order = ((1,2),)
-JuAFEM.faces(::BernsteinBasis{2,2}) = ((1,2,3),(3,6,9),(9,8,7),(7,5,1))
+JuAFEM.faces(::BernsteinBasis{2,(2,2)}) where order = ((1,2,3),(3,6,9), (9,8,7), (7,4,1))
+JuAFEM.faces(::IGA.BernsteinBasis{1,order}) where order = ((1,), (order+1,))
 
 JuAFEM.getnbasefunctions(b::BernsteinBasis{dim,order}) where {dim,order} = prod(order.+1)#(order+1)^dim
 JuAFEM.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
@@ -279,6 +279,9 @@ JuAFEM.getn_scalarbasefunctions(bcv::BezierValues) = JuAFEM.getn_scalarbasefunct
 JuAFEM._gradienttype(::BezierValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
 function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T} 
     return JuAFEM.function_gradient(fe_v.cv_store, q_point, u)
+end
+function JuAFEM.function_value(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T} 
+    return JuAFEM.function_value(fe_v.cv_store, q_point, u)
 end
 
 #=function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
