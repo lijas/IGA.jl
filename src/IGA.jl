@@ -19,7 +19,10 @@ include("plot_utils.jl")
 
 
 const BezierCell{dim,N,order} = JuAFEM.Cell{dim,N,order}
-JuAFEM.faces(c::BezierCell) = error("idk of bezier elements have faces")
+JuAFEM.faces(c::BezierCell{2,9,2}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), 
+                                      (c.nodes[3],c.nodes[6],c.nodes[9]),
+                                      (c.nodes[9],c.nodes[8],c.nodes[7]),
+                                      (c.nodes[7],c.nodes[4],c.nodes[1]))
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
 JuAFEM.default_interpolation(::Type{BezierCell{2,9,2}}) = BernsteinBasis{2,2}()

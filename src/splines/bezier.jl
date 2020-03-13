@@ -252,7 +252,7 @@ end
 Second try for bezier cellvalues
 """
 
-struct BezierValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}
+struct BezierFaceValues{dim_s,T<:Real,CV<:JuAFEM.FaceValues} <: JuAFEM.FaceValues{dim_s,T,JuAFEM.RefCube}
     cv_bezier::CV
     cv_store::CV
 
@@ -261,20 +261,42 @@ struct BezierValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{di
     compute_second_derivative::Bool
 end
 
-function BezierValues(Ce::Array{Array{SparseArrays.SparseVector{T,Int64},1},1}, cv::JuAFEM.CellValues{dim_s}; compute_second_derivative=false) where {T,dim_s}
-    BezierValues(dim_s, Ce, cv, compute_second_derivative=compute_second_derivative) 
+function BezierFaceValues(Ce::Array{Array{SparseArrays.SparseVector{T,Int64},1},1}, cv::JuAFEM.FaceValues{dim_s}; compute_second_derivative=false) where {T,dim_s}
+    BezierFaceValues(dim_s, Ce, cv, compute_second_derivative=compute_second_derivative) 
 end
 
-function BezierValues(dim_s::Int, Ce::Array{Array{SparseArrays.SparseVector{T2,Int64},1},1}, cv; compute_second_derivative=false) where T2
+function BezierFaceValues(dim_s::Int, Ce::Array{Array{SparseArrays.SparseVector{T2,Int64},1},1}, cv; compute_second_derivative=false) where T2
     @assert(length(first(Ce)) == JuAFEM.getnbasefunctions(cv))
-    return BezierValues{dim_s,T2,typeof(cv)}(cv, deepcopy(cv), Ref(-1), Ce, compute_second_derivative)
+    return BezierFaceValues{dim_s,T2,typeof(cv)}(cv, deepcopy(cv), Ref(-1), Ce, compute_second_derivative)
+end
+
+struct BezierCellValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}
+#struct BezierValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}
+    cv_bezier::CV
+    cv_store::CV
+
+    current_cellid::Ref{Int}
+    extraction_operators::Vector{Vector{SparseArrays.SparseVector{T,Int}}} #Yikes... 
+    compute_second_derivative::Bool
+end
+
+const BezierValues{dim_s,T,CV} = Union{BezierFaceValues{dim_s,T,CV}, BezierCellValues{dim_s,T,CV}}
+
+function BezierCellValues(Ce::Array{Array{SparseArrays.SparseVector{T,Int64},1},1}, cv::JuAFEM.CellValues{dim_s}; compute_second_derivative=false) where {T,dim_s}
+    BezierCellValues(dim_s, Ce, cv, compute_second_derivative=compute_second_derivative) 
+end
+
+function BezierCellValues(dim_s::Int, Ce::Array{Array{SparseArrays.SparseVector{T2,Int64},1},1}, cv; compute_second_derivative=false) where T2
+    @assert(length(first(Ce)) == JuAFEM.getnbasefunctions(cv))
+    return BezierCellValues{dim_s,T2,typeof(cv)}(cv, deepcopy(cv), Ref(-1), Ce, compute_second_derivative)
 end
 
 JuAFEM.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
 JuAFEM.getngeobasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.M, 1)
 JuAFEM.getnquadpoints(bcv::BezierValues) = JuAFEM.getnquadpoints(bcv.cv_bezier)
 JuAFEM.getdetJdV(bcv::BezierValues, i::Int) = bcv.cv_bezier.detJdV[i]
-JuAFEM.shape_value(bcv::BezierValues, qp::Int, i::Int) = bcv.cv_store.N[i, qp]
+JuAFEM.getdetJdV(bv::BezierValues, q_point::Int) = JuAFEM.getdetJdV(bv.cv_bezier, q_point)
+JuAFEM.shape_value(bcv::BezierValues, qp::Int, i::Int, faceid::Int=1) = bcv.cv_store.N[i, qp, faceid]
 JuAFEM.getn_scalarbasefunctions(bcv::BezierValues) = JuAFEM.getn_scalarbasefunctions(bcv.cv_store)
 JuAFEM._gradienttype(::BezierValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
 function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T} 
@@ -299,8 +321,19 @@ end=#
 JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = bcv.cv_store.dNdx[base_func, q_point]
 set_current_cellid!(bcv::BezierValues, ie::Int) = bcv.current_cellid[]=ie
 
-function JuAFEM.reinit!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T}}; update_physical::Bool=true) where {dim_s,T}
+function JuAFEM.reinit!(bcv::BezierFaceValues, x::AbstractVector{Vec{dim_s,T}}, faceid::Int; update_physical::Bool=true) where {dim_s,T}
+    update_physical && JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
+
+    _reinit_bezier!(bcv, x, faceid, update_physical=update_physical)
+end
+
+function JuAFEM.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}; update_physical::Bool=true) where {dim_s,T}
     update_physical && JuAFEM.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
+
+    _reinit_bezier!(bcv, x, 1, update_physical=update_physical)
+end
+
+function _reinit_bezier!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int; update_physical::Bool=true) where {dim_s,T}
 
     cv_store = bcv.cv_store
 
@@ -316,23 +349,24 @@ function JuAFEM.reinit!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T}
             #d = ((ib-1)%dim_s) +1
             #a = convert(Int, ceil(ib/dim_s))
             
-            N = bezier_transfrom(Cb[ie][ib], B[:, iq])
-            cv_store.N[ib, iq] = N
+            N = bezier_transfrom(Cb[ie][ib], B[:, iq, faceid])
+            cv_store.N[ib, iq, faceid] = N
 
-            dNdξ = bezier_transfrom(Cb[ie][ib], dBdξ[:, iq])
-            cv_store.dNdξ[ib, iq] = dNdξ
+            dNdξ = bezier_transfrom(Cb[ie][ib], dBdξ[:, iq, faceid])
+            cv_store.dNdξ[ib, iq, faceid] = dNdξ
 
             if update_physical
-                dNdx = bezier_transfrom(Cb[ie][ib], dBdx[:, iq])
-                cv_store.dNdx[ib, iq] = dNdx
+                dNdx = bezier_transfrom(Cb[ie][ib], dBdx[:, iq, faceid])
+                cv_store.dNdx[ib, iq, faceid] = dNdx
             end
 
             if bcv.compute_second_derivative
-                dN²dξ² = bezier_transfrom(Cb[ie][ib], dB²dξ²[:, iq])
-                cv_store.dN²dξ²[ib, iq] = dN²dξ²
+                dN²dξ² = bezier_transfrom(Cb[ie][ib], dB²dξ²[:, iq, faceid])
+                cv_store.dN²dξ²[ib, iq, faceid] = dN²dξ²
             end
         end
     end
+
 end
 
 """

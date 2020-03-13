@@ -1,6 +1,9 @@
 
 export bezier_transfrom, bezier_transfrom!, compute_bezier_extraction_operators
 
+const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
+
+
 function compute_bezier_points(Ce::AbstractMatrix{T}, control_points::AbstractVector{Vec{sdim,T}}) where {T,sdim}
 
 	n_new_points = size(Ce,2)
@@ -8,6 +11,22 @@ function compute_bezier_points(Ce::AbstractMatrix{T}, control_points::AbstractVe
 	for i in 1:n_new_points
 		for (ic, p) in enumerate(control_points)
 			bezierpoints[i] += Ce[ic,i]*p
+		end
+	end
+	return bezierpoints
+
+end
+
+function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}) where {T,sdim}
+
+	n_new_points = length(first(Ce))
+	bezierpoints = zeros(Vec{sdim,T}, n_new_points)
+	for i in 1:n_new_points
+		for (ic, p) in enumerate(control_points)
+			@show p
+			@show Ce[i]
+			@show bezierpoints[i]
+			bezierpoints[i] .+= Ce[i].*p
 		end
 	end
 	return bezierpoints
