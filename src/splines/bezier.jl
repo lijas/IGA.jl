@@ -1,5 +1,5 @@
 export BernsteinBasis, BezierCellVectorValues, value, reference_coordinates, set_current_cellid!
-
+export BezierFaceValues, BezierCellValues, BezierValues
 """
 BernsteinBasis subtype of JuAFEM:s interpolation struct
 """  
@@ -294,11 +294,11 @@ end
 JuAFEM.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
 JuAFEM.getngeobasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.M, 1)
 JuAFEM.getnquadpoints(bcv::BezierValues) = JuAFEM.getnquadpoints(bcv.cv_bezier)
-JuAFEM.getdetJdV(bcv::BezierValues, i::Int) = bcv.cv_bezier.detJdV[i]
 JuAFEM.getdetJdV(bv::BezierValues, q_point::Int) = JuAFEM.getdetJdV(bv.cv_bezier, q_point)
 JuAFEM.shape_value(bcv::BezierValues, qp::Int, i::Int, faceid::Int=1) = bcv.cv_store.N[i, qp, faceid]
 JuAFEM.getn_scalarbasefunctions(bcv::BezierValues) = JuAFEM.getn_scalarbasefunctions(bcv.cv_store)
 JuAFEM._gradienttype(::BezierValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
+
 function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T} 
     return JuAFEM.function_gradient(fe_v.cv_store, q_point, u)
 end
@@ -406,4 +406,20 @@ function JuAFEM.value(b::BSplineInterpolation{2,T}, i, xi) where {T}
     y = _bspline_basis_value_alg1(b.orders[2], b.knot_vectors[2], nj, η)
 
     return x*y
+end
+
+function JuAFEM.value(b::BSplineInterpolation{1,T}, i, xi::Vec{1}) where {T}
+    global_basefunk = b.IEN[i,b.current_element[]]
+
+    _ni = b.INN[b.IEN[1,b.current_element[]],:][1] #The first basefunction defines the element span
+    ni = b.INN[global_basefunk,:][1] # Defines the basis functions nurbs coord
+
+    gp = xi
+    #xi will be in interwall [-1,1] most likely
+    ξ = 0.5*((b.knot_vectors[1][_ni+1] - b.knot_vectors[1][_ni])*gp[1] + (b.knot_vectors[1][_ni+1] + b.knot_vectors[1][_ni]))
+
+    #dηdη̂ = 0.5*(local_knot[nj+1] - local_knot[nj])
+    x = _bspline_basis_value_alg1(b.orders[1], b.knot_vectors[1], ni, ξ)
+
+    return x
 end

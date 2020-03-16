@@ -25,6 +25,9 @@ JuAFEM.faces(c::BezierCell{2,9,2}) = ((c.nodes[1],c.nodes[2],c.nodes[3]),
                                       (c.nodes[7],c.nodes[4],c.nodes[1]))
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
+#beam/shell element in 2d
+JuAFEM.faces(c::BezierCell{2,3,2}) = ((c.nodes[1],), (c.nodes[3],))
+
 JuAFEM.default_interpolation(::Type{BezierCell{2,9,2}}) = BernsteinBasis{2,2}()
 JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"
 
