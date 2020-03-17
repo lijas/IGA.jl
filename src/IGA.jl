@@ -17,7 +17,7 @@ include("bezier_extraction.jl")
 include("splines/bezier.jl")
 include("plot_utils.jl")
 
-
+#const BezierCell{dim,N,order} = JuAFEM.AbstractCell{dim,N,4}
 const BezierCell{dim,N,order} = JuAFEM.Cell{dim,N,order}
 JuAFEM.faces(c::BezierCell{2,9,2}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), 
                                       (c.nodes[3],c.nodes[6],c.nodes[9]),
@@ -27,6 +27,14 @@ JuAFEM.vertices(c::BezierCell) = c.nodes
 
 #beam/shell element in 2d
 JuAFEM.faces(c::BezierCell{2,3,2}) = ((c.nodes[1],), (c.nodes[3],))
+
+#Shell elements
+JuAFEM.faces(c::BezierCell{3,9,2}) = (c.nodes, reverse(c.nodes))
+JuAFEM.edges(c::BezierCell{3,9,2}) =  ((c.nodes[1],c.nodes[2],c.nodes[3]), 
+                                        (c.nodes[3],c.nodes[6],c.nodes[9]),
+                                        (c.nodes[9],c.nodes[8],c.nodes[7]),
+                                        (c.nodes[7],c.nodes[4],c.nodes[1]))
+JuAFEM.vertices(c::BezierCell{3,9,2}) = c.nodes
 
 JuAFEM.default_interpolation(::Type{BezierCell{2,9,2}}) = BernsteinBasis{2,2}()
 JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"

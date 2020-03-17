@@ -295,7 +295,7 @@ JuAFEM.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
 JuAFEM.getngeobasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.M, 1)
 JuAFEM.getnquadpoints(bcv::BezierValues) = JuAFEM.getnquadpoints(bcv.cv_bezier)
 JuAFEM.getdetJdV(bv::BezierValues, q_point::Int) = JuAFEM.getdetJdV(bv.cv_bezier, q_point)
-JuAFEM.shape_value(bcv::BezierValues, qp::Int, i::Int, faceid::Int=1) = bcv.cv_store.N[i, qp, faceid]
+JuAFEM.shape_value(bcv::BezierValues, qp::Int, i::Int) = JuAFEM.shape_value(bcv.cv_store,qp,i)
 JuAFEM.getn_scalarbasefunctions(bcv::BezierValues) = JuAFEM.getn_scalarbasefunctions(bcv.cv_store)
 JuAFEM._gradienttype(::BezierValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
 
@@ -323,6 +323,7 @@ set_current_cellid!(bcv::BezierValues, ie::Int) = bcv.current_cellid[]=ie
 
 function JuAFEM.reinit!(bcv::BezierFaceValues, x::AbstractVector{Vec{dim_s,T}}, faceid::Int; update_physical::Bool=true) where {dim_s,T}
     update_physical && JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
+    bcv.cv_store.current_face[] = faceid
 
     _reinit_bezier!(bcv, x, faceid, update_physical=update_physical)
 end
@@ -343,7 +344,7 @@ function _reinit_bezier!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T
     dBdx   = bcv.cv_bezier.dNdx # The derivatives of the bezier element
     dBdξ   = bcv.cv_bezier.dNdξ
     B      = bcv.cv_bezier.N
-    
+
     for iq in 1:JuAFEM.getnquadpoints(bcv)
         for ib in 1:JuAFEM.getnbasefunctions(bcv.cv_bezier)
             #d = ((ib-1)%dim_s) +1

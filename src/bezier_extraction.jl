@@ -23,7 +23,7 @@ function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::
 	n_points = length(control_points)
 	bezierpoints = zeros(Vec{sdim,T}, n_points)
 
-	row = 1:pad:n_points*2
+	row = 1:pad:n_points*sdim
 	for (ic, p) in enumerate(control_points)
 		ce = Ce[row[ic]]
 		# Some bezier extraction operators will be padded due to them working for CellVectorValues
