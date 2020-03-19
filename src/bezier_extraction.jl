@@ -68,12 +68,28 @@ function bezier_transfrom!(bezier::AbstractVector{TENSOR}, Ce::AbstractMatrix, c
 
 end
 
+#Todo: remvoe this:
 function bezier_transfrom(Ce::AbstractVector, control_points::AbstractVector{TENSOR}) where {T,sdim,TENSOR}
 	_tensor = zero(TENSOR)
-	for (ic, p) in enumerate(control_points)
+	
+	return Ce * control_points
+	#=for (ic, p) in enumerate(control_points)
 		_tensor += Ce[ic]*p
 	end
+	return _tensor=#
+end
+
+function bezier_transfrom(Ce::SparseArrays.SparseVector{T,Int}, B::AbstractVector{TENSOR}) where {T,sdim,TENSOR}
+	_tensor = zero(TENSOR)
+
+	for (i, ind) in enumerate(Ce.nzind)
+		_tensor += Ce.nzval[i]*B[ind]
+	end
 	return _tensor
+	#=for (ic, p) in enumerate(control_points)
+		_tensor += Ce[ic]*p
+	end
+	return _tensor=#
 end
 
 compute_bezier_extraction_operators(o::NTuple{pdim,Int}, U::NTuple{pdim,Vector{T}}) where {pdim,T} = 

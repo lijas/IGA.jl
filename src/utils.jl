@@ -47,3 +47,39 @@ function _interleave_zeros(a::AbstractVector{T}, dim_s::Int, offset::Int = 0) wh
     end
     return c
 end
+
+"""
+Function for learning/testing:
+    Given a knot vector and a new knot to be inserted,
+    the function gives a matrix C which when multiplied with 
+    the control_points, retains the original geomatry of the curve.
+"""
+function knotinsertion_operator(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
+
+    n = length(ξ) - p - 1
+    m = n+1
+
+    k = findfirst(ξᵢ -> ξᵢ>ξᴺ, ξ)-1
+
+    @assert((k>p))
+    C = zeros(T,m,n)
+    C[1,1] = 1
+    for i in 2:m-1
+        
+        local α
+        if i<=k-p
+            α = 1.0
+        elseif k-p+1<=i<=k
+            α = (ξᴺ - ξ[i])/(ξ[i+p] - ξ[i])
+        elseif i>=k+1
+             α = 0.0
+        end
+        C[i,i] = α
+        C[i,i-1] = (1-α)
+    end
+    C[m,n] = 1
+    
+    new_knot_vector = copy(ξ)
+    insert!(new_knot_vector,k,ξᴺ)
+    return C, new_knot_vector
+end

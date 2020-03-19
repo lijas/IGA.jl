@@ -6,12 +6,9 @@ BernsteinBasis subtype of JuAFEM:s interpolation struct
 struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order} 
 
     function BernsteinBasis{dim,order}() where {dim,order} 
-         @assert(length(order)==dim)
-         _order = order
-         if dim==1 #if order is a tuple and of dim==1, make it in to Int
-            _order = order[1]
-         end
-         return new{dim,_order}()
+         @assert(length(order)<=dim)
+         #Make order into tuple for 1d case
+         return new{dim,Tuple(order)}()
     end
 
 end
@@ -41,6 +38,11 @@ end
 JuAFEM.faces(::BernsteinBasis{2,(2,2)}) where order = ((1,2,3),(3,6,9), (9,8,7), (7,4,1))
 JuAFEM.faces(::IGA.BernsteinBasis{1,order}) where order = ((1,), (order+1,))
 
+#Line in 2d
+JuAFEM.edges(::IGA.BernsteinBasis{2,(2,)}) = ((1,), (3,))
+JuAFEM.faces(::IGA.BernsteinBasis{2,(2,)}) = ((1,2,3), (3,2,1))
+
+#
 JuAFEM.getnbasefunctions(b::BernsteinBasis{dim,order}) where {dim,order} = prod(order.+1)#(order+1)^dim
 JuAFEM.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
 JuAFEM.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
@@ -57,24 +59,31 @@ function _bernstein_basis_recursive(p::Int, i::Int, xi::T) where T
     end
 end
 
-function JuAFEM.reference_coordinates(::BernsteinBasis{dim,order}) where {dim,order}
-    #dim = 2
+function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_s,order}
+    dim_p = length(order)
     T = Float64
 
     _n = order.+1
     _n = (_n...,) #if dim is 1d, make it into tuple
 
-    ranges = [range(-1.0, stop=1.0, length=_n[i]) for i in 1:dim]
+    ranges = [range(-1.0, stop=1.0, length=_n[i]) for i in 1:dim_p]
 
-    coords = Vec{dim,T}[]
+    coords = Vec{dim_s,T}[]
 
     #algo independent of dimensions
     inds = CartesianIndices(_n)[:]
     for ind in inds
         _vec = T[]
-        for d in 1:dim
+        for d in 1:dim_p
             push!(_vec, ranges[d][ind[d]])
         end
+        #In some cases we have for example a 1d-line (dim_p=1) in 2d (dim_s=1). 
+        # Then this bernsteinbasis will only be used for, not for actualy calculating basefunction values
+        # Anyways, in those cases, we will still need to export a 2d-coord, because JuAFEM.BCValues will be super mad 
+        for _ in 1:(dim_s-dim_p)
+            push!(_vec, zero(T))
+        end
+
         push!(coords, Vec(Tuple(_vec)))
     end
 
@@ -256,7 +265,7 @@ struct BezierFaceValues{dim_s,T<:Real,CV<:JuAFEM.FaceValues} <: JuAFEM.FaceValue
     cv_bezier::CV
     cv_store::CV
 
-    current_cellid::Ref{Int}
+    current_cellid::Base.RefValue{Int}
     extraction_operators::Vector{Vector{SparseArrays.SparseVector{T,Int}}} #Yikes... 
     compute_second_derivative::Bool
 end
@@ -275,7 +284,7 @@ struct BezierCellValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValue
     cv_bezier::CV
     cv_store::CV
 
-    current_cellid::Ref{Int}
+    current_cellid::Base.RefValue{Int}
     extraction_operators::Vector{Vector{SparseArrays.SparseVector{T,Int}}} #Yikes... 
     compute_second_derivative::Bool
 end
@@ -320,26 +329,27 @@ end=#
 
 JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = bcv.cv_store.dNdx[base_func, q_point]
 set_current_cellid!(bcv::BezierValues, ie::Int) = bcv.current_cellid[]=ie
+get_current_cellid(bcv::BezierValues)::Int = bcv.current_cellid[]
 
-function JuAFEM.reinit!(bcv::BezierFaceValues, x::AbstractVector{Vec{dim_s,T}}, faceid::Int; update_physical::Bool=true) where {dim_s,T}
-    update_physical && JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
+function JuAFEM.reinit!(bcv::BezierFaceValues, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T}
+    JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
     bcv.cv_store.current_face[] = faceid
 
-    _reinit_bezier!(bcv, x, faceid, update_physical=update_physical)
+    _reinit_bezier!(bcv, x, faceid)
 end
 
 function JuAFEM.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}; update_physical::Bool=true) where {dim_s,T}
-    update_physical && JuAFEM.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
-
-    _reinit_bezier!(bcv, x, 1, update_physical=update_physical)
+    JuAFEM.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
+    _reinit_bezier!(bcv, x, 1)
 end
 
-function _reinit_bezier!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int; update_physical::Bool=true) where {dim_s,T}
+function _reinit_bezier!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T}
 
     cv_store = bcv.cv_store
 
     Cb = bcv.extraction_operators
-    ie = bcv.current_cellid[]
+    ie = get_current_cellid(bcv)
+    Cbe = Cb[ie]
 
     dBdx   = bcv.cv_bezier.dNdx # The derivatives of the bezier element
     dBdξ   = bcv.cv_bezier.dNdξ
@@ -347,23 +357,18 @@ function _reinit_bezier!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T
 
     for iq in 1:JuAFEM.getnquadpoints(bcv)
         for ib in 1:JuAFEM.getnbasefunctions(bcv.cv_bezier)
-            #d = ((ib-1)%dim_s) +1
-            #a = convert(Int, ceil(ib/dim_s))
-            
-            N = bezier_transfrom(Cb[ie][ib], B[:, iq, faceid])
-            cv_store.N[ib, iq, faceid] = N
 
-            dNdξ = bezier_transfrom(Cb[ie][ib], dBdξ[:, iq, faceid])
-            cv_store.dNdξ[ib, iq, faceid] = dNdξ
+            cv_store.N[ib, iq, faceid] = zero(eltype(cv_store.N))
+            cv_store.dNdξ[ib, iq, faceid] = zero(eltype(cv_store.dNdξ))
+            cv_store.dNdx[ib, iq, faceid] = zero(eltype(cv_store.dNdx))
 
-            if update_physical
-                dNdx = bezier_transfrom(Cb[ie][ib], dBdx[:, iq, faceid])
-                cv_store.dNdx[ib, iq, faceid] = dNdx
-            end
+            Cbe_ib = Cbe[ib]
+            for (i, nz_ind) in enumerate(Cbe_ib.nzind)                
+                val = Cbe_ib.nzval[i]
 
-            if bcv.compute_second_derivative
-                dN²dξ² = bezier_transfrom(Cb[ie][ib], dB²dξ²[:, iq, faceid])
-                cv_store.dN²dξ²[ib, iq, faceid] = dN²dξ²
+                cv_store.N[ib, iq, faceid]    += val*   B[nz_ind, iq, faceid]
+                #cv_store.dNdξ[ib, iq, faceid] += val*dBdξ[nz_ind, iq, faceid]
+                cv_store.dNdx[ib, iq, faceid] += val*dBdx[nz_ind, iq, faceid]
             end
         end
     end

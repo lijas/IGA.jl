@@ -75,9 +75,9 @@ end
 
     Cvecs = IGA.bezier_extraction_to_vectors(C, pad=dim)
 
-    bern_cv = IGA.BezierValues(Cvecs, cv)
+    bern_cv = IGA.BezierCellValues(Cvecs, cv) 
     
-    random_coords = zeros(Vec{2,T}, getnbasefunctions(bern_cv) ) #since we dont update "physcial" dNdX, coords can be random
+    random_coords = JuAFEM.reference_coordinates(bern_ip) #since we dont update "physcial" dNdX, coords can be random
 
     for ie in [1,3,6,7] #for all elements
         IGA.set_current_cellid!(bern_cv, ie)
