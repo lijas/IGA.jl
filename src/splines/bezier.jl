@@ -35,13 +35,46 @@ function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi::Vec{dim}) where {dim,
     return val
 end
 
-JuAFEM.faces(::BernsteinBasis{2,(2,2)}) where order = ((1,2,3),(3,6,9), (9,8,7), (7,4,1))
+JuAFEM.faces(::BernsteinBasis{2,(2,2)}) = ((1,2,3),(3,6,9), (9,8,7), (7,4,1))
 JuAFEM.faces(::IGA.BernsteinBasis{1,order}) where order = ((1,), (order+1,))
 
 #Line in 2d
 JuAFEM.edges(::IGA.BernsteinBasis{2,(2,)}) = ((1,), (3,))
 JuAFEM.faces(::IGA.BernsteinBasis{2,(2,)}) = ((1,2,3), (3,2,1))
 
+#3d
+function JuAFEM.faces(::IGA.BernsteinBasis{3,order}) where {order}
+    @assert(length(order)==3)
+    faces = Tuple[]
+    ci = CartesianIndices((order.+1))
+    ind = reshape(1:prod(order.+1), (order.+1)...)
+
+    #bottom
+    a = ci[:,:,1]; 
+    push!(faces, Tuple(reverse(ind[a], dims=2)[:]))
+
+    #front
+    a = ci[:,1,:]; 
+    push!(faces, Tuple(ind[a][:]))
+
+    #right
+    a = ci[end,:,:]; 
+    push!(faces, Tuple(ind[a][:]))
+
+    #back
+    a = ci[:,end,:]; 
+    push!(faces, Tuple(reverse(ind[a], dims=1)[:]))
+
+    #left
+    a = ci[1,:,:]; 
+    push!(faces, Tuple(reverse(ind[a], dims=1)[:]))
+
+    #top
+    a = ci[:,:,end]; 
+    push!(faces, Tuple(ind[a][:]))
+
+    return Tuple(faces)
+end
 #
 JuAFEM.getnbasefunctions(b::BernsteinBasis{dim,order}) where {dim,order} = prod(order.+1)#(order+1)^dim
 JuAFEM.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
