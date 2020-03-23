@@ -42,7 +42,10 @@ JuAFEM.faces(::IGA.BernsteinBasis{1,order}) where order = ((1,), (order+1,))
 JuAFEM.edges(::IGA.BernsteinBasis{2,(2,)}) = ((1,), (3,))
 JuAFEM.faces(::IGA.BernsteinBasis{2,(2,)}) = ((1,2,3), (3,2,1))
 
-#3d
+#3d Shell
+JuAFEM.faces(::BernsteinBasis{3,(2,2)}) = (1,2,3,4,5,6,7,8,9)
+
+#3d Hexahedron
 function JuAFEM.faces(::IGA.BernsteinBasis{3,order}) where {order}
     @assert(length(order)==3)
     faces = Tuple[]
