@@ -1,10 +1,32 @@
 
-struct BSplineBasis{T}
-	order::Int
-	knot_vector::Vector{T}
+struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order}
+	knot_vector::NTuple{dim,Vector{T}}
+
+    function BSplineBasis(knots::NTuple{dim,Vector{T}}, order::NTuple{dim,Int}) where {dim,T} 
+		@assert(length(order)==dim)
+		return new{dim,T,Tuple(order)}(knots)
+    end
+    function BSplineBasis(knots::Vector{T}, order::Int) where {T} 
+		return new{1,T,Tuple(order)}((knots,))
+    end
 end
 
-nbasefunctions(basis::BSplineBasis) = length(basis.knot_vector) - basis.order - 1
+getnbasefunctions_dim(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = Tuple([length(basis.knot_vector[i]) - order[i] - 1 for i in 1:dim])
+JuAFEM.getnbasefunctions(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = prod(getnbasefunctions_dim(basis))::Int
+
+function JuAFEM.value(b::BSplineBasis{dim,T,order}, i, xi::Vec{dim}) where {dim,T,order}
+
+    @assert( i <= JuAFEM.getnbasefunctions(b))
+
+    _n = getnbasefunctions_dim(b)
+    
+    coord = Tuple(CartesianIndices(_n)[i])
+    val = 1.0
+    for i in 1:dim
+        val *= IGA._bspline_basis_value_alg1(order[i], b.knot_vector[i], coord[i], xi[i])
+    end
+    return val
+end
 
 struct BSplineGeometry{pdim,sdim,T}
 	basis::NTuple{pdim,BSplineBasis{T}}
@@ -13,8 +35,6 @@ end
 
 const BSplineCurve{sdim,T} = BSplineGeometry{1,sdim,T}
 const BSplineSurface{sdim,T} = BSplineGeometry{2,sdim,T}
-
-JuAFEM.value(basis::BSplineBasis{T}, i::Int, xi::T) where T = _bspline_basis_value_alg1(basis.order, basis.knot, i, xi)
 
 """
 Calculates 
