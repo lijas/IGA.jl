@@ -20,7 +20,7 @@ end
 
 function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}, pad::Int=1) where {sdim,T}
 
-	n_points = length(control_points)
+	n_points = length(first(Ce))#length(control_points)
 	bezierpoints = zeros(Vec{sdim,T}, n_points)
 
 	row = 1:pad:n_points*sdim
@@ -172,4 +172,35 @@ function compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
 	#pop!(C)
 	C = SparseArrays.sparse.(C[1:nb])
 	return C, nb
+end
+
+function knotinsertion(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
+
+    n = length(ξ) - p - 1
+    m = n+1
+
+    k = findfirst(ξᵢ -> ξᵢ>ξᴺ, ξ)-1
+
+    @assert((k>p))
+    C = zeros(T,m,n)
+    C[1,1] = 1
+    for i in 2:m-1
+        
+        local α
+        if i<=k-p
+            α = 1.0
+        elseif k-p+1<=i<=k
+            α = (ξᴺ - ξ[i])/(ξ[i+p] - ξ[i])
+        elseif i>=k+1
+             α = 0.0
+        end
+        C[i,i] = α
+        C[i,i-1] = (1-α)
+    end
+    C[m,n] = 1
+    
+    new_knot_vector = copy(ξ)
+    insert!(new_knot_vector,k+1,ξᴺ)
+    return C, new_knot_vector
+
 end

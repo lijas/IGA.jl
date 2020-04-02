@@ -6,20 +6,25 @@ function bezier_extraction_to_vectors(Ce::AbstractVector{<:AbstractMatrix}; pad:
 
     Cvecs = [Vector{SparseArrays.SparseVector{T,Int}}() for _ in 1:nbe]
     for ie in 1:nbe
-        for r in 1:size(Ce[ie],1)
-                ce = Ce[ie][r,:]
-                
-                if pad != 1
-                    for d in 0:pad-1
-                        ce_new = _interleave_zeros(ce, pad, d)
-                        
-                        push!(Cvecs[ie], SparseArrays.sparsevec(ce_new))
-                    end
-                else
-                    push!(Cvecs[ie], SparseArrays.sparsevec(ce))
-                end
+        cv = bezier_extraction_to_vector(Ce[ie];pad=pad)
+        Cvecs[ie] = cv
+    end
+    return Cvecs
+end
+
+function bezier_extraction_to_vector(Ce::AbstractMatrix{T}; pad::Int = 1) where T
+
+    Cvecs = Vector{SparseArrays.SparseVector{T,Int}}()
+    for r in 1:size(Ce,1)
+        ce = Ce[r,:]
+        if pad != 1
+            for d in 0:pad-1
+                ce_new = _interleave_zeros(ce, pad, d)
+                push!(Cvecs, SparseArrays.sparsevec(ce_new))
+            end
+        else
+            push!(Cvecs, SparseArrays.sparsevec(ce))
         end
-        
     end
     return Cvecs
 end
