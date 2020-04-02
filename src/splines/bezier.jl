@@ -95,6 +95,10 @@ function _bernstein_basis_recursive(p::Int, i::Int, xi::T) where T
     end
 end
 
+function _bernstein_basis_derivative_recursive(p::Int, i::Int, xi::T) where T
+    return p*(_bernstein_basis_recursive(p-1, i-1, xi) - _bernstein_basis_recursive(p-1, i, xi))
+end
+
 function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_s,order}
     dim_p = length(order)
     T = Float64
