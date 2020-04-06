@@ -1,6 +1,6 @@
 module IGA
 
-using Plots; pyplot();
+
 using Reexport
 
 @reexport using Tensors
@@ -18,7 +18,9 @@ include("splines/bsplines.jl")
 include("nurbsmesh.jl")
 include("bezier_extraction.jl")
 include("splines/bezier.jl")
-include("plot_utils.jl")
+
+#using Plots; pyplot();
+#include("plot_utils.jl")
 
 #const BezierCell{dim,N,order} = JuAFEM.AbstractCell{dim,N,4}
 const BezierCell{dim,N,order} = JuAFEM.Cell{dim,N,order}

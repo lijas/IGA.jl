@@ -351,8 +351,8 @@ JuAFEM._gradienttype(::BezierValues{dim}, ::AbstractVector{T}) where {dim,T} = T
 function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T} 
     return JuAFEM.function_gradient(fe_v.cv_store, q_point, u)
 end
-function JuAFEM.function_value(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T} 
-    return JuAFEM.function_value(fe_v.cv_store, q_point, u)
+function JuAFEM.function_value(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::AbstractVector{Int} = collect(1:length(u))) where {dim,T} 
+    return JuAFEM.function_value(fe_v.cv_store, q_point, u, dof_range)
 end
 
 #=function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
