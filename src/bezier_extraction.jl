@@ -20,7 +20,7 @@ end
 
 function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}, pad::Int=1) where {sdim,T}
 
-	n_points = length(control_points)#length(first(Ce))
+	n_points = length(first(Ce))#length(control_points)#
 	#@show n_points, length(control_points)
 	bezierpoints = zeros(Vec{sdim,T}, n_points)
 
