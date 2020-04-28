@@ -3,8 +3,8 @@
     order = 2
     knots = Float64[0,0,0, 0.5, 1,1,1]
 
-    basis = IGA.BSplineBasis(order,knots)
-    n = IGA.nbasefunctions(basis)
+    basis = IGA.BSplineBasis(knots,order)
+    n = IGA.JuAFEM.getnbasefunctions(basis)
     for xi in [0.0, 0.25, 0.5, 1.0]
         sum = 0.0
         for i in 1:n

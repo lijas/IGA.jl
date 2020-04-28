@@ -23,37 +23,55 @@ include("splines/bezier.jl")
 #include("plot_utils.jl")
 
 #const BezierCell{dim,N,order} = JuAFEM.AbstractCell{dim,N,4}
-const BezierCell{dim,N,order} = JuAFEM.Cell{dim,N,order}
-JuAFEM.faces(c::BezierCell{2,9,2}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), 
+struct BezierCell{dim,N,order} <: JuAFEM.AbstractCell{dim,N,4}
+    nodes::NTuple{N,Int}
+    function BezierCell{dim,N,order}(nodes::NTuple{N,Int}) where {dim,N,order} 
+        @assert(order isa Tuple)
+        @assert(prod(order.+1)==N)
+		return new{dim,N,order}(nodes)
+    end
+end
+
+JuAFEM.faces(c::BezierCell{2,9,(2,)}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), 
                                       (c.nodes[3],c.nodes[6],c.nodes[9]),
                                       (c.nodes[9],c.nodes[8],c.nodes[7]),
                                       (c.nodes[7],c.nodes[4],c.nodes[1]))
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
 #beam/shell element in 2d
-JuAFEM.edges(c::BezierCell{2,3,2}) = ((c.nodes[1],), (c.nodes[3],))
-JuAFEM.faces(c::BezierCell{2,3,2}) = ((c.nodes[1], c.nodes[3]), ((c.nodes[3], c.nodes[1])))
+JuAFEM.edges(c::BezierCell{2,3,(2,)}) = ((c.nodes[1],), (c.nodes[3],))
+JuAFEM.faces(c::BezierCell{2,3,(2,)}) = ((c.nodes[1], c.nodes[3]), ((c.nodes[3], c.nodes[1])))
 
 #Shell elements
-JuAFEM.faces(c::BezierCell{3,9,2}) = (c.nodes,)
-JuAFEM.edges(c::BezierCell{3,9,2}) =  ((c.nodes[1],c.nodes[2],c.nodes[3]), 
+#JuAFEM.faces(c::BezierCell{3,25,(4,4)}) = (c.nodes, reverse(c.nodes))
+#JuAFEM.faces(c::BezierCell{3,16,(3,3)}) = (c.nodes, reverse(c.nodes))
+JuAFEM.edges(c::BezierCell{3,9,(2,)}) =  ((c.nodes[1],c.nodes[2],c.nodes[3]), 
                                         (c.nodes[3],c.nodes[6],c.nodes[9]),
                                         (c.nodes[9],c.nodes[8],c.nodes[7]),
                                         (c.nodes[7],c.nodes[4],c.nodes[1]))
-JuAFEM.vertices(c::BezierCell{3,9,2}) = c.nodes
+#Dim 3                                        
+JuAFEM.vertices(c::BezierCell{3,9,(3,)}) = c.nodes
+#JuAFEM.edges(c::BezierCell{3,16,(3,)}) = (Tuple(c.nodes[[1,2,3,4]]), Tuple(c.nodes[[4,8,12,16]]), Tuple(c.nodes[[16,15,14,13]]), Tuple(c.nodes[[13,9,5,1]]))
 
-JuAFEM.default_interpolation(::Type{BezierCell{2,9,2}}) = BernsteinBasis{2,2}()
-JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"
-
-function JuAFEM.reference_coordinates(::BernsteinBasis{2,2})
-    coord = -1:1:1
-    output = Vec{2,Float64}[]
-    for i in 1:3
-    	for j in 1:3
-    		push!(output, Vec{2,Float64}((coord[j], coord[i])))
-    	end
-    end
-    return output
+function JuAFEM.faces(c::BezierCell{3,N,order}) where {N,order}
+    #own dispatch
+    length(order)==2 && return _faces_quad(c)
+    length(order)==3 && return _faces_hexa(c)
 end
+_faces_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.faces(BernsteinBasis{3,order}() )))
+_faces_quad(c::BezierCell{3,N,order}) where {N,order} = (c.nodes, reverse(c.nodes))
+
+#
+function JuAFEM.edges(c::BezierCell{3,N,order}) where {N,order}
+    #own dispatch
+    length(order)==2 && return _edges_quad(c)
+    length(order)==3 && return _edges_hexa(c)
+end
+_edges_hexa(c::BezierCell{3,N,order}) where {N,order} = error("Not implemenetet")
+_edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.edges(BernsteinBasis{3,order}() )))
+
+
+JuAFEM.default_interpolation(::Type{BezierCell{dim,N,order}}) where {dim,N,order}= BernsteinBasis{dim,order}()
+JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"
 
 end #end module

@@ -6,7 +6,7 @@ const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 
 
 function compute_bezier_points(Ce::AbstractMatrix{T}, control_points::AbstractVector{Vec{sdim,T}}) where {T,sdim}
-
+	error("dont use")
 	n_new_points = size(Ce,2)
 	bezierpoints = zeros(Vec{sdim,T}, n_new_points)
 	for i in 1:n_new_points
@@ -18,79 +18,25 @@ function compute_bezier_points(Ce::AbstractMatrix{T}, control_points::AbstractVe
 
 end
 
-function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}, pad::Int=1) where {sdim,T}
+function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}, pad::Int) where {sdim,T}
+	error("deprecated pad")
+end
 
-	n_points = length(first(Ce))#length(control_points)#
-	#@show n_points, length(control_points)
+function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}) where {sdim,T}
+
+	n_points = length(control_points)#length(first(Ce))
 	bezierpoints = zeros(Vec{sdim,T}, n_points)
 
-	row = 1:pad:n_points*sdim
 	for (ic, p) in enumerate(control_points)
-		ce = Ce[row[ic]]
-		# Some bezier extraction operators will be padded due to them working for CellVectorValues
-		# That is why we skip sdim numbers
-		start = (ic-1)%pad + 1
-		for (ip,i) in enumerate(1:pad:(n_points*pad))
-			bezierpoints[ip] += ce[i]*control_points[ic]
+		ce = Ce[ic]
+
+		for i in 1:(n_points)
+			bezierpoints[i] += ce[i]*control_points[ic]
 		end
 	end
 
 	return bezierpoints
 
-end
-
-function bezier_transfrom!(bezier::AbstractVector{TENSOR}, Ce::BezierExtractionOperator{T}, control_points::AbstractVector{TENSOR}) where {T,sdim,TENSOR}
-
-	n_new_points = length(Ce)
-	#bezier = zeros(TENSOR, n_new_points)
-	for i in 1:n_new_points
-		_new_point = zero(TENSOR)
-		for (ic, p) in enumerate(control_points)
-			 _new_point += Ce[i][ic]*p
-		end
-		bezier[i] = _new_point
-	end
-	#return bezierpoints
-
-end
-
-function bezier_transfrom!(bezier::AbstractVector{TENSOR}, Ce::AbstractMatrix, control_points::AbstractVector{TENSOR}) where {T,sdim,TENSOR}
-
-	n_new_points = size(Ce,2)
-	#bezier = zeros(TENSOR, n_new_points)
-	for i in 1:n_new_points
-		_new_point = zero(TENSOR)
-		for (ic, p) in enumerate(control_points)
-			 _new_point += Ce[i, ic]*p
-		end
-		bezier[i] = _new_point
-	end
-	#return bezierpoints
-
-end
-
-#Todo: remvoe this:
-function bezier_transfrom(Ce::AbstractVector, control_points::AbstractVector{TENSOR}) where {T,sdim,TENSOR}
-	_tensor = zero(TENSOR)
-	
-	return Ce * control_points
-	#=for (ic, p) in enumerate(control_points)
-		_tensor += Ce[ic]*p
-	end
-	return _tensor=#
-end
-
-function bezier_transfrom(Ce::SparseArrays.SparseVector{T,Int}, B::AbstractVector{TENSOR}) where {T,sdim,TENSOR}
-	_tensor = zero(TENSOR)
-
-	for (i, ind) in enumerate(Ce.nzind)
-		_tensor += Ce.nzval[i]*B[ind]
-	end
-	return _tensor
-	#=for (ic, p) in enumerate(control_points)
-		_tensor += Ce[ic]*p
-	end
-	return _tensor=#
 end
 
 compute_bezier_extraction_operators(o::NTuple{pdim,Int}, U::NTuple{pdim,Vector{T}}) where {pdim,T} = 
@@ -105,12 +51,13 @@ function compute_bezier_extraction_operators(p::Int, q::Int, r::Int, knot1::Vect
 	for k in 1:nbe3
 		for j in 1:nbe2
 			for i in 1:nbe1
-				_C = kron(Ce3[k], Ce2[j],Ce1[i])
+				_C = kron(Ce2[j],Ce1[i])
+				_C = kron(Ce3[k], _C)
 				push!(C,_C)
 			end
 		end
 	end
-	return C, nbe1*nbe2
+	return C, nbe1*nbe2*nbe3
 end
 
 function compute_bezier_extraction_operators(p::Int, q::Int, knot1::Vector{T}, knot2::Vector{T}) where T

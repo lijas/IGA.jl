@@ -1,21 +1,29 @@
 export bezier_extraction_to_vectors
 
-function bezier_extraction_to_vectors(Ce::AbstractVector{<:AbstractMatrix}; pad::Int = 1)
+function bezier_extraction_to_vectors(Ce::AbstractVector{<:AbstractMatrix}; pad::Int )
+    error("pad depricated")
+end
+
+function bezier_extraction_to_vectors(Ce::AbstractVector{<:AbstractMatrix})
     T = Float64
     nbe = length(Ce)
 
     Cvecs = [Vector{SparseArrays.SparseVector{T,Int}}() for _ in 1:nbe]
     for ie in 1:nbe
-        cv = bezier_extraction_to_vector(Ce[ie];pad=pad)
+        cv = bezier_extraction_to_vector(Ce[ie])
         Cvecs[ie] = cv
     end
     return Cvecs
 end
 
-function bezier_extraction_to_vector(Ce::AbstractMatrix{T}; pad::Int = 1) where T
+function bezier_extraction_to_vector(Ce::AbstractMatrix{T}) where T
 
     Cvecs = Vector{SparseArrays.SparseVector{T,Int}}()
     for r in 1:size(Ce,1)
+        ce = Ce[r,:]
+        push!(Cvecs, SparseArrays.sparsevec(ce))
+    end
+    #=for r in 1:size(Ce,1)
         ce = Ce[r,:]
         if pad != 1
             for d in 0:pad-1
@@ -25,7 +33,7 @@ function bezier_extraction_to_vector(Ce::AbstractMatrix{T}; pad::Int = 1) where 
         else
             push!(Cvecs, SparseArrays.sparsevec(ce))
         end
-    end
+    end=#
     return Cvecs
 end
 

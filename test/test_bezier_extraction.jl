@@ -24,3 +24,48 @@
     @test C[9] ≈ kron( [1/2 0 0; 1/2 1 0; 0 0 1], [1/2 0 0; 1/2 1 0; 0 0 1])
 
 end
+
+@testset "bezier_controlpoints_transform" begin
+
+    dim = 3
+    T = Float64
+
+    orders = (4,4,4)
+
+    #Check if nurbs splines are equal to C*B
+    mesh = IGA.generate_nurbsmesh((20,20,20), orders, (5.0,4.0,2.0))
+    grid = IGA.convert_to_grid_representation(mesh)
+
+    bspline_ip = IGA.BSplineInterpolation{dim,Float64}(mesh.INN, mesh.IEN, mesh.knot_vectors, mesh.orders)
+    bern_ip = BernsteinBasis{dim, mesh.orders}()
+
+    #
+    C,nbe = IGA.compute_bezier_extraction_operators(mesh.orders..., mesh.knot_vectors...)
+    qr = JuAFEM.QuadratureRule{dim,JuAFEM.RefCube}(2)
+    cv = JuAFEM.CellVectorValues(qr, bern_ip)
+
+    Cvecs = IGA.bezier_extraction_to_vectors(C)
+    bern_cv = IGA.BezierCellValues(Cvecs, cv) 
+
+    for ie in [1,2,3, getncells(grid)]#1:getncells(grid)
+
+        coords = getcoordinates(grid, ie)
+        bezier_coords = IGA.compute_bezier_points(Cvecs[ie], coords)
+
+        IGA.set_current_cellid!(bern_cv, ie)
+        IGA.set_current_cellid!(bspline_ip, ie)
+
+        reinit!(bern_cv, coords)
+
+        for qp in 1:getnquadpoints(bern_cv)
+            X1 = JuAFEM.spatial_coordinate(bern_cv, qp, bezier_coords)
+            X2 = zero(Vec{dim,T})
+            for i in 1:getnbasefunctions(bspline_ip)
+                N = JuAFEM.value(bspline_ip, i, qr.points[qp])
+                X2 += N*reverse(coords)[i]
+            end
+            @test X2 ≈ X1
+        end
+
+    end
+end

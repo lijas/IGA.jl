@@ -1,3 +1,4 @@
+export BSplineBasis
 
 struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order}
 	knot_vector::NTuple{dim,Vector{T}}
