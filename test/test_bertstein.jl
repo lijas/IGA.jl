@@ -19,7 +19,7 @@ end
 T = Float64
 for p in (2,4)
     knot_vector = [(ones(T, p+1)*-1)..., ones(T, p+1)...]
-    
+   
     ip1 = BSplineBasis((knot_vector,knot_vector), (p,p))
     ip2 = BernsteinBasis{2,(p,p)}()
 

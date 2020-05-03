@@ -1,8 +1,5 @@
 export bezier_extraction_to_vectors
 
-function bezier_extraction_to_vectors(Ce::AbstractVector{<:AbstractMatrix}; pad::Int )
-    error("pad depricated")
-end
 
 function bezier_extraction_to_vectors(Ce::AbstractVector{<:AbstractMatrix})
     T = Float64

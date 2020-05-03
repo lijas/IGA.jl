@@ -1,5 +1,5 @@
-export BernsteinBasis, BezierCellVectorValues, value, reference_coordinates, set_current_cellid!
-export BezierFaceValues, BezierCellValues, BezierValues
+export BernsteinBasis, value, reference_coordinates, set_current_cellid!
+export BezierFaceValues, BezierCellValues, BezierValues, set_bezier_operator!
 """
 BernsteinBasis subtype of JuAFEM:s interpolation struct
 """  
@@ -43,28 +43,49 @@ JuAFEM.edges(::IGA.BernsteinBasis{2,(2,)}) = ((1,), (3,))
 JuAFEM.faces(::IGA.BernsteinBasis{2,(2,)}) = ((1,2,3), (3,2,1))
 
 #3d Shell
-JuAFEM.faces(::BernsteinBasis{3,(2,2)}) = (1,2,3,4,5,6,7,8,9)
 JuAFEM.edges(::BernsteinBasis{3,(2,2)}) = ((1,2,3), (3,6,9), (9,8,7), (7,4,1))
 
-#Order 3
-JuAFEM.edges(::BernsteinBasis{3,(3,3)}) = ((1,2,3,4), (4,8,12,16), (16,15,14,13), (13,9,5,1))
 
-#3d shell
-function JuAFEM.faces(::IGA.BernsteinBasis{3,(3,3)})# where {order<:NTuple{2,Int}}
-    order = (3,3)
-    idx = collect(1:prod(order.+1))
-    return (Tuple(idx), Tuple(reverse(idx)))
+function JuAFEM.faces(c::BernsteinBasis{2,order}) where {order}
+    length(order)==1 && return _faces_line(c)
+    length(order)==2 && return _faces_quad(c)
+end
+_faces_line(::BernsteinBasis{2,order}) where {order} = ((ntuple(i->i,order)), reverse(ntuple(i->i,order)))
+function _faces_quad(::BernsteinBasis{2,order}) where {order}
+    dim = 2
+    faces = Tuple[]
+    ci = CartesianIndices((order.+1))
+    ind = reshape(1:prod(order.+1), (order.+1)...)
+
+    #bottom
+    a = ci[:,1]; 
+    push!(faces, Tuple(ind[a]))
+
+    #left
+    a = ci[end,:]; 
+    push!(faces, Tuple(ind[a]))
+
+    #top
+    a = ci[:,end]; 
+    push!(faces, reverse(Tuple(ind[a])))
+
+    #right
+    a = ci[1,:]; 
+    push!(faces, reverse(Tuple(ind[a])))
+
+    return Tuple(faces)   
+
 end
 
-function JuAFEM.faces(::IGA.BernsteinBasis{3,(4,4)})# where {order<:NTuple{2,Int}}
-    order = (4,4)
-    idx = collect(1:prod(order.+1))
-    return (Tuple(idx), Tuple(reverse(idx)))
+function JuAFEM.faces(c::BernsteinBasis{3,order}) where {order}
+    length(order)==2 && return _faces_quad(c)
+    length(order)==3 && return _faces_hexa(c)
 end
+_faces_quad(::BernsteinBasis{3,order}) where {order} = ((ntuple(i->i, prod(order.+1))), reverse(ntuple(i->i, prod(order.+1))))
+function _faces_hexa(::IGA.BernsteinBasis{3,order}) where {order}
 
-#3d Hexahedron
-function JuAFEM.faces(::IGA.BernsteinBasis{3,order}) where {order}
     @assert(length(order)==3)
+
     faces = Tuple[]
     ci = CartesianIndices((order.+1))
     ind = reshape(1:prod(order.+1), (order.+1)...)
@@ -182,18 +203,25 @@ struct BezierFaceValues{dim_s,T<:Real,CV<:JuAFEM.FaceValues} <: JuAFEM.FaceValue
     cv_bezier::CV
     cv_store::CV
 
-    current_cellid::Base.RefValue{Int}
-    extraction_operators::Vector{Vector{SparseArrays.SparseVector{T,Int}}} #Yikes... 
-    compute_second_derivative::Bool
+    current_beo::Base.RefValue{BezierExtractionOperator{T}}
 end
 
-function BezierFaceValues(Ce::Array{Array{SparseArrays.SparseVector{T,Int64},1},1}, cv::JuAFEM.FaceValues{dim_s}; compute_second_derivative=false) where {T,dim_s}
-    BezierFaceValues(dim_s, Ce, cv, compute_second_derivative=compute_second_derivative) 
+function BezierFaceValues(cv::JuAFEM.FaceValues{dim_s,T}) where {T,dim_s}
+
+    undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
+
+    return BezierFaceValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
 end
 
-function BezierFaceValues(dim_s::Int, Ce::Array{Array{SparseArrays.SparseVector{T2,Int64},1},1}, cv; compute_second_derivative=false) where T2
-    @assert(length(first(Ce)) == JuAFEM.getn_scalarbasefunctions(cv))
-    return BezierFaceValues{dim_s,T2,typeof(cv)}(cv, deepcopy(cv), Ref(-1), Ce, compute_second_derivative)
+function BezierFaceValues(quad_rule::JuAFEM.QuadratureRule{dim_p,JuAFEM.RefCube,T}, 
+                          func_interpol::JuAFEM.Interpolation{dim_s}, 
+                          geom_interpol::JuAFEM.Interpolation{dim_s}=func_interpol; 
+                          cvtype::Type{CV}=JuAFEM.FaceVectorValues) where {dim_p,dim_s,T,CV}
+                          
+    cv = CV(quad_rule, func_interpol, geom_interpol)
+    undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
+
+    return BezierFaceValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
 end
 
 struct BezierCellValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}
@@ -201,21 +229,24 @@ struct BezierCellValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValue
     cv_bezier::CV
     cv_store::CV
 
-    current_cellid::Base.RefValue{Int}
-    extraction_operators::Vector{Vector{SparseArrays.SparseVector{T,Int}}} #To do, remove this to be handeld by user 
-    compute_second_derivative::Bool
+    current_beo::Base.RefValue{BezierExtractionOperator{T}}
 end
 
 const BezierValues{dim_s,T,CV} = Union{BezierFaceValues{dim_s,T,CV}, BezierCellValues{dim_s,T,CV}}
 
-function BezierCellValues(Ce::Array{Array{SparseArrays.SparseVector{T,Int64},1},1}, cv::JuAFEM.CellValues{dim_s}; compute_second_derivative=false) where {T,dim_s}
-    BezierCellValues(dim_s, Ce, cv, compute_second_derivative=compute_second_derivative) 
+function BezierCellValues(cv::JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}) where {dim_s,T}
+    undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
+    return BezierCellValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
 end
 
-function BezierCellValues(dim_s::Int, Ce::Array{Array{SparseArrays.SparseVector{T2,Int64},1},1}, cv; compute_second_derivative=false) where T2
-    
-    @assert(length(first(Ce)) == JuAFEM.getn_scalarbasefunctions(cv))
-    return BezierCellValues{dim_s,T2,typeof(cv)}(cv, deepcopy(cv), Ref(-1), Ce, compute_second_derivative)
+function BezierCellValues(quad_rule::JuAFEM.QuadratureRule{dim_s,JuAFEM.RefCube,T}, 
+                            func_interpol::JuAFEM.Interpolation{dim_s}, 
+                            geom_interpol::JuAFEM.Interpolation{dim_s}=func_interpol; 
+                            cvtype::Type{CV}=JuAFEM.CellVectorValues) where {dim_s,T,CV}
+
+    cv = CV(quad_rule, func_interpol, geom_interpol)
+    undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
+    return BezierFaceValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
 end
 
 JuAFEM.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
@@ -236,21 +267,9 @@ end
 
 JuAFEM.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} = cv.cv_bezier.M[i,q_point]
 
-#=function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
-    n_base_funcs = JuAFEM.getn_scalarbasefunctions(fe_v)
-    n_base_funcs *= dim
-    @assert length(dof_range) == n_base_funcs
-    @boundscheck checkbounds(u, dof_range)
-    grad = zero(JuAFEM._gradienttype(fe_v, u))
-    @inbounds for (i, j) in enumerate(dof_range)
-        grad += JuAFEM.shape_gradient(fe_v, q_point, i) * u[j]
-    end
-    return grad
-end=#
 
 JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = JuAFEM.shape_gradient(bcv.cv_store, q_point, base_func)#bcv.cv_store.dNdx[base_func, q_point]
-set_current_cellid!(bcv::BezierValues, ie::Int) = bcv.current_cellid[]=ie
-get_current_cellid(bcv::BezierValues)::Int = bcv.current_cellid[]
+set_bezier_operator!(bcv::BezierValues, beo::BezierExtractionOperator) = bcv.current_beo[]=beo
 _cellvaluestype(bcv::BezierValues{dim_s,T,CV}) where {dim_s,T,CV} = CV
 
 function JuAFEM.reinit!(bcv::BezierFaceValues, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T}
@@ -270,10 +289,7 @@ function _reinit_bezier!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T
 
     cv_store = bcv.cv_store
 
-    Cb = bcv.extraction_operators
-    ie = get_current_cellid(bcv)
-    
-    Cbe = Cb[ie]
+    Cbe = bcv.current_beo[]
 
     dBdx   = bcv.cv_bezier.dNdx # The derivatives of the bezier element
     dBdξ   = bcv.cv_bezier.dNdξ

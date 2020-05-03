@@ -4,7 +4,9 @@ struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,orde
 	knot_vector::NTuple{dim,Vector{T}}
 
     function BSplineBasis(knots::NTuple{dim,Vector{T}}, order::NTuple{dim,Int}) where {dim,T} 
-		@assert(length(order)==dim)
+        @assert(length(order)==dim)
+        @assert(last(first(knots))==T(1))
+        @assert(first(first(knots))==T(-1))
 		return new{dim,T,Tuple(order)}(knots)
     end
     function BSplineBasis(knots::Vector{T}, order::Int) where {T} 

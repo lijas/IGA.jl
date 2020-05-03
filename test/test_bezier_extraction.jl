@@ -45,14 +45,14 @@ end
     cv = JuAFEM.CellVectorValues(qr, bern_ip)
 
     Cvecs = IGA.bezier_extraction_to_vectors(C)
-    bern_cv = IGA.BezierCellValues(Cvecs, cv) 
+    bern_cv = IGA.BezierCellValues(cv) 
 
     for ie in [1,2,3, getncells(grid)]#1:getncells(grid)
 
         coords = getcoordinates(grid, ie)
         bezier_coords = IGA.compute_bezier_points(Cvecs[ie], coords)
 
-        IGA.set_current_cellid!(bern_cv, ie)
+        IGA.set_bezier_operator!(bern_cv, Cvecs[ie])
         IGA.set_current_cellid!(bspline_ip, ie)
 
         reinit!(bern_cv, coords)

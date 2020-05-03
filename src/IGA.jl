@@ -9,7 +9,7 @@ import SparseArrays
 using StaticArrays
 using TimerOutputs
 
-import InteractiveUtils
+#import InteractiveUtils
 
 import JuAFEM
 
@@ -32,10 +32,10 @@ struct BezierCell{dim,N,order} <: JuAFEM.AbstractCell{dim,N,4}
     end
 end
 
-JuAFEM.faces(c::BezierCell{2,9,(2,)}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), 
-                                      (c.nodes[3],c.nodes[6],c.nodes[9]),
-                                      (c.nodes[9],c.nodes[8],c.nodes[7]),
-                                      (c.nodes[7],c.nodes[4],c.nodes[1]))
+JuAFEM.faces(c::BezierCell{2,9,(2,2)}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), 
+                                         (c.nodes[3],c.nodes[6],c.nodes[9]),
+                                         (c.nodes[9],c.nodes[8],c.nodes[7]),
+                                         (c.nodes[7],c.nodes[4],c.nodes[1]))
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
 #beam/shell element in 2d
@@ -49,6 +49,15 @@ JuAFEM.edges(c::BezierCell{3,9,(2,)}) =  ((c.nodes[1],c.nodes[2],c.nodes[3]),
                                         (c.nodes[3],c.nodes[6],c.nodes[9]),
                                         (c.nodes[9],c.nodes[8],c.nodes[7]),
                                         (c.nodes[7],c.nodes[4],c.nodes[1]))
+#Dim 2
+function JuAFEM.faces(c::BezierCell{2,N,order}) where {N,order}
+    #own dispatch
+    length(order)==1 && return _faces_line(c)
+    length(order)==2 && return _faces_quad(c)
+end
+_faces_line(c::BezierCell{2,N,order}) where {N,order} = (c.nodes, reverse(c.nodes))
+_faces_quad(c::BezierCell{2,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.faces(BernsteinBasis{2,order}() )))
+
 #Dim 3                                        
 JuAFEM.vertices(c::BezierCell{3,9,(3,)}) = c.nodes
 #JuAFEM.edges(c::BezierCell{3,16,(3,)}) = (Tuple(c.nodes[[1,2,3,4]]), Tuple(c.nodes[[4,8,12,16]]), Tuple(c.nodes[[16,15,14,13]]), Tuple(c.nodes[[13,9,5,1]]))
@@ -58,8 +67,8 @@ function JuAFEM.faces(c::BezierCell{3,N,order}) where {N,order}
     length(order)==2 && return _faces_quad(c)
     length(order)==3 && return _faces_hexa(c)
 end
-_faces_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.faces(BernsteinBasis{3,order}() )))
 _faces_quad(c::BezierCell{3,N,order}) where {N,order} = (c.nodes, reverse(c.nodes))
+_faces_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.faces(BernsteinBasis{3,order}() )))
 
 #
 function JuAFEM.edges(c::BezierCell{3,N,order}) where {N,order}
