@@ -43,21 +43,21 @@ function doassemble(cellvalues::CellValues{dim}, K::SparseMatrixCSC, dh::DofHand
     return K, f
 end
 
-
 function goiga(nelx,nely)
 
     dim = 2
     order = 2
 
-    L = 1.0
+    Lx = 1.0
+    Ly = 1.0*2
 
-    nurbsmesh = IGA.generate_nurbsmesh((nelx + order, nely + order),(order,order),(L,L))
+    nurbsmesh = IGA.generate_nurbsmesh((nelx + order, nely + order),(order,order),(Lx,Ly))
     grid = IGA.convert_to_grid_representation(nurbsmesh)
 
     addfaceset!(grid, "left",   (x)->x[1]<0.001)
-    addfaceset!(grid, "right",  (x)->x[1]>L*0.9999)
+    addfaceset!(grid, "right",  (x)->x[1]>Lx*0.9999)
     addfaceset!(grid, "bottom", (x)->x[2]<0.001)
-    addfaceset!(grid, "top",    (x)->x[2]>L*0.9999)
+    addfaceset!(grid, "top",    (x)->x[2]>Ly*0.9999)
 
     ip = IGA.BernsteinBasis{dim, (order,order)}()
     qr = QuadratureRule{dim, RefCube}(3)
@@ -92,8 +92,27 @@ function goiga(nelx,nely)
         vtk_point_data(vtk, dh, u)
     end=#
 
-    return u, ndofs(dh)
+    umax = 0.0
+    temperatures = Float64[]
+    for celldata in CellIterator(dh)
+
+        ue = u[celldofs(celldata)]
+
+        coords = getcoordinates(celldata)
+        bcoords = IGA.compute_bezier_points(Cvec[cellid(celldata)], coords)
+        IGA.set_bezier_operator!(cellvalues, Cvec[cellid(celldata)])
+
+        reinit!(cellvalues, bcoords)
+
+        for qp in 1:getnquadpoints(cellvalues)
+            u_qp = function_value(cellvalues, qp, ue)
+            push!(temperatures, u_qp)
+        end
+    end
+
+    return maximum(u), ndofs(dh)
 end
+
 
 
 function gofem(nelx,nely)
@@ -101,9 +120,10 @@ function gofem(nelx,nely)
     dim = 2
     order = 1
 
-    L = 1.0
+    Lx = 1.0
+    Ly = 1.0*2
 
-    grid = generate_grid(Quadrilateral, (nelx, nely), Vec((0.0, 0.0)), Vec((L, L)) );
+    grid = generate_grid(Quadrilateral, (nelx, nely), Vec((0.0, 0.0)), Vec((Lx, Ly)) );
 
 
     ip = Lagrange{dim, RefCube, order}()
@@ -132,19 +152,19 @@ function gofem(nelx,nely)
     apply!(K, f, ch)
     u = K \ f;
 
-    #=vtk_grid("heat_equation", dh) do vtk
+    vtk_grid("heat_equation", dh) do vtk
         vtk_point_data(vtk, dh, u)
-    end=#
+    end
 
-    return u, ndofs(dh)
+    return maximum(u), ndofs(dh)
 end
 
 function teststuff()
 
-    ufem, ndofsfem = gofem(40,40)
-    uiga, ndofsiga = goiga(40,40)
+    ufem, ndofsfem = gofem(400,400)
+    uiga, ndofsiga = goiga(400,400)
 
-    @show maximum(ufem), ndofsfem
-    @show maximum(uiga), ndofsiga
+    @show ufem, ndofsfem
+    @show uiga, ndofsiga
 
 end

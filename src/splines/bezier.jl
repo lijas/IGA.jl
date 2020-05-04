@@ -262,7 +262,7 @@ function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::Abst
     return JuAFEM.function_gradient(fe_v.cv_store, q_point, u)
 end
 function JuAFEM.function_value(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::AbstractVector{Int} = collect(1:length(u))) where {dim,T} 
-    return JuAFEM.function_value(fe_v.cv_store, q_point, u, dof_range)
+    return JuAFEM.function_value(fe_v.cv_store, q_point, u)#, dof_range)
 end
 
 JuAFEM.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} = cv.cv_bezier.M[i,q_point]
@@ -317,11 +317,12 @@ function _reinit_bezier!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T
                 
                 if _cellvaluestype(bcv) <: JuAFEM.ScalarValues
                     cv_store.N[ib, iq, faceid]    += val*   B[nz_ind, iq, faceid]
-                    #cv_store.dNdξ[ib, iq, faceid] += val*dBdξ[nz_ind, iq, faceid]
+                    cv_store.dNdξ[ib, iq, faceid] += val*dBdξ[nz_ind, iq, faceid]
                     cv_store.dNdx[ib, iq, faceid] += val*dBdx[nz_ind, iq, faceid]
                 elseif _cellvaluestype(bcv) <: JuAFEM.VectorValues
                     for d in 1:dim_s
                            cv_store.N[(ib-1)*dim_s + d, iq, faceid] += val*   B[(nz_ind-1)*dim_s + d, iq, faceid]
+                        cv_store.dNdξ[(ib-1)*dim_s + d, iq, faceid] += val*dBdξ[(nz_ind-1)*dim_s + d, iq, faceid]
                         cv_store.dNdx[(ib-1)*dim_s + d, iq, faceid] += val*dBdx[(nz_ind-1)*dim_s + d, iq, faceid]
                     end
                 end
