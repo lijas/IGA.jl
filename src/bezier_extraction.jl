@@ -63,6 +63,7 @@ end
 
 function compute_bezier_extraction_operators(p::Int, q::Int, knot1::Vector{T}, knot2::Vector{T}) where T
 
+	@show q, knot2
 	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
 	Ce2, nbe2 = compute_bezier_extraction_operators(q, knot2)
 	C = Vector{eltype(Ce1)}()
@@ -92,7 +93,7 @@ function compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
 
 		if mult < p + 1
 			
-			α = zeros(T,3)
+			α = zeros(T,p)
 			for j in p:-1:(mult+1)
 				α[j-mult] = (knot[b]-knot[a])/(knot[a+j]-knot[a])
 			end
