@@ -28,8 +28,8 @@ struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 				end
 			end
 		end
-		#to_keep = setdiff(collect(1:nel), to_remove)
-		#IEN = IEN[:, to_keep] #IEN = IEN[end:-1:1, to_keep]
+		to_keep = setdiff(collect(1:nel), to_remove)
+		IEN = IEN[:, to_keep] #IEN = IEN[end:-1:1, to_keep]
 		new{pdim,sdim,T}(knot_vectors,orders,control_points,IEN,INN)
 	end
 
@@ -53,69 +53,58 @@ function convert_to_grid_representation(mesh::NURBSMesh{pdim,sdim,T}) where {pdi
 
 end
 
-function generate_nurbsmesh(nbasefuncs::NTuple{3,Int}, order::NTuple{3,Int}, _size::NTuple{3,T}) where T
+function generate_nurbsmesh(nel::NTuple{3,Int}, orders::NTuple{3,Int}, _size::NTuple{3,T}; multiplicity::NTuple{3,Int}=(1,1,1)) where T
 
 	pdim = 3
 	sdim = 3
 
 	L,b,h = _size
-	p,q,r = order
-	nbasefunks_x, nbasefunks_y, nbasefunks_z = nbasefuncs
 
-	nknots_x = nbasefunks_x + 1 + p 
-	#mid_knots = (range(-one(T), stop=one(T), length=nknots_x-(p)*2))
-	#mid_knots = sign.(mid_knots) .* mid_knots
-	
-	mid_knots = range(-one(T), stop=one(T), length=nknots_x-(p)*2)
-	knot_vector_x = [-ones(T, p)..., mid_knots..., ones(T, p)...]
-
-	nknots_y = nbasefunks_y + 1 + q 
-	#mid_knots = (range(-one(T), stop=one(T), length=nknots_y-(q)*2))
-	#mid_knots = sign.(mid_knots) .* mid_knots
-	
-	mid_knots = range(-one(T), stop=one(T), length=nknots_y-(q)*2)
-	knot_vector_y = [-ones(T, q)..., mid_knots..., ones(T, q)...]
-	
-	nknots_z = nbasefunks_z + 1 + r 
-	#mid_knots = (range(-one(T), stop=one(T), length=nknots_z-(r)*2))
-	#mid_knots = sign.(mid_knots) .* mid_knots
-
-	mid_knots = range(-one(T), stop=one(T), length=nknots_z-(r)*2)
-	knot_vector_z = [-ones(T, r)..., mid_knots..., ones(T, r)...]
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 	
 	control_points = Vec{sdim,T}[]
-	for z in range(0.0, stop=h, length=nbasefunks_z)
-		for y in range(0.0, stop=b, length=nbasefunks_y)
-			for x in range(0.0, stop=L, length=nbasefunks_x)
+	for z in range(0.0, stop=h, length=length(knot_vectors[3])-1-orders[3])
+		for y in range(0.0, stop=b, length=length(knot_vectors[2])-1-orders[2])
+			for x in range(0.0, stop=L, length=length(knot_vectors[1])-1-orders[1])
 				_v = [x,y,z]
 				push!(control_points, Vec{sdim,T}((_v...,)))
 			end
 		end
 	end
 
-	mesh = IGA.NURBSMesh{pdim,sdim,T}((knot_vector_x, knot_vector_y,knot_vector_z), (p,q,r), control_points)
+	mesh = IGA.NURBSMesh{pdim,sdim,T}(Tuple(knot_vectors), orders, control_points)
 	
     return mesh
 
 end
 
-function generate_nurbsmesh(nbasefuncs::NTuple{2,Int}, order::NTuple{2,Int}, _size::NTuple{2,T}, sdim::Int=2) where T
+function _create_knotvector(T, nelx, p, m)
+	nbasefunks_x= nelx+p
+	nknots_x = nbasefunks_x + 1 + p 
+
+	mid_knots = T[]
+	for k in range(zero(T), stop=one(T), length=nknots_x-(p)*2)[2:end-1]
+		for _ in 1:m
+			push!(mid_knots, k)
+		end
+	end
+
+	knot_vector_x = [zeros(T, p+1)..., mid_knots..., ones(T, p+1)...]
+end
+
+function generate_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _size::NTuple{2,T}; multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
+
+	@assert( all(orders .>= multiplicity) )
 
 	pdim = 2
 
 	L,h = _size
-	p,q = order
-	nbasefunks_x, nbasefunks_y = nbasefuncs
-
-	nknots_x = nbasefunks_x + 1 + p 
-	knot_vector_x = [zeros(T, p)..., range(zero(T), stop=one(T), length=nknots_x-(p)*2)..., ones(T, p)...]
-
-	nknots_y = nbasefunks_y + 1 + q 
-	knot_vector_y = [zeros(T, q)..., range(zero(T), stop=one(T), length=nknots_y-(q)*2)..., ones(T, q)...]
+	
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 
 	control_points = Vec{sdim,T}[]
-	for y in range(0.0, stop=h, length=nbasefunks_y)
-		for x in range(0.0, stop=L, length=nbasefunks_x)
+	for y in range(0.0, stop=h, length=length(knot_vectors[2])-1-orders[2] )
+		for x in range(0.0, stop=L, length=length(knot_vectors[1])-1-orders[1] )
 			_v = [x,y]
 			if sdim == 3
 				push!(_v, zero(T))
@@ -124,8 +113,17 @@ function generate_nurbsmesh(nbasefuncs::NTuple{2,Int}, order::NTuple{2,Int}, _si
 		end
 	end
 
-	mesh = IGA.NURBSMesh{pdim,sdim,T}((knot_vector_x, knot_vector_y), (p,q), control_points)
+	mesh = IGA.NURBSMesh{pdim,sdim,T}(Tuple(knot_vectors), orders, control_points)
 	
+#=	point = zeros(T,sdim)
+	points = Vec{sdim,T}[]
+	count = 1
+	Base.Cartesian.@nloops $sdim i j->(1:length(cp_coords[j])) d->point[d] = cp_coords[d][i_d] begin
+		t = Base.Cartesian.@ntuple $sdim j -> point[i_j]
+		points[count] = Vec{$sdim,T}(t)
+		count += 1
+	end=#
+
     return mesh
 
 end
