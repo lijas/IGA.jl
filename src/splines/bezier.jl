@@ -195,7 +195,6 @@ function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_
     return coords
 end
 
-_bernstein_ordering(::BezierCell{dim,N,orders}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())
 function _bernstein_ordering(::BernsteinBasis{2,orders}) where {orders}
     @assert(length(orders)==2)
 
@@ -386,7 +385,10 @@ struct BSplineInterpolation{dim,T} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,1}
 end
 
 function BSplineInterpolation{dim,T}(INN::AbstractMatrix, IEN::AbstractMatrix, knot_vectors::NTuple{dim,Vector{T}}, orders::NTuple{dim,Int}) where{dim,T}
-    return BSplineInterpolation{dim,T}(INN, IEN, knot_vectors, orders, Ref(1))
+    return BSplineInterpolation{dim,T}(INN, IEN, knot_vectors, orders, Ref(-1))
+end
+function BSplineInterpolation(mesh::NURBSMesh{pdim,sdim,T}) where{pdim,sdim,T}
+    return BSplineInterpolation{pdim,T}(mesh.INN, mesh.IEN, mesh.knot_vectors, mesh.orders, Ref(-1))
 end
 JuAFEM.getnbasefunctions(b::BSplineInterpolation) = prod(b.orders.+1)
 

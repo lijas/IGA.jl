@@ -36,6 +36,8 @@ struct BezierCell{dim,N,order} <: JuAFEM.AbstractCell{dim,N,4}
     end
 end
 
+_bernstein_ordering(::BezierCell{dim,N,orders}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())
+
 JuAFEM.faces(c::BezierCell{2,9,(2,2)}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), 
                                          (c.nodes[3],c.nodes[6],c.nodes[9]),
                                          (c.nodes[9],c.nodes[8],c.nodes[7]),
