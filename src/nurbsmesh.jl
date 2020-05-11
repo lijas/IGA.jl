@@ -1,5 +1,47 @@
 export getnbasefunctions, NURBSMesh
 
+struct BezierGrid{G<:JuAFEM.Grid} <: JuAFEM.AbstractGrid
+	grid::G
+	rational_weights::Vector{Float64}
+	beo::Vector{BezierExtractionOperator{Float64}}
+end
+JuAFEM.getdim(g::BezierGrid) = JuAFEM.getdim(g.grid)
+
+function BezierGrid(cells::Vector{C},
+		nodes::Vector{JuAFEM.Node{dim,T}};
+		cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
+		nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
+		facesets::Dict{String,Set{Tuple{Int,Int}}}=Dict{String,Set{Tuple{Int,Int}}}(),
+		boundary_matrix::SparseArrays.SparseMatrixCSC{Bool,Int}=SparseArrays.spzeros(Bool, 0, 0)) where {dim,C,T}
+
+	grid = JuAFEM.Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
+
+	rational_weights = ones(T, JuAFEM.getnnodes(grid))
+	return BezierGrid(grid, rational_weights)
+end
+
+function BezierGrid(grid::G) where {G}
+	rational_weights = ones(Float64, JuAFEM.getnnodes(grid))
+	return BezierGrid(grid, rational_weights)
+end
+
+function Base.getproperty(m::BezierGrid{G}, s::Symbol) where {G}
+    if s === :nodes
+        return getfield(m.grid, :nodes)
+    elseif s === :cells
+		return getfield(m.grid, :cells)
+    elseif s === :cellsets
+		return getfield(m.grid, :cellsets)
+    elseif s === :nodesets
+		return getfield(m.grid, :nodesets)
+    elseif s === :facesets
+        return getfield(m.grid, :facesets)
+    else 
+        return getfield(m, s)
+    end
+end
+
+
 struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 	knot_vectors::NTuple{pdim,Vector{T}}
 	orders::NTuple{pdim,Int}
@@ -306,3 +348,50 @@ function get_nurbs_meshdata(order::NTuple{3,Int}, nbf::NTuple{3,Int})
 	return nel, nnp, nen, INN, IEN
 end
 
+function WriteVTK.vtk_point_data(vtkfile, dh::JuAFEM.MixedDofHandler, u::Vector, beo::Vector{BezierExtractionOperator{T}}, suffix="") where {T}
+
+    fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
+
+    for name in fieldnames
+        JuAFEM.@debug println("exporting field $(name)")
+        field_dim = JuAFEM.getfielddim(dh, name)
+        space_dim = field_dim == 2 ? 3 : field_dim
+        data = fill(NaN, space_dim, JuAFEM.getnnodes(dh.grid))  # set default value
+
+        for fh in dh.fieldhandlers
+            # check if this fh contains this field, otherwise continue to the next
+            field_pos = findfirst(i->i == name, JuAFEM.getfieldnames(fh))
+            if field_pos == 0 && continue end
+
+            cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
+            offset = JuAFEM.field_offset(fh, name)
+
+            for cellnum in cellnumbers
+                cell = dh.grid.cells[cellnum]
+                n = JuAFEM.ndofs_per_cell(dh, cellnum)
+                eldofs = zeros(Int, n)
+                _celldofs = JuAFEM.celldofs!(eldofs, dh, cellnum)
+                counter = 1
+
+				@assert(field_dim==1)
+				dof_range = 1:(length(cell.nodes)*field_dim ) .+ offset
+				ue = compute_bezier_points(beo[cellnum], u[_celldofs[dof_range]])
+				@show ue
+                for node in cell.nodes
+                    for d in 1:field_dim
+                        data[d, node] = ue[counter]
+                        JuAFEM.@debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
+                        counter += 1
+                    end
+                    if field_dim == 2
+                        # paraview requires 3D-data so pad with zero
+                        data[3, node] = 0
+                    end
+                end
+            end
+        end
+        vtk_point_data(vtkfile, data, string(name, suffix))
+    end
+
+    return vtkfile
+end

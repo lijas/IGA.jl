@@ -195,6 +195,48 @@ function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_
     return coords
 end
 
+_bernstein_ordering(::BezierCell{dim,N,orders}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())
+function _bernstein_ordering(::BernsteinBasis{2,orders}) where {orders}
+    @assert(length(orders)==2)
+
+    dim = 2
+
+    ci = CartesianIndices((orders.+1))
+    ind = reshape(1:prod(orders.+1), (orders.+1)...)
+
+    #Corners
+    ordering = Int[]
+    corner = ci[1,1]
+    push!(ordering, ind[corner])
+
+    corner = ci[end,1]
+    push!(ordering, ind[corner])
+
+    corner = ci[end,end]
+    push!(ordering, ind[corner])
+
+    corner = ci[1,end]
+    push!(ordering, ind[corner])
+
+    #edges
+    edge = ci[2:end-1,1]
+    append!(ordering, ind[edge])
+    
+    edge = ci[end,2:end-1]
+    append!(ordering, ind[edge])
+
+    edge = ci[2:end-1,end]
+    append!(ordering, ind[edge])
+
+    edge = ci[1,2:end-1]
+    append!(ordering, ind[edge])
+
+    #inner dofs
+    rest = ci[2:end-1,2:end-1]
+    append!(ordering, ind[rest])
+    return ordering
+end
+
 """
 Second try for bezier cellvalues
 """

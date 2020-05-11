@@ -2,8 +2,6 @@
 export compute_bezier_extraction_operators
 export BezierExtractionOperator, compute_bezier_points
 
-const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
-
 
 function compute_bezier_points(Ce::AbstractMatrix{T}, control_points::AbstractVector{Vec{sdim,T}}) where {T,sdim}
 	error("dont use")
@@ -18,15 +16,13 @@ function compute_bezier_points(Ce::AbstractMatrix{T}, control_points::AbstractVe
 
 end
 
-function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}, pad::Int) where {sdim,T}
-	error("deprecated pad")
-end
 
-function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}) where {sdim,T}
+#function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}) where {sdim,T}
+function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}) where {T2,T}
 
 	@assert(length(control_points) == length(Ce))
 	n_points = length(first(Ce))#length(control_points)#length(first(Ce))
-	bezierpoints = zeros(Vec{sdim,T}, n_points)
+	bezierpoints = zeros(T2, n_points)
 
 	for (ic, p) in enumerate(control_points)
 		ce = Ce[ic]

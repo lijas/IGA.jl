@@ -8,10 +8,13 @@ using LinearAlgebra
 import SparseArrays
 using StaticArrays
 using TimerOutputs
+using WriteVTK
 
 #import InteractiveUtils
 
 import JuAFEM
+
+const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 
 include("utils.jl")
 include("splines/bsplines.jl")
@@ -21,6 +24,7 @@ include("splines/bezier.jl")
 
 #using Plots; pyplot();
 #include("plot_utils.jl")
+
 
 #const BezierCell{dim,N,order} = JuAFEM.AbstractCell{dim,N,4}
 struct BezierCell{dim,N,order} <: JuAFEM.AbstractCell{dim,N,4}
@@ -82,5 +86,32 @@ _edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), 
 
 JuAFEM.default_interpolation(::Type{BezierCell{dim,N,order}}) where {dim,N,order}= BernsteinBasis{dim,order}()
 JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"
+
+#
+function JuAFEM.cell_to_vtkcell(::Type{BezierCell{2,N,order}}) where {N,order}
+    if length(order) == 2
+        return JuAFEM.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
+    end
+end
+
+function WriteVTK.vtk_grid(filename::AbstractString, grid::JuAFEM.Grid{G}, beo::Vector{BezierExtractionOperator{T}}) where {G,T} #BezierGrid{G}
+    dim = JuAFEM.getdim(grid)
+    
+    cls = MeshCell[]
+    coords = zeros(Vec{dim,T}, JuAFEM.getnnodes(grid))
+    for (cellid, cell) in enumerate(grid.cells)
+        celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
+        if typeof(cell) <: BezierCell
+            ordering = _bernstein_ordering(cell)
+            coords[collect(cell.nodes)] = compute_bezier_points(beo[cellid], JuAFEM.getcoordinates(grid, cellid))
+            push!(cls, MeshCell(celltype, collect(cell.nodes[ordering])))
+        else
+            push!(cls, MeshCell(celltype, collect(cell.nodes)))
+        end
+    end
+    #coords = reshape(reinterpret(T, JuAFEM.getnodes(grid)), (dim, JuAFEM.getnnodes(grid)))
+    _coords = reshape(reinterpret(T, coords), (dim, JuAFEM.getnnodes(grid)))
+    return WriteVTK.vtk_grid(filename, _coords, cls)
+end
 
 end #end module

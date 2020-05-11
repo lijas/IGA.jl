@@ -1,6 +1,6 @@
 using JuAFEM, IGA, SparseArrays
 
-function doassemble(cellvalues::CellValues{dim}, K::SparseMatrixCSC, dh::DofHandler, Cvecs=-1) where {dim}
+function doassemble(cellvalues::CellValues{dim}, K::SparseMatrixCSC, dh::JuAFEM.AbstractDofHandler, Cvecs=-1) where {dim}
 
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -46,13 +46,15 @@ end
 function goiga(nelx,nely)
 
     dim = 2
-    order = 2
+    order = 3
 
     Lx = 1.0
     Ly = 1.0*2
 
-    nurbsmesh = IGA.generate_nurbsmesh((nelx + order, nely + order),(order,order),(Lx,Ly))
+    nurbsmesh = IGA.generate_nurbsmesh((nelx, nely),(order,order),(Lx,Ly),multiplicity=(1,1))
     grid = IGA.convert_to_grid_representation(nurbsmesh)
+
+    @show nurbsmesh.knot_vectors
 
     addfaceset!(grid, "left",   (x)->x[1]<0.001)
     addfaceset!(grid, "right",  (x)->x[1]>Lx*0.9999)
@@ -60,10 +62,10 @@ function goiga(nelx,nely)
     addfaceset!(grid, "top",    (x)->x[2]>Ly*0.9999)
 
     ip = IGA.BernsteinBasis{dim, (order,order)}()
-    qr = QuadratureRule{dim, RefCube}(3)
+    qr = QuadratureRule{dim, RefCube}(4)
     cellvalues = IGA.BezierCellValues(CellScalarValues(qr, ip))
 
-    dh = DofHandler(grid)
+    dh = MixedDofHandler(grid)
     push!(dh, :u, 1)
     close!(dh);
 
@@ -87,10 +89,11 @@ function goiga(nelx,nely)
 
     apply!(K, f, ch)
     u = K \ f;
-
-    #=vtk_grid("heat_equation", dh) do vtk
-        vtk_point_data(vtk, dh, u)
-    end=#
+    #vtk = vtk_grid("heat_equation_iga", grid, Cvec)
+    #IGA.vtk_point_data1(vtk, dh, u, Cvec)
+    vtk_grid("heat_equation_iga", grid, Cvec) do vtk
+        vtk_point_data(vtk, dh, u, Cvec)
+    end
 
     umax = 0.0
     temperatures = Float64[]
@@ -118,7 +121,7 @@ end
 function gofem(nelx,nely)
 
     dim = 2
-    order = 1
+    order = 2
 
     Lx = 1.0
     Ly = 1.0*2
@@ -127,11 +130,11 @@ function gofem(nelx,nely)
 
 
     ip = Lagrange{dim, RefCube, order}()
-    qr = QuadratureRule{dim, RefCube}(3)
-    cellvalues = CellScalarValues(qr, ip)
+    qr = QuadratureRule{dim, RefCube}(4)
+    cellvalues = CellScalarValues(qr, ip, JuAFEM.default_interpolation(Quadrilateral))
 
     dh = DofHandler(grid)
-    push!(dh, :u, 1)
+    push!(dh, :u, 1, ip)
     close!(dh);
 
     K = create_sparsity_pattern(dh);
@@ -161,8 +164,8 @@ end
 
 function teststuff()
 
-    ufem, ndofsfem = gofem(400,400)
-    uiga, ndofsiga = goiga(400,400)
+    ufem, ndofsfem = gofem(100,100)
+    uiga, ndofsiga = goiga(100,100)
 
     @show ufem, ndofsfem
     @show uiga, ndofsiga
