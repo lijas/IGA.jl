@@ -59,7 +59,6 @@ end
 
 function compute_bezier_extraction_operators(p::Int, q::Int, knot1::Vector{T}, knot2::Vector{T}) where T
 
-	@show q, knot2
 	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
 	Ce2, nbe2 = compute_bezier_extraction_operators(q, knot2)
 	C = Vector{eltype(Ce1)}()

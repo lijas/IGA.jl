@@ -1,4 +1,6 @@
 using JuAFEM, IGA, SparseArrays
+using Plots; pyplot()
+
 
 function doassemble(cellvalues::CellValues{dim}, K::SparseMatrixCSC, dh::JuAFEM.AbstractDofHandler, Cvecs=-1) where {dim}
 
@@ -43,18 +45,18 @@ function doassemble(cellvalues::CellValues{dim}, K::SparseMatrixCSC, dh::JuAFEM.
     return K, f
 end
 
-function goiga(nelx,nely)
+function goiga(nelx,nely, order, multiplicity)
 
     dim = 2
-    order = 3
+    #order = 3
 
     Lx = 1.0
     Ly = 1.0*2
 
-    nurbsmesh = IGA.generate_nurbsmesh((nelx, nely),(order,order),(Lx,Ly),multiplicity=(1,1))
+    nurbsmesh = IGA.generate_nurbsmesh((nelx, nely),(order,order),(Lx,Ly),multiplicity=multiplicity)
     grid = IGA.convert_to_grid_representation(nurbsmesh)
-
-    @show nurbsmesh.knot_vectors
+    
+    #@show nurbsmesh.knot_vectors
 
     addfaceset!(grid, "left",   (x)->x[1]<0.001)
     addfaceset!(grid, "right",  (x)->x[1]>Lx*0.9999)
@@ -62,11 +64,11 @@ function goiga(nelx,nely)
     addfaceset!(grid, "top",    (x)->x[2]>Ly*0.9999)
 
     ip = IGA.BernsteinBasis{dim, (order,order)}()
-    qr = QuadratureRule{dim, RefCube}(4)
+    qr = QuadratureRule{dim, RefCube}(100)
     cellvalues = IGA.BezierCellValues(CellScalarValues(qr, ip))
 
     dh = MixedDofHandler(grid)
-    push!(dh, :u, 1)
+    push!(dh, :u, 1, ip)
     close!(dh);
 
     C, nbe = IGA.compute_bezier_extraction_operators(nurbsmesh.orders, nurbsmesh.knot_vectors)
@@ -91,13 +93,26 @@ function goiga(nelx,nely)
     u = K \ f;
     #vtk = vtk_grid("heat_equation_iga", grid, Cvec)
     #IGA.vtk_point_data1(vtk, dh, u, Cvec)
-    vtk_grid("heat_equation_iga", grid, Cvec) do vtk
+    vtk_grid("heat_equation_iga"*string(order), grid, Cvec) do vtk
         vtk_point_data(vtk, dh, u, Cvec)
     end
 
     umax = 0.0
     temperatures = Float64[]
-    for celldata in CellIterator(dh)
+
+    @assert(isodd(nelx))
+    @assert(isodd(nely))
+    midcell = ceil(Int, nelx*nely*0.5)
+    qr = QuadratureRule{dim, RefCube}(1)
+    cellvalues = IGA.BezierCellValues(CellScalarValues(qr, ip))
+    coords = getcoordinates(grid, midcell)
+    bcoords = IGA.compute_bezier_points(Cvec[midcell], coords)
+    IGA.set_bezier_operator!(cellvalues, Cvec[midcell])
+    reinit!(cellvalues, bcoords)
+    ue = u[celldofs(dh, midcell)]
+    u_qp = function_value(cellvalues, 1, ue)
+    @show spatial_coordinate(cellvalues, 1, bcoords)
+    #=for celldata in CellIterator(dh)
 
         ue = u[celldofs(celldata)]
 
@@ -111,9 +126,9 @@ function goiga(nelx,nely)
             u_qp = function_value(cellvalues, qp, ue)
             push!(temperatures, u_qp)
         end
-    end
+    end=#
 
-    return maximum(u), ndofs(dh)
+    return u_qp, ndofs(dh)
 end
 
 
@@ -164,10 +179,57 @@ end
 
 function teststuff()
 
-    ufem, ndofsfem = gofem(100,100)
-    uiga, ndofsiga = goiga(100,100)
+    meshsizes = [(11,21),(21,41),(51,101)]#,(70,70)]
+    orders = [1,2,3,4]
 
-    @show ufem, ndofsfem
-    @show uiga, ndofsiga
+    #ufem, ndofsfem = gofem(100,100)
+    #uiga, ndofsiga = goiga(100,100)
+
+
+    #overkill_sol, overkill_ndofs = gofem(1000,1000)
+    #overkill_sol, overkill_ndofs = gofem(50,50)
+
+    overkill_ndofs = 1004004 
+    overkill_sol = 0.11374078569738395
+    @show overkill_sol, overkill_ndofs
+
+    ndofs_fem = Dict(orders .=> [Int[] for _ in 1:length(orders)])
+    ndofs_iga = Dict(orders .=> [Int[] for _ in 1:length(orders)])
+    disp_fem = Dict(orders .=> [Float64[] for _ in 1:length(orders)])
+    disp_iga = Dict(orders .=> [Float64[] for _ in 1:length(orders)])
+    #meshsizes = [(3,3)]
+    #orders = [10]
+    for meshsize in meshsizes
+        for order in orders
+
+            #ufem, ndofsfem = goiga(meshsize..., order, (order,order))
+            uiga, ndofsiga = goiga(meshsize..., order, (1,1))
+            @show uiga, ndofsiga
+            error("hej")
+
+            push!(ndofs_fem[order], ndofsfem)
+            push!(ndofs_iga[order], ndofsiga)
+
+            push!(disp_fem[order], ufem)
+            push!(disp_iga[order], uiga)
+        end
+    end
+
+    return disp_fem,disp_iga, ndofs_fem,ndofs_iga, overkill_sol, overkill_ndofs
+
+    #@show ufem, ndofsfem
+    #@show uiga, ndofsiga
 
 end
+
+disp_fem,disp_iga, ndofs_fem,ndofs_iga, overkill_sol, overkill_ndofs = teststuff()
+
+fig = plot(reuse = false)
+
+for order in [2,3,4]#sort(collect(keys(ndofs_iga)))
+
+    plot!(fig, log10.(ndofs_iga[order]), log10.(disp_iga[order]./overkill_sol), marker=:square, label="$order iga")
+    plot!(fig, log10.(ndofs_fem[order]), log10.(disp_fem[order]./overkill_sol), marker=:square, label="$order fem")
+
+end
+display(fig)
