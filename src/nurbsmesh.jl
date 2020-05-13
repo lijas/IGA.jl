@@ -2,13 +2,15 @@ export getnbasefunctions, NURBSMesh
 
 struct BezierGrid{G<:JuAFEM.Grid} <: JuAFEM.AbstractGrid
 	grid::G
-	rational_weights::Vector{Float64}
+	weights::Vector{Float64} #JuaFEM.CellVector{Float64}
 	beo::Vector{BezierExtractionOperator{Float64}}
 end
 JuAFEM.getdim(g::BezierGrid) = JuAFEM.getdim(g.grid)
 
 function BezierGrid(cells::Vector{C},
-		nodes::Vector{JuAFEM.Node{dim,T}};
+		nodes::Vector{JuAFEM.Node{dim,T}},
+		weights::AbstractVector{T},
+		extraction_operator::AbstractVector{BezierExtractionOperator{T}};
 		cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
 		nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
 		facesets::Dict{String,Set{Tuple{Int,Int}}}=Dict{String,Set{Tuple{Int,Int}}}(),
@@ -16,16 +18,15 @@ function BezierGrid(cells::Vector{C},
 
 	grid = JuAFEM.Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
 
-	rational_weights = ones(T, JuAFEM.getnnodes(grid))
-	return BezierGrid(grid, rational_weights)
+	return BezierGrid{typeof(grid)}(grid, weights, extraction_operator)
 end
 
-function BezierGrid(grid::G) where {G}
-	rational_weights = ones(Float64, JuAFEM.getnnodes(grid))
+#=function BezierGrid(grid::G) where {G}
+	rational_weights = ones(Float64, length(JuAFEM.getnnodes(grid)))
 	return BezierGrid(grid, rational_weights)
-end
+end=#
 
-function Base.getproperty(m::BezierGrid{G}, s::Symbol) where {G}
+function Base.getproperty(m::BezierGrid, s::Symbol)
     if s === :nodes
         return getfield(m.grid, :nodes)
     elseif s === :cells
@@ -41,16 +42,34 @@ function Base.getproperty(m::BezierGrid{G}, s::Symbol) where {G}
     end
 end
 
+function getweights!(w::AbstractVector{T}, grid::BezierGrid, ic::Int) where {T}
+	nodeids = zeros(Int, JuAFEM.nnodes_per_cell(grid))
+	JuAFEM.cellnodes!(nodeids, grid, ic)
+	w .= grid.weights[nodeids]
+end
+
+function get_bezier_coordinates!(bcoords::AbstractVector{Vec{dim,T}}, wb::AbstractVector{T}, grid::BezierGrid, ic::Int) where {dim,T}
+
+	C = grid.beo[ic]
+
+	JuAFEM.getcoordinates!(bcoords, grid.grid, ic)
+	getweights!(wb, grid, ic)
+	wb .= compute_bezier_points(C, wb)
+
+	bcoords .= inv.(wb) .* compute_bezier_points(C, w.*bcoords)
+end
 
 struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 	knot_vectors::NTuple{pdim,Vector{T}}
 	orders::NTuple{pdim,Int}
 	control_points::Vector{Vec{sdim,T}}
+	weights::Vector{T}
 	IEN::Matrix{Int}
 	INN::Matrix{Int}
 
 	function NURBSMesh{pdim,sdim,T}(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdim,Int},
-						            control_points::Vector{Vec{sdim,T}}) where {pdim,sdim,T}
+									control_points::Vector{Vec{sdim,T}}, 
+									weights::AbstractVector{T}=ones(T, length(control_points))) where {pdim,sdim,T}
 
 		pdim==3 && sdim==2 ? error("A 3d geometry can not exist in 2d") : nothing
 
@@ -72,9 +91,27 @@ struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 		end
 		to_keep = setdiff(collect(1:nel), to_remove)
 		IEN = IEN[:, to_keep] #IEN = IEN[end:-1:1, to_keep]
-		new{pdim,sdim,T}(knot_vectors,orders,control_points,IEN,INN)
+		new{pdim,sdim,T}(knot_vectors,orders,control_points,weights,IEN,INN)
 	end
 
+end
+
+function BezierGrid(mesh::NURBSMesh{sdim}) where {sdim}
+
+	ncontrolpoints_per_cell = length(mesh.IEN[:,1])
+	nodes = [JuAFEM.Node(x) for x in mesh.control_points]
+
+	_BezierCell = BezierCell{sdim,ncontrolpoints_per_cell,mesh.orders}
+	cells = [_BezierCell(Tuple(reverse(mesh.IEN[:,ie]))) for ie in 1:getncells(mesh)]
+
+	C, nbe = compute_bezier_extraction_operators(mesh.orders, mesh.knot_vectors)
+	@assert nbe == length(cells)
+
+	Cvec = bezier_extraction_to_vectors(C)
+
+	grid = JuAFEM.Grid(cells,nodes)
+
+	return BezierGrid{typeof(grid)}(grid, mesh.weights, Cvec)
 end
 
 getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)

@@ -317,16 +317,20 @@ function JuAFEM.reinit!(bcv::BezierFaceValues, x::AbstractVector{Vec{dim_s,T}}, 
     JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
     bcv.cv_store.current_face[] = faceid
 
-    _reinit_bezier!(bcv, x, faceid)
+    _reinit_bezier!(bcv, faceid)
 end
 
 function JuAFEM.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T}
     JuAFEM.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
-    _reinit_bezier!(bcv, x, 1)
+    _reinit_bezier!(bcv, 1)
     
 end
+function JuAFEM.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractArray{T}) where {dim_s,T}
+    JuAFEM.reinit!(bcv.cv_bezier, x, w) #call the normal reinit function first
+    _reinit_bezier!(bcv, 1)
+end
 
-function _reinit_bezier!(bcv::BezierValues{dim_s}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T}
+function _reinit_bezier!(bcv::BezierValues{dim_s}, faceid::Int) where {dim_s,T}
 
     cv_store = bcv.cv_store
 

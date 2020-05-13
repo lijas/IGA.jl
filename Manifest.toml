@@ -141,9 +141,7 @@ version = "0.21.0"
 
 [[JuAFEM]]
 deps = ["LinearAlgebra", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
-git-tree-sha1 = "6b7a27d51a650c09dd20d081faeaac45e38dacec"
-repo-rev = "master"
-repo-url = "https://github.com/KristofferC/JuAFEM.jl.git"
+path = "C:\\Users\\elias\\.julia\\dev\\JuAFEM"
 uuid = "30d91d44-8115-11e8-1d28-c19a5ac16de8"
 version = "0.2.0"
 
