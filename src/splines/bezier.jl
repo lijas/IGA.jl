@@ -35,6 +35,8 @@ function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi::Vec{dim}) where {dim,
     return val
 end
 
+JuAFEM.vertices(ip::BernsteinBasis{dim,order}) where {dim,order} = ntuple(i->i, JuAFEM.getnbasefunctions(ip))
+
 JuAFEM.faces(::BernsteinBasis{2,(2,2)}) = ((1,2,3),(3,6,9), (9,8,7), (7,4,1))
 JuAFEM.faces(::IGA.BernsteinBasis{1,order}) where order = ((1,), (order+1,))
 
@@ -144,7 +146,7 @@ function JuAFEM.edges(::IGA.BernsteinBasis{3,order}) where {order}
     return Tuple(edges)
 end
 
-JuAFEM.getnbasefunctions(b::BernsteinBasis{dim,order}) where {dim,order} = prod(order.+1)#(order+1)^dim
+JuAFEM.getnbasefunctions(::BernsteinBasis{dim,order}) where {dim,order} = prod(order.+1)#(order+1)^dim
 JuAFEM.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
 JuAFEM.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
 JuAFEM.nfacedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
