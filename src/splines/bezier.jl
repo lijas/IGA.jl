@@ -425,6 +425,8 @@ end
 
 function JuAFEM.value(b::BSplineInterpolation{2,T}, i, xi) where {T}
 
+    @assert _coord_in_range(xi)
+
     global_basefunk = b.IEN[i,b.current_element[]]
 
     _ni,_nj = b.INN[b.IEN[1,b.current_element[]],:] #The first basefunction defines the element span
@@ -445,6 +447,9 @@ function JuAFEM.value(b::BSplineInterpolation{2,T}, i, xi) where {T}
 end
 
 function JuAFEM.value(b::BSplineInterpolation{1,T}, i, xi::Vec{1}) where {T}
+    
+    @assert _coord_in_range(xi)
+    
     global_basefunk = b.IEN[i,b.current_element[]]
 
     _ni = b.INN[b.IEN[1,b.current_element[]],:][1] #The first basefunction defines the element span

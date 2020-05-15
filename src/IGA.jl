@@ -116,4 +116,32 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::JuAFEM.Grid{G}, beo::
     return WriteVTK.vtk_grid(filename, _coords, cls)
 end
 
+function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid)
+    dim = JuAFEM.getdim(grid)
+    T = eltype(first(grid.nodes).x)
+    
+    cls = MeshCell[]
+    coords = zeros(Vec{dim,T}, JuAFEM.getnnodes(grid))
+    weights = zeros(T, JuAFEM.getnnodes(grid))
+    ordering = _bernstein_ordering(first(grid.cells))
+
+    @show ordering
+
+    for (cellid, cell) in enumerate(grid.cells)
+        celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
+        
+        x,w = get_bezier_coordinates(grid, cellid)
+        coords[collect(cell.nodes)] .= x
+        weights[collect(cell.nodes)] .= w
+
+        push!(cls, MeshCell(celltype, collect(cell.nodes[ordering])))
+    end
+    #coords = reshape(reinterpret(T, JuAFEM.getnodes(grid)), (dim, JuAFEM.getnnodes(grid)))
+    _coords = reshape(reinterpret(T, coords), (dim, JuAFEM.getnnodes(grid)))
+    vtkfile = WriteVTK.vtk_grid(filename, _coords, cls)
+
+    vtkfile["RationalWeights", VTKPointData()] = weights
+    return vtkfile
+end
+
 end #end module

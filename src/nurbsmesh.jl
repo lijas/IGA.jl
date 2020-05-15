@@ -6,6 +6,7 @@ struct BezierGrid{G<:JuAFEM.Grid} <: JuAFEM.AbstractGrid
 	beo::Vector{BezierExtractionOperator{Float64}}
 end
 JuAFEM.getdim(g::BezierGrid) = JuAFEM.getdim(g.grid)
+getT(g::BezierGrid) = eltype(first(g.nodes).x)
 
 function BezierGrid(cells::Vector{C},
 		nodes::Vector{JuAFEM.Node{dim,T}},
@@ -43,20 +44,32 @@ function Base.getproperty(m::BezierGrid, s::Symbol)
 end
 
 function getweights!(w::AbstractVector{T}, grid::BezierGrid, ic::Int) where {T}
-	nodeids = zeros(Int, JuAFEM.nnodes_per_cell(grid))
-	JuAFEM.cellnodes!(nodeids, grid, ic)
+	nodeids = collect(grid.cells[ic].nodes)
 	w .= grid.weights[nodeids]
 end
 
-function get_bezier_coordinates!(bcoords::AbstractVector{Vec{dim,T}}, wb::AbstractVector{T}, grid::BezierGrid, ic::Int) where {dim,T}
+function get_bezier_coordinates!(bcoords::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}, grid::BezierGrid, ic::Int) where {dim,T}
 
 	C = grid.beo[ic]
 
 	JuAFEM.getcoordinates!(bcoords, grid.grid, ic)
-	getweights!(wb, grid, ic)
-	wb .= compute_bezier_points(C, wb)
+	getweights!(w, grid, ic)
 
-	bcoords .= inv.(wb) .* compute_bezier_points(C, w.*bcoords)
+	bcoords .= inv.(compute_bezier_points(C, w)) .* compute_bezier_points(C, w.*bcoords)
+	w .= compute_bezier_points(C, w)
+	return nothing
+end
+
+function get_bezier_coordinates(grid::BezierGrid, ic::Int)
+
+	dim = JuAFEM.getdim(grid); T = getT(grid)
+
+	n = JuAFEM.nnodes_per_cell(grid, ic)
+	w = zeros(T, n)
+	x = zeros(Vec{dim,T}, n)
+	
+	get_bezier_coordinates!(x,w,grid,ic)
+	return x,w
 end
 
 struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
@@ -272,6 +285,93 @@ function generate_curved_nurbsmesh(nbasefuncs::NTuple{2,Int}, order::NTuple{2,In
 	
     return mesh
 
+end
+
+function generate_beziergrid_1()
+
+	cp = [
+		Vec((0.0,   1.0)),   
+		Vec((0.2612,   1.0)),   
+		Vec((0.7346,   0.7346)),   
+		Vec((1.0,   0.2612)),   
+		Vec((1.0,   0.0)),   
+		Vec((0.0,   1.25)),   
+		Vec((0.3265,   1.25)),   
+		Vec((0.9182,   0.9182)),   
+		Vec((1.25,   0.3265)),   
+		Vec((1.25,   0.0)),   
+		Vec((0.0,   1.75)),   
+		Vec((0.4571,   1.75)),   
+		Vec((1.2856,   1.2856)),   
+		Vec((1.75,   0.4571)),   
+		Vec((1.75,   0.0)),   
+		Vec((0.0,   2.25)),   
+		Vec((0.5877,   2.25)),   
+		Vec((1.6528,   1.6528)),   
+		Vec((2.25,   0.5877)),   
+		Vec((2.25,   0.0)),   
+		Vec((0.0,   2.5)),   
+		Vec((0.6530,   2.5)),   
+		Vec((1.8365,   1.8365)),   
+		Vec((2.5,   0.6530)),   
+		Vec((2.5,   0.0))
+    ]
+    
+    w = [1.0, 0.9024, 0.8373, 0.9024, 1.0,
+         1.0, 0.9024, 0.8373, 0.9024, 1.0,
+         1.0, 0.9024, 0.8373, 0.9024, 1.0,
+         1.0, 0.9024, 0.8373, 0.9024, 1.0,
+         1.0, 0.9024, 0.8373, 0.9024, 1.0]
+
+    knot_vectors = (Float64[0, 0, 0, 1/3, 2/3, 1, 1, 1],
+                    Float64[0, 0, 0, 1/3, 2/3, 1, 1, 1])
+    orders = (2,2)
+
+	#Create intermidate nurbsmesh represention 
+	#mesh = NURBSMesh(knot_vectors, orders, cp, w)
+
+	cells, nodes = get_nurbs_griddata(orders, knot_vectors, cp)
+
+	#Bezier extraction operator
+	C, nbe = compute_bezier_extraction_operators(orders, knot_vectors)
+	@assert(nbe == 9)
+	Cvec = bezier_extraction_to_vectors(C)
+
+	return BezierGrid(cells, nodes, w, Cvec)
+
+end
+
+function get_nurbs_griddata(orders::NTuple{pdim,Int}, knot_vectors::NTuple{pdim,Vector{T}}, control_points::Vector{Vec{sdim,T}}) where {sdim,pdim,T}
+	
+	#get mesh data in CALFEM/Matrix format
+	nbasefuncs = length.(knot_vectors) .- orders .- 1
+	nel, nnp, nen, INN, IEN = get_nurbs_meshdata(orders, nbasefuncs)
+	
+	@assert(prod(nbasefuncs)==maximum(IEN))
+
+	#Remove elements which are zero length
+	to_remove = Int[]
+	for e in 1:nel
+		nurbs_coords = [INN[IEN[1,e],d] for d in 1:pdim]
+		for d in 1:pdim
+			if knot_vectors[d][nurbs_coords[d]] == knot_vectors[d][nurbs_coords[d]+1]
+				push!(to_remove, e)
+				break
+			end
+		end
+	end
+	to_keep = setdiff(collect(1:nel), to_remove)
+	IEN = IEN[:, to_keep] #IEN = IEN[end:-1:1, to_keep]
+	nel = size(IEN, 2)
+
+	#Create cells and nodes
+	ncontrolpoints = length(IEN[:,1])
+	nodes = [JuAFEM.Node(x) for x in control_points]
+
+	_BezierCell = BezierCell{sdim,ncontrolpoints,orders}
+	cells = [_BezierCell(Tuple(reverse(IEN[:,ie]))) for ie in 1:nel]
+
+	return cells, nodes
 end
 
 function get_nurbs_meshdata(order::NTuple{1,Int}, nbf::NTuple{1,Int})

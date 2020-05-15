@@ -34,6 +34,16 @@ function bezier_extraction_to_vector(Ce::AbstractMatrix{T}) where T
     return Cvecs
 end
 
+function beo2matrix(m::BezierExtractionOperator{T}) where T
+
+    m2 = zeros(T, length(m), length(first(m)))
+    for r in 1:length(m)
+        for c in 1:length(m[r])
+            m2[r,c] = m[r][c]
+        end
+    end
+    return m2
+end
 
 function _interleave_zeros(a::AbstractVector{T}, dim_s::Int, offset::Int = 0) where T
     dim_s > 0 || error("dim_s < 1")
