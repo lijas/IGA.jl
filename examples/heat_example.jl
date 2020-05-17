@@ -93,9 +93,9 @@ function goiga(nelx,nely, order, multiplicity)
     u = K \ f;
     #vtk = vtk_grid("heat_equation_iga", grid, Cvec)
     #IGA.vtk_point_data1(vtk, dh, u, Cvec)
-    vtk_grid("heat_equation_iga"*string(order), grid, Cvec) do vtk
+    #=vtk_grid("heat_equation_iga"*string(order), grid, Cvec) do vtk
         vtk_point_data(vtk, dh, u, Cvec)
-    end
+    end=#
 
     umax = 0.0
     temperatures = Float64[]
@@ -179,15 +179,10 @@ end
 
 function teststuff()
 
-    meshsizes = [(11,21),(21,41),(51,101)]#,(70,70)]
-    orders = [1,2,3,4]
+    meshsizes = [(11,21).*k for k in 1:2:7]#[(11,21),(21,41),(51,101)]#,(70,70)]
+    orders = [2,3]#[1,2,3,4]
 
-    #ufem, ndofsfem = gofem(100,100)
-    #uiga, ndofsiga = goiga(100,100)
-
-
-    #overkill_sol, overkill_ndofs = gofem(1000,1000)
-    #overkill_sol, overkill_ndofs = gofem(50,50)
+    #overkill_sol, overkill_ndofs = goiga((200,400), 2, (2,2))
 
     overkill_ndofs = 1004004 
     overkill_sol = 0.11374078569738395
@@ -197,15 +192,12 @@ function teststuff()
     ndofs_iga = Dict(orders .=> [Int[] for _ in 1:length(orders)])
     disp_fem = Dict(orders .=> [Float64[] for _ in 1:length(orders)])
     disp_iga = Dict(orders .=> [Float64[] for _ in 1:length(orders)])
-    #meshsizes = [(3,3)]
-    #orders = [10]
+
     for meshsize in meshsizes
         for order in orders
 
-            #ufem, ndofsfem = goiga(meshsize..., order, (order,order))
+            ufem, ndofsfem = goiga(meshsize..., order, (order,order))
             uiga, ndofsiga = goiga(meshsize..., order, (1,1))
-            @show uiga, ndofsiga
-            error("hej")
 
             push!(ndofs_fem[order], ndofsfem)
             push!(ndofs_iga[order], ndofsiga)
@@ -217,19 +209,16 @@ function teststuff()
 
     return disp_fem,disp_iga, ndofs_fem,ndofs_iga, overkill_sol, overkill_ndofs
 
-    #@show ufem, ndofsfem
-    #@show uiga, ndofsiga
-
 end
 
-disp_fem,disp_iga, ndofs_fem,ndofs_iga, overkill_sol, overkill_ndofs = teststuff()
+disp_fem, disp_iga, ndofs_fem, ndofs_iga, overkill_sol, overkill_ndofs = teststuff()
 
-fig = plot(reuse = false)
 
-for order in [2,3,4]#sort(collect(keys(ndofs_iga)))
-
+for order in [2,3]#,3,4]#sort(collect(keys(ndofs_iga)))
+    fig = plot(reuse = false)
+    
     plot!(fig, log10.(ndofs_iga[order]), log10.(disp_iga[order]./overkill_sol), marker=:square, label="$order iga")
     plot!(fig, log10.(ndofs_fem[order]), log10.(disp_fem[order]./overkill_sol), marker=:square, label="$order fem")
 
+    display(fig)
 end
-display(fig)

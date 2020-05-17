@@ -43,7 +43,7 @@ end
 
 function goiga()
 
-    grid = IGA.generate_beziergrid_1()
+    grid = IGA.generate_nurbsmesh_2((20,20))
     order = 2
 
     n = JuAFEM.nnodes_per_cell(grid)
@@ -54,7 +54,7 @@ function goiga()
     IGA.get_bezier_coordinates!(coords, weights, grid, cellid)
 
 
-    vtk_grid("heat_equation_bla"*string(order), grid) do vtk
+    vtk_grid("heat_equation_half_bla"*string(order), grid) do vtk
         #vtk_point_data(vtk, dh, u)
     end
     error("Hej")

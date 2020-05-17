@@ -80,7 +80,7 @@ struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 	IEN::Matrix{Int}
 	INN::Matrix{Int}
 
-	function NURBSMesh{pdim,sdim,T}(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdim,Int},
+	function NURBSMesh(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdim,Int},
 									control_points::Vector{Vec{sdim,T}}, 
 									weights::AbstractVector{T}=ones(T, length(control_points))) where {pdim,sdim,T}
 
@@ -122,9 +122,9 @@ function BezierGrid(mesh::NURBSMesh{sdim}) where {sdim}
 
 	Cvec = bezier_extraction_to_vectors(C)
 
-	grid = JuAFEM.Grid(cells,nodes)
+	#grid = JuAFEM.Grid(cells,nodes)
 
-	return BezierGrid{typeof(grid)}(grid, mesh.weights, Cvec)
+	return BezierGrid(cells, nodes, mesh.weights, Cvec)
 end
 
 getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
@@ -338,6 +338,99 @@ function generate_beziergrid_1()
 	Cvec = bezier_extraction_to_vectors(C)
 
 	return BezierGrid(cells, nodes, w, Cvec)
+
+end
+
+function generate_beziergrid_2()
+
+
+	
+	cp = [
+		Vec((-1.0,   0.0)),   
+		Vec((-1.0, sqrt(2)-1)),   
+		Vec((1-sqrt(2),   1.0)),   
+		Vec((0.0,   1.0)),   
+		Vec((-2.5,   0.0)),   
+		Vec((-2.5,   0.75)),   
+		Vec((-0.75,   2.5)),   
+		Vec((0.0,   2.5)),   
+		Vec((-4.0,   0.0)),   
+		Vec((-4.0,   4.0)),   
+		Vec((-4.0,   4.0)),   
+		Vec((0.0,   4.0))
+    ]
+    
+	w = [1,1,1, 
+		 0.5(1 + 1/sqrt(2)), 1,1,
+		 0.5(1 + 1/sqrt(2)), 1,1,
+		 1,1,1]
+
+
+    knot_vectors = (Float64[0, 0, 0, 1/5, 1, 1, 1],
+                    Float64[0, 0, 0, 1, 1, 1])
+    orders = (2,2)
+
+	#Create intermidate nurbsmesh represention 
+	#mesh = NURBSMesh(knot_vectors, orders, cp, w)
+
+	cells, nodes = get_nurbs_griddata(orders, knot_vectors, cp)
+
+	#Bezier extraction operator
+	C, nbe = compute_bezier_extraction_operators(orders, knot_vectors)
+	@assert(nbe == 2)
+	Cvec = bezier_extraction_to_vectors(C)
+
+	return BezierGrid(cells, nodes, w, Cvec)
+
+end
+
+function generate_nurbsmesh_2(nel::NTuple{2,Int})
+
+	@assert(nel[1]>=2 && nel[2]>=1)
+	
+	cp = [
+		Vec((-1.0,   0.0)),   
+		Vec((-1.0, sqrt(2)-1)),   
+		Vec((1-sqrt(2),   1.0)),   
+		Vec((0.0,   1.0)),   
+		Vec((-2.5,   0.0)),   
+		Vec((-2.5,   0.75)),   
+		Vec((-0.75,   2.5)),   
+		Vec((0.0,   2.5)),   
+		Vec((-4.0,   0.0)),   
+		Vec((-4.0,   4.0)),   
+		Vec((-4.0,   4.0)),   
+		Vec((0.0,   4.0))
+    ]
+    
+	w = [1,1,1, 
+		 0.5(1 + 1/sqrt(2)), 1,1,
+		 0.5(1 + 1/sqrt(2)), 1,1,
+		 1,1,1]
+
+
+    knot_vectors = (Float64[0, 0, 0, 1/2, 1, 1, 1],
+                    Float64[0, 0, 0, 1, 1, 1])
+    orders = (2,2)
+
+	#Create intermidate nurbsmesh represention 
+	rangex = range(0.0, stop = 1.0, length=nel[1])[2:end-1]
+	rangey = range(0.0, stop = 1.0, length=nel[1]+1)[2:end-1]
+	for xi in rangex
+		if xi == 0.5
+			continue
+		end
+		knotinsertion!(knot_vectors, orders, cp, w, xi, dir=1)
+	end
+	rangex = range(0.0, stop = 1.0, length=nel[1]+1)[2:end-1]
+	for xi in rangex
+		knotinsertion!(knot_vectors, orders, cp, w, xi, dir=2)
+	end
+
+	
+	mesh = NURBSMesh(knot_vectors, orders, cp, w)
+
+	return BezierGrid(mesh)
 
 end
 

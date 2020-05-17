@@ -119,6 +119,39 @@ function compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
 	return C, nb
 end
 
+#Worlds slowest knot insertion algo.
+function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdim,Int}, control_points::Vector{Vec{sdim,T}}, weights::Vector{T}, ξᴺ::T; dir::Int) where {pdim,sdim,T}
+
+	C, new_knot_vector = knotinsertion(knot_vectors[dir], orders[dir], ξᴺ)
+	
+	n = length(knot_vectors[dir]) - 1 - orders[dir] #number of basefunctions
+	m = length(control_points) ÷ n
+
+	
+	new_cps = zeros(Vec{sdim,T}, (n+1)*m)
+	new_ws = zeros(T, (n+1)*m)
+	for r in 1:m
+		indx = (dir==1) ? ((1:n) .+ (r-1)*n) : (r:m:(length(control_points)))
+		cp_row = control_points[indx]
+
+		w_row = weights[indx]
+		for i in 1:size(C,1)
+			new_cp = sum(C[i,:] .* cp_row)
+			new_w = sum(C[i,:] .* w_row)
+			
+			indx2 = (dir==1) ? (i + (r-1)*(n+1)) : (r + (i-1)*m)
+		
+			new_cps[indx2] = new_cp
+			new_ws[indx2] = new_w
+		end
+	end
+	
+	JuAFEM.copy!!(knot_vectors[dir], new_knot_vector)
+	JuAFEM.copy!!(control_points, new_cps)
+	JuAFEM.copy!!(weights, new_ws)
+
+end
+
 function knotinsertion(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
 
     n = length(ξ) - p - 1
@@ -147,5 +180,4 @@ function knotinsertion(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
     new_knot_vector = copy(ξ)
     insert!(new_knot_vector,k+1,ξᴺ)
     return C, new_knot_vector
-
 end
