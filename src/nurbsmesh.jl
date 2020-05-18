@@ -195,6 +195,9 @@ function generate_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _size::NT
 	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 
 	control_points = Vec{sdim,T}[]
+	@show collect(range(0.0, stop=h, length=length(knot_vectors[2])-1-orders[2] ))
+	@show [0.0, h/10, h/8, 7h/8, 9h/10, h]
+	#for y in [0.0, h/10, h/8, 7h/8, 9h/10, h]
 	for y in range(0.0, stop=h, length=length(knot_vectors[2])-1-orders[2] )
 		for x in range(0.0, stop=L, length=length(knot_vectors[1])-1-orders[1] )
 			_v = [x,y]
@@ -205,7 +208,7 @@ function generate_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _size::NT
 		end
 	end
 
-	mesh = IGA.NURBSMesh{pdim,sdim,T}(Tuple(knot_vectors), orders, control_points)
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
 #=	point = zeros(T,sdim)
 	points = Vec{sdim,T}[]
@@ -384,7 +387,7 @@ function generate_beziergrid_2()
 
 end
 
-function generate_nurbsmesh_2(nel::NTuple{2,Int})
+function generate_beziergrid_2(nel::NTuple{2,Int})
 
 	@assert(nel[1]>=2 && nel[2]>=1)
 	
@@ -408,6 +411,10 @@ function generate_nurbsmesh_2(nel::NTuple{2,Int})
 		 0.5(1 + 1/sqrt(2)), 1,1,
 		 1,1,1]
 
+	w = Float64[1,1,1, 
+		 1,1,1,
+		 1,1,1,
+		 1,1,1]
 
     knot_vectors = (Float64[0, 0, 0, 1/2, 1, 1, 1],
                     Float64[0, 0, 0, 1, 1, 1])
@@ -427,7 +434,7 @@ function generate_nurbsmesh_2(nel::NTuple{2,Int})
 		knotinsertion!(knot_vectors, orders, cp, w, xi, dir=2)
 	end
 
-	
+	@assert( all(w .≈ 1.0) )
 	mesh = NURBSMesh(knot_vectors, orders, cp, w)
 
 	return BezierGrid(mesh)
@@ -620,6 +627,58 @@ function WriteVTK.vtk_point_data(vtkfile, dh::JuAFEM.MixedDofHandler, u::Vector,
                 end
             end
         end
+        vtk_point_data(vtkfile, data, string(name, suffix))
+    end
+
+    return vtkfile
+end
+
+function vtk_bezier_point_data(vtkfile, dh::JuAFEM.MixedDofHandler, u::Vector{T}, suffix="") where {T}
+
+    fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
+
+    for name in fieldnames
+        JuAFEM.@debug println("exporting field $(name)")
+        field_dim = JuAFEM.getfielddim(dh, name)
+        space_dim = field_dim == 2 ? 3 : field_dim
+        data = fill(NaN, space_dim, JuAFEM.getnnodes(dh.grid))  # set default value
+
+        for fh in dh.fieldhandlers
+            # check if this fh contains this field, otherwise continue to the next
+            field_pos = findfirst(i->i == name, JuAFEM.getfieldnames(fh))
+            if field_pos == 0 && continue end
+
+            cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
+            offset = JuAFEM.field_offset(fh, name)
+
+            for cellnum in cellnumbers
+                cell = dh.grid.cells[cellnum]
+                n = JuAFEM.ndofs_per_cell(dh, cellnum)
+                eldofs = zeros(Int, n)
+                _celldofs = JuAFEM.celldofs!(eldofs, dh, cellnum)
+                counter = 1
+
+				#@assert(field_dim==1)
+				dof_range = 1:(length(cell.nodes)*field_dim ) .+ offset
+
+				utuple = reinterpret(IGA.SVector{field_dim,T}, u[_celldofs[dof_range]])
+				uetuple = compute_bezier_points(dh.grid.beo[cellnum], utuple)
+				ue = reinterpret(T, uetuple)
+				
+                for node in cell.nodes
+                    for d in 1:field_dim
+                        data[d, node] = ue[counter]
+                        JuAFEM.@debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
+                        counter += 1
+                    end
+                    if field_dim == 2
+                        # paraview requires 3D-data so pad with zero
+                        data[3, node] = 0
+                    end
+                end
+            end
+		end
+		
         vtk_point_data(vtkfile, data, string(name, suffix))
     end
 

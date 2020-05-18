@@ -312,7 +312,7 @@ JuAFEM.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} 
 
 
 JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = JuAFEM.shape_gradient(bcv.cv_store, q_point, base_func)#bcv.cv_store.dNdx[base_func, q_point]
-set_bezier_operator!(bcv::BezierValues, beo::BezierExtractionOperator) = bcv.current_beo[]=beo
+set_bezier_operator!(bcv::BezierValues, beo::BezierExtractionOperator{T}) where T = bcv.current_beo[]=beo
 _cellvaluestype(bcv::BezierValues{dim_s,T,CV}) where {dim_s,T,CV} = CV
 
 function JuAFEM.reinit!(bcv::BezierFaceValues, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T}
@@ -438,6 +438,10 @@ function JuAFEM.value(b::BSplineInterpolation{2,T}, i, xi) where {T}
     ξ = 0.5*((b.knot_vectors[1][_ni+1] - b.knot_vectors[1][_ni])*gp[1] + (b.knot_vectors[1][_ni+1] + b.knot_vectors[1][_ni]))
     #dξdξ̃ = 0.5*(local_knot[ni+1] - local_knot[ni])
     η = 0.5*((b.knot_vectors[2][_nj+1] - b.knot_vectors[2][_nj])*gp[2] + (b.knot_vectors[2][_nj+1] + b.knot_vectors[2][_nj]))
+
+    #=for 
+        ξ += _bspline_basis_value_alg1(b.orders[1], b.knot_vectors[1], ni, gp[1])*b.knot_vectors[1][_ni]
+    end=#
 
     #dηdη̂ = 0.5*(local_knot[nj+1] - local_knot[nj])
     x = _bspline_basis_value_alg1(b.orders[1], b.knot_vectors[1], ni, ξ)

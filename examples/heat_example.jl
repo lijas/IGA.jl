@@ -87,7 +87,10 @@ function goiga(nelx,nely, order, multiplicity)
     update!(ch, 0.0);
 
 
-    K, f = doassemble(cellvalues, K, dh, Cvec);
+    #InteractiveUtils.@code_warntype doassemble(cellvalues, K, dh, Cvec);
+    #error("shde")
+    K,f = doassemble(cellvalues, K, dh, Cvec);
+    
 
     apply!(K, f, ch)
     u = K \ f;
@@ -179,14 +182,15 @@ end
 
 function teststuff()
 
-    meshsizes = [(11,21).*k for k in 1:2:7]#[(11,21),(21,41),(51,101)]#,(70,70)]
-    orders = [2,3]#[1,2,3,4]
+    meshsizes = [(11,21).*k for k in 1:2:5]#[(11,21),(21,41),(51,101)]#,(70,70)]
+    orders = [3]#[1,2,3,4]
 
-    #overkill_sol, overkill_ndofs = goiga((200,400), 2, (2,2))
+    overkill_sol, overkill_ndofs = goiga(501,1001, 2, (2,2))
+    @show overkill_sol, overkill_ndofs
+    error("H")
 
     overkill_ndofs = 1004004 
     overkill_sol = 0.11374078569738395
-    @show overkill_sol, overkill_ndofs
 
     ndofs_fem = Dict(orders .=> [Int[] for _ in 1:length(orders)])
     ndofs_iga = Dict(orders .=> [Int[] for _ in 1:length(orders)])
@@ -214,7 +218,7 @@ end
 disp_fem, disp_iga, ndofs_fem, ndofs_iga, overkill_sol, overkill_ndofs = teststuff()
 
 
-for order in [2,3]#,3,4]#sort(collect(keys(ndofs_iga)))
+for order in [3]#,3,4]#sort(collect(keys(ndofs_iga)))
     fig = plot(reuse = false)
     
     plot!(fig, log10.(ndofs_iga[order]), log10.(disp_iga[order]./overkill_sol), marker=:square, label="$order iga")
