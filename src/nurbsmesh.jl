@@ -155,16 +155,22 @@ function generate_nurbsmesh(nel::NTuple{3,Int}, orders::NTuple{3,Int}, _size::NT
 	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 	
 	control_points = Vec{sdim,T}[]
-	for z in range(0.0, stop=h, length=length(knot_vectors[3])-1-orders[3])
-		for y in range(0.0, stop=b, length=length(knot_vectors[2])-1-orders[2])
-			for x in range(0.0, stop=L, length=length(knot_vectors[1])-1-orders[1])
+	for iz in 1:(length(knot_vectors[3])-1-orders[3])
+		z = h*sum([knot_vectors[3][iz+j] for j in 1:orders[3]])/orders[3]
+
+		for iy in 1:(length(knot_vectors[2])-1-orders[2])
+			y = b*sum([knot_vectors[2][iy+j] for j in 1:orders[2]])/orders[2]
+
+			for ix in 1:(length(knot_vectors[1])-1-orders[1])
+				x = L*sum([knot_vectors[1][ix+j] for j in 1:orders[1]])/orders[1]
+				
 				_v = [x,y,z]
 				push!(control_points, Vec{sdim,T}((_v...,)))
 			end
 		end
 	end
 
-	mesh = IGA.NURBSMesh{pdim,sdim,T}(Tuple(knot_vectors), orders, control_points)
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
     return mesh
 
@@ -196,10 +202,14 @@ function generate_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _size::NT
 
 	control_points = Vec{sdim,T}[]
 	@show collect(range(0.0, stop=h, length=length(knot_vectors[2])-1-orders[2] ))
-	@show [0.0, h/10, h/8, 7h/8, 9h/10, h]
-	#for y in [0.0, h/10, h/8, 7h/8, 9h/10, h]
-	for y in range(0.0, stop=h, length=length(knot_vectors[2])-1-orders[2] )
-		for x in range(0.0, stop=L, length=length(knot_vectors[1])-1-orders[1] )
+	#@show [0.0, h/10, 0.5 9h/10, h]
+	#for y in [0.0, h/10, h/2, 9h/10, h]
+	for iy in 1:(length(knot_vectors[2])-1-orders[2])
+		y = h*sum([knot_vectors[2][iy+j] for j in 1:orders[2]])/orders[2]
+		#y = range(0.0, stop=h, length=length(knot_vectors[2])-1-orders[2])[iy]
+		for ix in 1:(length(knot_vectors[1])-1-orders[1])
+			x = L*sum([knot_vectors[1][ix+j] for j in 1:orders[1]])/orders[1]
+			#x = range(0.0, stop=L, length=length(knot_vectors[1])-1-orders[1])[ix]
 			_v = [x,y]
 			if sdim == 3
 				push!(_v, zero(T))
@@ -223,30 +233,39 @@ function generate_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _size::NT
 
 end
 
-function generate_nurbsmesh(nbasefuncs::NTuple{1,Int}, order::NTuple{1,Int}, _size::NTuple{1,T}, sdim::Int=1) where T
+function generate_nurbsmesh(nel::NTuple{1,Int}, orders::NTuple{1,Int}, _size::NTuple{1,T}; multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
+
+	@assert( all(orders .>= multiplicity) )
 
 	pdim = 1
 
 	L = _size[1]
-	p = order[1]
-	nbasefunks_x = nbasefuncs[1]
-
-	nknots_x = nbasefunks_x + 1 + p 
-	knot_vector_x = [zeros(T, p)..., range(zero(T), stop=one(T), length=nknots_x-(p)*2)..., ones(T, p)...]
-
+	
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
+	
 	control_points = Vec{sdim,T}[]
 
-		for x in range(0.0, stop=L, length=nbasefunks_x)
-			_v = [x]
-			if sdim == 2
-				push!(_v, zero(T))
-			end
-			push!(control_points, Vec{sdim,T}((_v...,)))
+	for i in 1:(length(knot_vectors[1])-1-orders[1])
+		x = L*sum([knot_vectors[1][i+j] for j in 1:orders[1]])/orders[1]
+		_v = [x]
+		if sdim == 2
+			push!(_v, zero(T))
 		end
+		push!(control_points, Vec{sdim,T}((_v...,)))
+	end
 
 
-	mesh = IGA.NURBSMesh{pdim,sdim,T}((knot_vector_x,), (p,), control_points)
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
+#=	point = zeros(T,sdim)
+	points = Vec{sdim,T}[]
+	count = 1
+	Base.Cartesian.@nloops $sdim i j->(1:length(cp_coords[j])) d->point[d] = cp_coords[d][i_d] begin
+		t = Base.Cartesian.@ntuple $sdim j -> point[i_j]
+		points[count] = Vec{$sdim,T}(t)
+		count += 1
+	end=#
+
     return mesh
 
 end

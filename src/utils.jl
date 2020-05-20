@@ -74,7 +74,7 @@ Function for learning/testing:
     the function gives a matrix C which when multiplied with 
     the control_points, retains the original geomatry of the curve.
 """
-function knotinsertion_operator(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
+#=function knotinsertion_operator(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
 
     n = length(ξ) - p - 1
     m = n+1
@@ -102,4 +102,4 @@ function knotinsertion_operator(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
     new_knot_vector = copy(ξ)
     insert!(new_knot_vector,k,ξᴺ)
     return C, new_knot_vector
-end
+end=#
