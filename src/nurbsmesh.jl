@@ -1,4 +1,4 @@
-export getnbasefunctions, NURBSMesh
+export getnbasefunctions, NURBSMesh, BezierGrid
 
 struct BezierGrid{G<:JuAFEM.Grid} <: JuAFEM.AbstractGrid
 	grid::G
@@ -270,7 +270,7 @@ function generate_nurbsmesh(nel::NTuple{1,Int}, orders::NTuple{1,Int}, _size::NT
 
 end
 
-function generate_curved_nurbsmesh(nbasefuncs::NTuple{2,Int}, order::NTuple{2,Int}, _angles::NTuple{2,T}, _radii::NTuple{2,T}) where T
+function generate_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _angles::NTuple{2,T}, _radii::NTuple{2,T}; multiplicity::NTuple{2,Int}=(1,1)) where T
 
 	pdim = 2
 	sdim = 3
@@ -278,19 +278,28 @@ function generate_curved_nurbsmesh(nbasefuncs::NTuple{2,Int}, order::NTuple{2,In
 	rx,ry = _radii
 	αᵢ,αⱼ = _angles
 
-	p,q = order
-	nbasefunks_x, nbasefunks_y = nbasefuncs
 
-	nknots_x = nbasefunks_x + 1 + p 
-	knot_vector_x = [zeros(T, p)..., range(zero(T), stop=one(T), length=nknots_x-(p)*2)..., ones(T, p)...]
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 
-	nknots_y = nbasefunks_y + 1 + q 
-	knot_vector_y = [zeros(T, q)..., range(zero(T), stop=one(T), length=nknots_y-(q)*2)..., ones(T, q)...]
+	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
 
+	#anglesx = range(0.0, stop=αᵢ, length = nbasefuncs[1])
+	#anglesy = range(-αⱼ/2, stop=αⱼ/2 , length = nbasefuncs[2])
+	
+	anglesx = Float64[]
+	for ix in 1:(length(knot_vectors[1])-1-orders[1])
+		ax = αᵢ*sum([knot_vectors[1][ix+j] for j in 1:orders[1]])/orders[1]
+		push!(anglesx, ax)
+	end
+	
+	anglesy = Float64[]
+	for iy in 1:(length(knot_vectors[2])-1-orders[2])
+		ay = (2*sum([knot_vectors[2][iy+j] for j in 1:orders[2]])/orders[2]) - 1
+		#@show ay
+		push!(anglesy, ay*αⱼ/2)
+	end
+	
 	control_points = Vec{sdim,T}[]
-	anglesx = range(0.0, stop=αᵢ, length = nbasefunks_x)
-	anglesy = range(-αⱼ/2, stop=αⱼ/2 , length = nbasefunks_y)
-
 	for ay in anglesy
 		for ax in anglesx
 			r = rx#*cos(ay)
@@ -303,7 +312,54 @@ function generate_curved_nurbsmesh(nbasefuncs::NTuple{2,Int}, order::NTuple{2,In
 		end
 	end
 
-	mesh = IGA.NURBSMesh{pdim,sdim,T}((knot_vector_x, knot_vector_y), (p,q), control_points)
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	
+    return mesh
+
+end
+
+
+function generate_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _angle::T, _radius::T, _width::T; multiplicity::NTuple{2,Int}=(1,1)) where T
+
+	pdim = 2
+	sdim = 3
+
+	rx = _radius
+	αᵢ = _angle
+	w = _width
+
+
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
+
+	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
+
+	#anglesx = range(0.0, stop=αᵢ, length = nbasefuncs[1])
+	#anglesy = range(-αⱼ/2, stop=αⱼ/2 , length = nbasefuncs[2])
+	
+	anglesx = Float64[]
+	for ix in 1:(length(knot_vectors[1])-1-orders[1])
+		ax = αᵢ*sum([knot_vectors[1][ix+j] for j in 1:orders[1]])/orders[1]
+		push!(anglesx, ax)
+	end
+	
+	widthy = Float64[]
+	for iy in 1:(length(knot_vectors[2])-1-orders[2])
+		ay = w*(sum([knot_vectors[2][iy+j] for j in 1:orders[2]])/orders[2])
+		push!(widthy, ay)
+	end
+	
+	control_points = Vec{sdim,T}[]
+	for wy in widthy
+		for ax in anglesx
+			r = rx#*cos(ay)
+			yy = wy
+			_v = (r*cos(ax), yy,  r*sin(ax))
+
+			push!(control_points, Vec{sdim,T}((_v...,)))
+		end
+	end
+
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
     return mesh
 
