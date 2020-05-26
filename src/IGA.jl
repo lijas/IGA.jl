@@ -82,7 +82,7 @@ function JuAFEM.edges(c::BezierCell{3,N,order}) where {N,order}
     length(order)==2 && return _edges_quad(c)
     length(order)==3 && return _edges_hexa(c)
 end
-_edges_hexa(c::BezierCell{3,N,order}) where {N,order} = error("Not implemenetet")
+_edges_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.edges(BernsteinBasis{3,order}() )))
 _edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.edges(BernsteinBasis{3,order}() )))
 
 

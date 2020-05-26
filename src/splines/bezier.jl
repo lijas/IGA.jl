@@ -120,8 +120,41 @@ function _faces_hexa(::IGA.BernsteinBasis{3,order}) where {order}
 end
 #
 
-#3d Hexahedron
-function JuAFEM.edges(::IGA.BernsteinBasis{3,order}) where {order}
+function JuAFEM.edges(c::BernsteinBasis{3,order}) where {order}
+    length(order)==2 && return _edges_quad(c)
+    length(order)==3 && return _edges_hexa(c)
+end
+
+
+function _edges_hexa(::IGA.BernsteinBasis{3,order}) where {order}
+    @assert(length(order)==3)
+    edges = Tuple[]
+    ci = CartesianIndices((order.+1))
+    ind = reshape(1:prod(order.+1), (order.+1)...)
+
+    #bottom
+    push!(edges, Tuple(ind[ci[:,1,1]]))
+    push!(edges, Tuple(ind[ci[end,:,1]]))
+    push!(edges, Tuple(ind[ci[:,end,1]]))
+    push!(edges, Tuple(ind[ci[1,:,1]]))
+
+    #top
+    push!(edges, Tuple(ind[ci[:,1,end]]))
+    push!(edges, Tuple(ind[ci[end,:,end]]))
+    push!(edges, Tuple(ind[ci[:,end,end]]))
+    push!(edges, Tuple(ind[ci[1,:,end]]))
+
+    #verticals
+    push!(edges, Tuple(ind[ci[1,1,:]]))
+    push!(edges, Tuple(ind[ci[end,1,:]]))
+    push!(edges, Tuple(ind[ci[end,end,:]]))
+    push!(edges, Tuple(ind[ci[1,end,:]]))
+
+
+    return Tuple(edges)
+end
+
+function _edges_quad(::IGA.BernsteinBasis{3,order}) where {order}
     @assert(length(order)==2)
     edges = Tuple[]
     ci = CartesianIndices((order.+1))
@@ -308,7 +341,7 @@ function JuAFEM.function_value(fe_v::BezierValues{dim}, q_point::Int, u::Abstrac
     return JuAFEM.function_value(fe_v.cv_store, q_point, u)#, dof_range)
 end
 
-JuAFEM.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} = cv.cv_bezier.M[i,q_point]
+JuAFEM.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} = JuAFEM.geometric_value(cv.cv_bezier, q_point, i);
 
 
 JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = JuAFEM.shape_gradient(bcv.cv_store, q_point, base_func)#bcv.cv_store.dNdx[base_func, q_point]
