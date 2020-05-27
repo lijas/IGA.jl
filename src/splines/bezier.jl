@@ -91,26 +91,26 @@ function _faces_hexa(::IGA.BernsteinBasis{3,order}) where {order}
     faces = Tuple[]
     ci = CartesianIndices((order.+1))
     ind = reshape(1:prod(order.+1), (order.+1)...)
+    
+    #front
+    a = ci[:,1,:]; 
+    push!(faces, Tuple(ind[a][:]))
+    
+    #right
+    a = ci[end,:,:]; 
+    push!(faces, Tuple(ind[a][:]))
+    
+    #back
+    a = ci[:,end,:]; 
+    push!(faces, Tuple(reverse(ind[a], dims=1)[:]))
+    
+    #left
+    a = ci[1,:,:]; 
+    push!(faces, Tuple(reverse(ind[a], dims=1)[:]))
 
     #bottom
     a = ci[:,:,1]; 
     push!(faces, Tuple(reverse(ind[a], dims=2)[:]))
-
-    #front
-    a = ci[:,1,:]; 
-    push!(faces, Tuple(ind[a][:]))
-
-    #right
-    a = ci[end,:,:]; 
-    push!(faces, Tuple(ind[a][:]))
-
-    #back
-    a = ci[:,end,:]; 
-    push!(faces, Tuple(reverse(ind[a], dims=1)[:]))
-
-    #left
-    a = ci[1,:,:]; 
-    push!(faces, Tuple(reverse(ind[a], dims=1)[:]))
 
     #top
     a = ci[:,:,end]; 
@@ -342,7 +342,6 @@ function JuAFEM.function_value(fe_v::BezierValues{dim}, q_point::Int, u::Abstrac
 end
 
 JuAFEM.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} = JuAFEM.geometric_value(cv.cv_bezier, q_point, i);
-
 
 JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = JuAFEM.shape_gradient(bcv.cv_store, q_point, base_func)#bcv.cv_store.dNdx[base_func, q_point]
 set_bezier_operator!(bcv::BezierValues, beo::BezierExtractionOperator{T}) where T = bcv.current_beo[]=beo

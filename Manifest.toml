@@ -141,15 +141,15 @@ version = "0.21.0"
 
 [[JuAFEM]]
 deps = ["LinearAlgebra", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
-path = "/home/elias/.julia/dev/JuAFEM/"
+path = "C:\\Users\\elias\\.julia\\dev\\JuAFEM\\"
 uuid = "30d91d44-8115-11e8-1d28-c19a5ac16de8"
 version = "0.2.0"
 
 [[JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
-git-tree-sha1 = "12289ab2f9ff307a603a42b20ed83e20717cc475"
+git-tree-sha1 = "4ab65b7deb5af83f022f26ad3351a3bd5d80c6e2"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.7.15"
+version = "0.7.16"
 
 [[LaTeXStrings]]
 git-tree-sha1 = "de44b395389b84fd681394d4e8d39ef14e3a2ea8"
@@ -183,9 +183,9 @@ uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
 [[LoweredCodeUtils]]
 deps = ["JuliaInterpreter"]
-git-tree-sha1 = "695206e7ec13cbec6e6ee4d19af7464e80f4d1ad"
+git-tree-sha1 = "225f0035f01c24858c0884f38bb519e22b0a5150"
 uuid = "6f1432cf-f94c-5a45-995e-cdbf5db27b0b"
-version = "0.4.4"
+version = "0.4.5"
 
 [[MacroTools]]
 deps = ["Markdown", "Random"]
@@ -335,9 +335,9 @@ uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[SpecialFunctions]]
 deps = ["OpenSpecFun_jll"]
-git-tree-sha1 = "a69e1eaf3397fbb5a4d718538463e5cc20ef42a4"
+git-tree-sha1 = "d8d8b8a9f4119829410ecd706da4cc8594a1e020"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "0.10.2"
+version = "0.10.3"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
@@ -403,6 +403,6 @@ version = "2.9.9+4"
 
 [[Zlib_jll]]
 deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "2f6c3e15e20e036ee0a0965879b31442b7ec50fa"
+git-tree-sha1 = "a2e0d558f6031002e380a90613b199e37a8565bf"
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.11+9"
+version = "1.2.11+10"

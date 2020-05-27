@@ -145,14 +145,21 @@ function convert_to_grid_representation(mesh::NURBSMesh{pdim,sdim,T}) where {pdi
 
 end
 
-function generate_nurbsmesh(nel::NTuple{3,Int}, orders::NTuple{3,Int}, _size::NTuple{3,T}; multiplicity::NTuple{3,Int}=(1,1,1)) where T
+function generate_nurbsmesh(nel::NTuple{3,Int}, orders::NTuple{3,Int}, _size::NTuple{3,T}; 
+							multiplicity::NTuple{3,Int}=(1,1,1)) where T
+	
+	pdim = 3
+	sdim = 3
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
+	generate_nurbsmesh(knot_vectors, orders, _size)
+end
+
+function generate_nurbsmesh(knot_vectors::NTuple{3,Vector{Float64}}, orders::NTuple{3,Int}, _size::NTuple{3,T}) where T
 
 	pdim = 3
 	sdim = 3
 
 	L,b,h = _size
-
-	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 	
 	control_points = Vec{sdim,T}[]
 	for iz in 1:(length(knot_vectors[3])-1-orders[3])
@@ -318,6 +325,61 @@ function generate_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _a
 
 end
 
+function generate_curved_nurbsmesh(nel::NTuple{3,Int}, orders::NTuple{3,Int}, _angle::T, _radius::T, _width::T, thickeness::T; multiplicity::NTuple{3,Int}=(1,1)) where T
+
+	pdim = 3
+	sdim = 3
+
+	αᵢ = _angle
+	w = _width
+
+
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
+
+	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
+
+	#anglesx = range(0.0, stop=αᵢ, length = nbasefuncs[1])
+	#anglesy = range(-αⱼ/2, stop=αⱼ/2 , length = nbasefuncs[2])
+	
+	anglesx = Float64[]
+	for ix in 1:(length(knot_vectors[1])-1-orders[1])
+		ax = αᵢ*sum([knot_vectors[1][ix+j] for j in 1:orders[1]])/orders[1]
+		push!(anglesx, ax)
+	end
+	reverse!(anglesx)
+	
+	widthy = Float64[]
+	for iy in 1:(length(knot_vectors[2])-1-orders[2])
+		ay = w*(sum([knot_vectors[2][iy+j] for j in 1:orders[2]])/orders[2])
+		push!(widthy, ay)
+	end
+
+	thickenessz = Float64[]
+	for iz in 1:(length(knot_vectors[3])-1-orders[3])
+		ay = (sum([knot_vectors[3][iz+j] for j in 1:orders[3]])/orders[3]) - 0.5
+		push!(thickenessz, ay*thickeness)
+	end
+	
+	
+	control_points = Vec{sdim,T}[]
+	for tz in thickenessz
+		for wy in widthy
+			for ax in anglesx
+				r = _radius
+
+				dir = (cos(ax),sin(ax))
+				_v = dir .* r .+ dir.*tz
+
+				push!(control_points, Vec{sdim,T}((_v[1], wy, _v[2])))
+			end
+		end
+	end
+
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	
+    return mesh
+
+end
 
 function generate_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _angle::T, _radius::T, _width::T; multiplicity::NTuple{2,Int}=(1,1)) where T
 
