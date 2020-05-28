@@ -404,6 +404,8 @@ function generate_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _a
 		push!(anglesx, ax)
 	end
 	
+	reverse!(anglesx)
+
 	widthy = Float64[]
 	for iy in 1:(length(knot_vectors[2])-1-orders[2])
 		ay = w*(sum([knot_vectors[2][iy+j] for j in 1:orders[2]])/orders[2])
