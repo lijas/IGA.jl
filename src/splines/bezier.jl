@@ -1,5 +1,5 @@
 export BernsteinBasis, value, reference_coordinates, set_current_cellid!
-export BezierFaceValues, BezierCellValues, BezierValues, set_bezier_operator!
+export BezierValues, set_bezier_operator!
 """
 BernsteinBasis subtype of JuAFEM:s interpolation struct
 """  
@@ -91,6 +91,10 @@ function _faces_hexa(::IGA.BernsteinBasis{3,order}) where {order}
     faces = Tuple[]
     ci = CartesianIndices((order.+1))
     ind = reshape(1:prod(order.+1), (order.+1)...)
+
+    #bottom
+    a = ci[:,:,1]; 
+    push!(faces, Tuple(reverse(ind[a], dims=2)[:]))
     
     #front
     a = ci[:,1,:]; 
@@ -107,10 +111,6 @@ function _faces_hexa(::IGA.BernsteinBasis{3,order}) where {order}
     #left
     a = ci[1,:,:]; 
     push!(faces, Tuple(reverse(ind[a], dims=1)[:]))
-
-    #bottom
-    a = ci[:,:,1]; 
-    push!(faces, Tuple(reverse(ind[a], dims=2)[:]))
 
     #top
     a = ci[:,:,end]; 
@@ -275,32 +275,7 @@ end
 Second try for bezier cellvalues
 """
 
-struct BezierFaceValues{dim_s,T<:Real,CV<:JuAFEM.FaceValues} <: JuAFEM.FaceValues{dim_s,T,JuAFEM.RefCube}
-    cv_bezier::CV
-    cv_store::CV
-
-    current_beo::Base.RefValue{BezierExtractionOperator{T}}
-end
-
-function BezierFaceValues(cv::JuAFEM.FaceValues{dim_s,T}) where {T,dim_s}
-
-    undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
-
-    return BezierFaceValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
-end
-
-function BezierFaceValues(quad_rule::JuAFEM.QuadratureRule{dim_p,JuAFEM.RefCube,T}, 
-                          func_interpol::JuAFEM.Interpolation{dim_s}, 
-                          geom_interpol::JuAFEM.Interpolation{dim_s}=func_interpol; 
-                          cvtype::Type{CV}=JuAFEM.FaceVectorValues) where {dim_p,dim_s,T,CV}
-                          
-    cv = CV(quad_rule, func_interpol, geom_interpol)
-    undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
-
-    return BezierFaceValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
-end
-
-struct BezierCellValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}
+struct BezierValues{dim_s,T<:Real,CV<:JuAFEM.Values} <: JuAFEM.Values{dim_s,T,JuAFEM.RefCube}
 #struct BezierValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}
     cv_bezier::CV
     cv_store::CV
@@ -308,28 +283,25 @@ struct BezierCellValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValue
     current_beo::Base.RefValue{BezierExtractionOperator{T}}
 end
 
-const BezierValues{dim_s,T,CV} = Union{BezierFaceValues{dim_s,T,CV}, BezierCellValues{dim_s,T,CV}}
-
-function BezierCellValues(cv::JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}) where {dim_s,T}
+function BezierValues(cv::JuAFEM.Values{dim_s,T,JuAFEM.RefCube}) where {dim_s,T}
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
-    return BezierCellValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
+    return BezierValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
 end
 
-function BezierCellValues(quad_rule::JuAFEM.QuadratureRule{dim_s,JuAFEM.RefCube,T}, 
+#=function BezierValues(quad_rule::JuAFEM.QuadratureRule{dim_s,JuAFEM.RefCube,T}, 
                             func_interpol::JuAFEM.Interpolation{dim_s}, 
                             geom_interpol::JuAFEM.Interpolation{dim_s}=func_interpol; 
                             cvtype::Type{CV}=JuAFEM.CellVectorValues) where {dim_s,T,CV}
 
     cv = CV(quad_rule, func_interpol, geom_interpol)
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
-    return BezierFaceValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
-end
+    return BezierValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
+end=#
 
 JuAFEM.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
 JuAFEM.getngeobasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.M, 1)
 JuAFEM.getnquadpoints(bcv::BezierValues) = JuAFEM.getnquadpoints(bcv.cv_bezier)
-JuAFEM.getdetJdV(bv::BezierCellValues, q_point::Int) = JuAFEM.getdetJdV(bv.cv_bezier, q_point)
-JuAFEM.getdetJdV(bv::BezierFaceValues, q_point::Int) = JuAFEM.getdetJdV(bv.cv_bezier, q_point)
+JuAFEM.getdetJdV(bv::BezierValues, q_point::Int) = JuAFEM.getdetJdV(bv.cv_bezier, q_point)
 JuAFEM.shape_value(bcv::BezierValues, qp::Int, i::Int) = JuAFEM.shape_value(bcv.cv_store,qp,i)
 JuAFEM.getn_scalarbasefunctions(bcv::BezierValues) = JuAFEM.getn_scalarbasefunctions(bcv.cv_store)
 JuAFEM._gradienttype(::BezierValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
@@ -345,29 +317,29 @@ JuAFEM.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} 
 
 JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = JuAFEM.shape_gradient(bcv.cv_store, q_point, base_func)#bcv.cv_store.dNdx[base_func, q_point]
 set_bezier_operator!(bcv::BezierValues, beo::BezierExtractionOperator{T}) where T = bcv.current_beo[]=beo
-_cellvaluestype(bcv::BezierValues{dim_s,T,CV}) where {dim_s,T,CV} = CV
+_cellvaluestype(::BezierValues{dim_s,T,CV}) where {dim_s,T,CV} = CV
 
-function JuAFEM.reinit!(bcv::BezierFaceValues, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T}
+function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T,CV<:JuAFEM.FaceValues}
     JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
     bcv.cv_store.current_face[] = faceid
 
     _reinit_bezier!(bcv, faceid)
 end
 
-function JuAFEM.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T}
+function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T,CV<:JuAFEM.CellValues}
     JuAFEM.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
+
     _reinit_bezier!(bcv, 1)
-    
 end
 
-JuAFEM.reinit!(bcv::BezierCellValues, coords::Tuple{AbstractVector{Vec{dim_s,T}}, AbstractArray{T}}) where {dim_s,T} = JuAFEM.reinit!(bcv, coords[1], coords[2])
+JuAFEM.reinit!(bcv::BezierValues, coords::Tuple{AbstractVector{Vec{dim_s,T}}, AbstractArray{T}}) where {dim_s,T} = JuAFEM.reinit!(bcv, coords[1], coords[2])
 
-function JuAFEM.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractArray{T}) where {dim_s,T}
+function JuAFEM.reinit!(bcv::BezierValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractArray{T}) where {dim_s,T}
     JuAFEM.reinit!(bcv.cv_bezier, x, w) #call the normal reinit function first
     _reinit_bezier!(bcv, 1)
 end
 
-function _reinit_bezier!(bcv::BezierValues{dim_s}, faceid::Int) where {dim_s,T}
+function _reinit_bezier!(bcv::BezierValues{dim_s}, faceid::Int) where {dim_s}
 
     cv_store = bcv.cv_store
 
