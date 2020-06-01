@@ -359,6 +359,9 @@ function JuAFEM.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}) 
     _reinit_bezier!(bcv, 1)
     
 end
+
+JuAFEM.reinit!(bcv::BezierCellValues, coords::Tuple{AbstractVector{Vec{dim_s,T}}, AbstractArray{T}}) where {dim_s,T} = JuAFEM.reinit!(bcv, coords[1], coords[2])
+
 function JuAFEM.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractArray{T}) where {dim_s,T}
     JuAFEM.reinit!(bcv.cv_bezier, x, w) #call the normal reinit function first
     _reinit_bezier!(bcv, 1)

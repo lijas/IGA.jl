@@ -1,6 +1,56 @@
 using JuAFEM, IGA, SparseArrays
 using Plots; pyplot()
 
+function generate_square_with_hole(nel::NTuple{2,Int}, L::T=4.0, R::T = 1.0) where T
+
+    grid = generate_grid(Quadrilateral, nel)
+
+    nnodesx = nel[1] + 1
+    nnodesy = nel[2] + 1
+
+    angle_range = range(0.0, stop=pi/2, length = nnodesy*2 - 1)
+
+    nodes = Node{2,T}[]
+    for i in 1:nnodesy
+        a = angle_range[i]
+
+        k = tan(a)
+        y = k*L
+
+        x_range = range(-sqrt(L^2 + y^2), stop = -R, length=nnodesx)
+
+        for x in x_range
+            v = Vec{2,T}((x*cos(a), -sin(a)*x))
+            push!(nodes, Node(v))
+        end
+    end
+
+    #part2
+    offset = (nnodesx*nnodesy) - nnodesx
+    cells = copy(grid.cells)
+    for cell in cells
+        new_node_ids = cell.nodes .+ offset
+        push!(grid.cells, Quadrilateral(new_node_ids))
+    end
+
+    
+    for i in (nnodesy+1):(2*nnodesy-1)
+        a = pi/2 - angle_range[i]
+        k = tan(a)
+        y = k*L
+        x_range = range(-sqrt(L^2 + y^2), stop = -R, length=nnodesx)
+
+        for x in x_range
+            v = Vec{2,T}((sin(a)*x, -x*cos(a)))
+            push!(nodes, Node(v))
+        end
+    end
+
+
+    JuAFEM.copy!!(grid.nodes, nodes)
+    empty!(grid.facesets)
+    return grid
+end
 
 function doassemble(cellvalues::JuAFEM.Values{dim}, facevalues::JuAFEM.Values{dim}, K::AbstractMatrix, dh::MixedDofHandler, C::SymmetricTensor{4,2}) where {dim}
 
@@ -19,13 +69,19 @@ function doassemble(cellvalues::JuAFEM.Values{dim}, facevalues::JuAFEM.Values{di
 
     for cellid in 1:getncells(dh.grid)
 
-        coords, w = IGA.get_bezier_coordinates(grid, cellid)
-        IGA.set_bezier_operator!(cellvalues, grid.beo[cellid])
+        local coords
+        if typeof(cellvalues) <: BezierCellValues
+            coords = IGA.get_bezier_coordinates(grid, cellid)
+            set_bezier_operator!(cellvalues, grid.beo[cellid])
+            @show coords
+        else
+            coords = getcoordinates(grid, cellid)
+        end
 
         fill!(Ke, 0)
         fill!(fe, 0)
 
-        reinit!(cellvalues, coords, w)
+        reinit!(cellvalues, coords)
         for q_point in 1:getnquadpoints(cellvalues)
             for i in 1:n_basefuncs
                 ɛ[i] = symmetric(shape_gradient(cellvalues, q_point, i)) 
@@ -45,8 +101,15 @@ function doassemble(cellvalues::JuAFEM.Values{dim}, facevalues::JuAFEM.Values{di
 
         for face in 1:4#nfaces(cell)
             if (cellid, face) ∈ getfaceset(dh.grid, "left")
-                coords, w = IGA.get_bezier_coordinates(grid, cellid)
-                IGA.set_bezier_operator!(facevalues, grid.beo[cellid])
+
+                local coords
+                if typeof(cellvalues) <: BezierCellValues
+                    coords, w = IGA.get_bezier_coordinates(grid, cellid)
+                    set_bezier_operator!(facevalues, grid.beo[cellid])
+                else
+                    coords = getcoordinates(grid, cellid)
+                end
+
                 reinit!(facevalues, coords, face)
                 for q_point in 1:getnquadpoints(facevalues)
                     dΓ = getdetJdV(facevalues, q_point)
@@ -106,26 +169,7 @@ function calc_stresses(cellvalues::JuAFEM.Values{dim}, dh::MixedDofHandler, u::V
     return cellstresses
 end;
 
-function goiga()
-
-    grid = IGA.generate_beziergrid_2((20, 20))
-    order = 2
-    dim = 2
-
-    addfaceset!(grid, "right",   (x)->x[1] ≈ 0.0)
-    addfaceset!(grid, "left",   (x)->x[1] ≈ -4.0)
-    addfaceset!(grid, "bottom", (x)->x[2] ≈ 0.0)
-
-    @show getfaceset(grid, "right")
-    @show getfaceset(grid, "left")
-    @show getfaceset(grid, "bottom")
-
-    ip = IGA.BernsteinBasis{dim,(order, order)}()
-    qr = QuadratureRule{dim,RefCube}(4)
-    cellvalues = IGA.BezierCellValues(CellVectorValues(qr, ip))
-
-    qr = QuadratureRule{dim-1,RefCube}(4)
-    facevalues = IGA.BezierFaceValues(FaceVectorValues(qr, ip))
+function go(grid, ip, cellvalues, facevalues)
 
     dh = MixedDofHandler(grid)
     push!(dh, :u, 2, ip)
@@ -136,8 +180,8 @@ function goiga()
     ch = ConstraintHandler(dh);
 
     dbc = Dirichlet(:u, getfaceset(grid, "bottom"), (x, t)->[0.0], 2)
-    add!(ch, dbc);
     dbc = Dirichlet(:u, getfaceset(grid, "right"), (x, t)->[0.0], 1)
+    add!(ch, dbc);
     add!(ch, dbc);
 
     close!(ch)
@@ -158,21 +202,64 @@ function goiga()
     apply!(K, f, ch)
     u = K \ f;
 
-    x = JuAFEM.reference_coordinates(ip)
-    qr = QuadratureRule{2,RefCube,Float64}(zeros(Float64,length(x)), x)
-    cellvalues = BezierCellValues(CellVectorValues(qr,ip))
+    #x = JuAFEM.reference_coordinates(ip)
+    #qr = QuadratureRule{2,RefCube,Float64}(zeros(Float64,length(x)), x)
+    #cellvalues = BezierCellValues(CellVectorValues(qr,ip))
     
-    cellstresses = calc_stresses(cellvalues, dh, u, Cmat)
+    #cellstresses = calc_stresses(cellvalues, dh, u, Cmat)
 
     #projector = L2Projector(cellvalues, ip, grid)
     #q_nodes = project(cellstresses, projector);
 
 
     #@show u
-    vtk = vtk_grid("half_cric" * string(order), grid)
+    vtk = vtk_grid("half_cric_" * string(typeof(grid)), grid)
     IGA.vtk_bezier_point_data(vtk, dh, u)
-    IGA.vtk_point_data(vtk, cellstresses, "stresses")
+    #vtk_point_data(vtk, dh, u)
+    #IGA.vtk_point_data(vtk, cellstresses, "stresses")
     vtk_save(vtk)
 
 end
 
+function goiga()
+
+    grid = IGA.generate_beziergrid_2((20, 20))
+    order = 2
+    dim = 2
+
+    addfaceset!(grid, "right",   (x)->x[1] ≈ 0.0)
+    addfaceset!(grid, "left",   (x)->x[1] ≈ -4.0)
+    addfaceset!(grid, "bottom", (x)->x[2] ≈ 0.0)
+
+    ip = IGA.BernsteinBasis{dim,(order, order)}()
+
+    qr = QuadratureRule{dim,RefCube}(4)
+    cellvalues = IGA.BezierCellValues(CellVectorValues(qr, ip))
+
+    qr = QuadratureRule{dim-1,RefCube}(4)
+    facevalues = IGA.BezierFaceValues(FaceVectorValues(qr, ip))
+
+    go(grid, ip, cellvalues, facevalues)
+end
+
+function gofem()
+
+    grid = generate_square_with_hole((20, 20))
+    order = 2
+    dim = 2
+
+    addfaceset!(grid, "right",   (x)->x[1] ≈ 0.0)
+    addfaceset!(grid, "left",   (x)->x[1] ≈ -4.0)
+    addfaceset!(grid, "bottom", (x)->x[2] ≈ 0.0)
+
+    ip_geom = Lagrange{dim,RefCube,1}()
+    ip = Lagrange{dim,RefCube,order}()
+
+    qr = QuadratureRule{dim,RefCube}(4)
+    cellvalues = CellVectorValues(qr, ip, ip_geom)
+
+    qr = QuadratureRule{dim-1,RefCube}(4)
+    facevalues = FaceVectorValues(qr, ip, ip_geom)
+
+    go(grid, ip, cellvalues, facevalues)
+end

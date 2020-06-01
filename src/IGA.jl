@@ -21,6 +21,7 @@ include("splines/bsplines.jl")
 include("nurbsmesh.jl")
 include("bezier_extraction.jl")
 include("splines/bezier.jl")
+include("nurbs.jl")
 
 #using Plots; pyplot();
 #include("plot_utils.jl")
@@ -86,7 +87,7 @@ _edges_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), 
 _edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.edges(BernsteinBasis{3,order}() )))
 
 
-JuAFEM.default_interpolation(::Type{BezierCell{dim,N,order}}) where {dim,N,order}= BernsteinBasis{dim,order}()
+JuAFEM.default_interpolation(::Type{BezierCell{dim,N,order}}) where {dim,N,order}= BernsteinBasis{length(order),order}()
 JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"
 
 #
