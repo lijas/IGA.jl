@@ -151,7 +151,7 @@ function generate_nurbsmesh(nel::NTuple{3,Int}, orders::NTuple{3,Int}, _size::NT
 	pdim = 3
 	sdim = 3
 	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
-	generate_nurbsmesh(knot_vectors, orders, _size)
+	generate_nurbsmesh(Tuple(knot_vectors), orders, _size)
 end
 
 function generate_nurbsmesh(knot_vectors::NTuple{3,Vector{Float64}}, orders::NTuple{3,Int}, _size::NTuple{3,T}) where T
