@@ -310,7 +310,7 @@ function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::Abst
     return JuAFEM.function_gradient(fe_v.cv_store, q_point, u)
 end
 function JuAFEM.function_value(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::AbstractVector{Int} = collect(1:length(u))) where {dim,T} 
-    return JuAFEM.function_value(fe_v.cv_store, q_point, u)#, dof_range)
+    return JuAFEM.function_value(fe_v.cv_store, q_point, u, dof_range)
 end
 
 JuAFEM.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} = JuAFEM.geometric_value(cv.cv_bezier, q_point, i);

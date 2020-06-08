@@ -164,12 +164,15 @@ function generate_nurbsmesh(knot_vectors::NTuple{3,Vector{Float64}}, orders::NTu
 	control_points = Vec{sdim,T}[]
 	for iz in 1:(length(knot_vectors[3])-1-orders[3])
 		z = h*sum([knot_vectors[3][iz+j] for j in 1:orders[3]])/orders[3]
+		#z = range(0.0, stop=h, length=length(knot_vectors[3])-1-orders[3])[iz]
 
 		for iy in 1:(length(knot_vectors[2])-1-orders[2])
 			y = b*sum([knot_vectors[2][iy+j] for j in 1:orders[2]])/orders[2]
+			#y = range(0.0, stop=b, length=length(knot_vectors[2])-1-orders[2])[iy]
 
 			for ix in 1:(length(knot_vectors[1])-1-orders[1])
 				x = L*sum([knot_vectors[1][ix+j] for j in 1:orders[1]])/orders[1]
+				#x = range(0.0, stop=L, length=length(knot_vectors[1])-1-orders[1])[ix]
 				
 				_v = [x,y,z]
 				push!(control_points, Vec{sdim,T}((_v...,)))
