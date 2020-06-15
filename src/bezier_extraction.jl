@@ -18,7 +18,7 @@ end
 
 
 #function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}) where {sdim,T}
-function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}) where {T2,T}
+function compute_bezier_points_dim1(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}) where {T2,T}
 
 	@assert(length(control_points) == length(Ce))
 	n_points = length(first(Ce))#length(control_points)#length(first(Ce))
@@ -29,6 +29,30 @@ function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::
 
 		for i in 1:(n_points)
 			bezierpoints[i] += ce[i]*control_points[ic]
+		end
+	end
+
+	return bezierpoints
+
+end
+
+function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1) where {T2,T}
+
+	if dim==1
+		compute_bezier_points_dim1(Ce, control_points)
+	end
+
+	@assert(length(control_points) == length(Ce)*dim)
+	n_points = length(first(Ce))#length(control_points)#length(first(Ce))
+	bezierpoints = zeros(T2, n_points*dim)
+
+	for ic in 1:length(control_points)÷dim
+		ce = Ce[ic]
+
+		for i in 1:n_points
+			for d in 1:dim
+				bezierpoints[(i-1)*dim + d] += ce[i] * control_points[(ic-1)*dim + d]
+			end
 		end
 	end
 
