@@ -18,7 +18,7 @@ function doassemble(cellvalues::CellValues{dim}, K::SparseMatrixCSC, dh::JuAFEM.
         
         coords = getcoordinates(cell)
         
-        if typeof(cellvalues) <: IGA.BezierCellValues
+        if typeof(cellvalues) <: IGA.BezierValues
             coords .= IGA.compute_bezier_points(Cvecs[cellid(cell)], coords)
             IGA.set_bezier_operator!(cellvalues, Cvecs[cellid(cell)])
         end
@@ -65,7 +65,7 @@ function goiga(nelx,nely, order, multiplicity)
 
     ip = IGA.BernsteinBasis{dim, (order,order)}()
     qr = QuadratureRule{dim, RefCube}(100)
-    cellvalues = IGA.BezierCellValues(CellScalarValues(qr, ip))
+    cellvalues = IGA.BezierValues(CellScalarValues(qr, ip))
 
     dh = MixedDofHandler(grid)
     push!(dh, :u, 1, ip)
@@ -107,7 +107,7 @@ function goiga(nelx,nely, order, multiplicity)
     @assert(isodd(nely))
     midcell = ceil(Int, nelx*nely*0.5)
     qr = QuadratureRule{dim, RefCube}(1)
-    cellvalues = IGA.BezierCellValues(CellScalarValues(qr, ip))
+    cellvalues = IGA.BezierValues(CellScalarValues(qr, ip))
     coords = getcoordinates(grid, midcell)
     bcoords = IGA.compute_bezier_points(Cvec[midcell], coords)
     IGA.set_bezier_operator!(cellvalues, Cvec[midcell])

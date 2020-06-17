@@ -70,7 +70,7 @@ function doassemble(cellvalues::JuAFEM.Values{dim}, facevalues::JuAFEM.Values{di
     for cellid in 1:getncells(dh.grid)
 
         local coords
-        if typeof(cellvalues) <: BezierCellValues
+        if typeof(cellvalues) <: BezierValues
             coords = IGA.get_bezier_coordinates(grid, cellid)
             set_bezier_operator!(cellvalues, grid.beo[cellid])
             @show coords
@@ -103,7 +103,7 @@ function doassemble(cellvalues::JuAFEM.Values{dim}, facevalues::JuAFEM.Values{di
             if (cellid, face) ∈ getfaceset(dh.grid, "left")
 
                 local coords
-                if typeof(cellvalues) <: BezierCellValues
+                if typeof(cellvalues) <: BezierValues
                     coords, w = IGA.get_bezier_coordinates(grid, cellid)
                     set_bezier_operator!(facevalues, grid.beo[cellid])
                 else
@@ -204,7 +204,7 @@ function go(grid, ip, cellvalues, facevalues)
 
     #x = JuAFEM.reference_coordinates(ip)
     #qr = QuadratureRule{2,RefCube,Float64}(zeros(Float64,length(x)), x)
-    #cellvalues = BezierCellValues(CellVectorValues(qr,ip))
+    #cellvalues = BezierValues(CellVectorValues(qr,ip))
     
     #cellstresses = calc_stresses(cellvalues, dh, u, Cmat)
 
@@ -234,7 +234,7 @@ function goiga()
     ip = IGA.BernsteinBasis{dim,(order, order)}()
 
     qr = QuadratureRule{dim,RefCube}(4)
-    cellvalues = IGA.BezierCellValues(CellVectorValues(qr, ip))
+    cellvalues = IGA.BezierValues(CellVectorValues(qr, ip))
 
     qr = QuadratureRule{dim-1,RefCube}(4)
     facevalues = IGA.BezierFaceValues(FaceVectorValues(qr, ip))

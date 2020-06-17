@@ -45,7 +45,7 @@ end
     cv = JuAFEM.CellVectorValues(qr, bern_ip)
 
     Cvecs = IGA.bezier_extraction_to_vectors(C)
-    bern_cv = IGA.BezierCellValues(cv) 
+    bern_cv = IGA.BezierValues(cv) 
 
     for ie in [1,2,3, getncells(grid)]#1:getncells(grid)
 
@@ -68,4 +68,24 @@ end
         end
 
     end
+end
+
+@testset "Bezier transformation" begin
+
+    X = [Vec((0.0, -1.0)), Vec((0.0, 0.0)), Vec((0.0, 1.0))]
+
+    C = [1.0  0.5  0.25  0.25  0.0  0.0;
+        0.0  0.5  0.5   0.5   0.5  0.0;
+        0.0  0.0  0.25  0.25  0.5  1.0]
+
+    Cvec = IGA.bezier_extraction_to_vector(C)
+    answer = [Vec((0.0, -1.0)), Vec((0.0, -0.5)), Vec((0.0, 0.0)), Vec((0.0, 0.0)), Vec((0.0, 0.5)), Vec((0.0, 1.0))]
+
+    #Vec form
+    Xnew = IGA.compute_bezier_points(Cvec, X)
+    @test all(Xnew .≈ answer)
+
+    #array form
+    Xnew = IGA.compute_bezier_points(Cvec, reinterpret(Float64,X), dim=2)
+    @test all(Xnew .≈ reinterpret(Float64, answer))
 end
