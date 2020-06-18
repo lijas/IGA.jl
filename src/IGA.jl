@@ -19,6 +19,7 @@ const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 include("utils.jl")
 include("splines/bsplines.jl")
 include("nurbsmesh.jl")
+include("mesh_generation.jl")
 include("bezier_extraction.jl")
 include("splines/bezier.jl")
 include("nurbs.jl")
