@@ -161,8 +161,8 @@ function generate_hemisphere(nel::NTuple{2,Int}, orders::NTuple{2,Int}, α1::NTu
     anglesy = _generate_linear_parametrization(knot_vectors[2], orders[2], α2[1], α2[2]) 
 	
 	control_points = Vec{sdim,T}[]
-	for φ in anglesy
-		for θ in anglesx
+	for θ in anglesx
+		for φ in anglesy
 
             x = r*cos(θ)*sin(φ)
             y = r*sin(θ)*sin(φ)
