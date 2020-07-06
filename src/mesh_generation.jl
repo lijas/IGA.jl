@@ -27,6 +27,14 @@ function _generate_linear_parametrization(knot_vector::Vector{T}, order::Int, fr
 	return coords
 end
 
+function _generate_equidistant_parametrization(knot_vector::Vector{T}, order::Int, from::T, to::T) where T
+	@assert(first(knot_vector)==0.0)
+	@assert(last(knot_vector)==1.0)
+
+	range(0.0, stop=h, length=length(knot_vectors[3])-1-orders[3])[iz]
+	return coords
+end
+
 
 function generate_nurbsmesh(nel::NTuple{3,Int}, orders::NTuple{3,Int}, _size::NTuple{3,T}; 
 							multiplicity::NTuple{3,Int}=(1,1,1)) where T
@@ -175,6 +183,31 @@ function generate_hemisphere(nel::NTuple{2,Int}, orders::NTuple{2,Int}, α1::NTu
 	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
     return mesh
+
+end
+
+function generate_nasa_specimen(nel::NTuple{2,Int}, orders::NTuple{2,Int}; L1::T, R::T, w::T, multiplicity::Tuple{2,Int}) where {T}
+
+	pdim = 2
+	sdim = 3
+
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
+	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
+
+	cp1 = _generate_linear_parametrization(knot_vectors[1], orders[1], R, L1) 
+
+	anglesx = _generate_equidistant_parametrization(knot_vectors[1], orders[1], 0.0, π/4) 
+	reverse!(anglesx)
+
+	bend_points = Vec{sdim,T}[]
+	for θ in anglesx
+		x = R*cos(θ)
+		y = R*sin(θ)
+		push!(bend_points, Vec((x,0.0,y)))
+	end
+
+	anglesx[end÷2 - 1] - 
+
 
 end
 
