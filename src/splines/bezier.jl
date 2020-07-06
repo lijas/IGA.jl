@@ -208,19 +208,21 @@ function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_
     
     coords = Vec{dim_s,T}[]
 
-    #ALTERNATIVE 1
-    ranges = [Float64[] for _ in 1:dim_p]
+    #ALTERNATIVE 1,
+    #Can delete this....the same as alternative 2...
+    
+    #=ranges = [Float64[] for _ in 1:dim_p]
     knot_vector = [Float64[fill(-1.0, order[d]+1)..., fill(1.0, order[d]+1)...] for d in 1:dim_p]
     for d in 1:dim_p
         for i in 1:order[1]+1
             x = sum([knot_vector[d][i+j] for j in 1:order[d]])/order[d]
             push!(ranges[d], x)
         end
-    end
+    end=#
 
     #ALTERNATIVE 2
     ranges = [range(-1.0, stop=1.0, length=_n[i]) for i in 1:dim_p]
-    
+
 
     #algo independent of dimensions
     inds = CartesianIndices(_n)[:]
