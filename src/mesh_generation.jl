@@ -31,8 +31,7 @@ function _generate_equidistant_parametrization(knot_vector::Vector{T}, order::In
 	@assert(first(knot_vector)==0.0)
 	@assert(last(knot_vector)==1.0)
 
-	range(0.0, stop=h, length=length(knot_vectors[3])-1-orders[3])[iz]
-	return coords
+	return range(from, stop=to, length=length(knot_vector)-1-order)
 end
 
 
@@ -186,29 +185,59 @@ function generate_hemisphere(nel::NTuple{2,Int}, orders::NTuple{2,Int}, α1::NTu
 
 end
 
-function generate_nasa_specimen(nel::NTuple{2,Int}, orders::NTuple{2,Int}; L1::T, R::T, w::T, multiplicity::Tuple{2,Int}) where {T}
+function generate_nasa_specimen(nel_bend::NTuple{2,Int}, orders::NTuple{2,Int}; L1::T, R::T, w::T, multiplicity::NTuple{2,Int}) where {T}
 
 	pdim = 2
 	sdim = 3
 
-	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
-	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
+	kv_bend = _create_knotvector(T, nel_bend[1], orders[1], multiplicity[1])
+	nbasefuncs_bend = [(length(kv_bend[i])-1-orders[i]) for i in 1:pdim]
 
-	cp1 = _generate_linear_parametrization(knot_vectors[1], orders[1], R, L1) 
+	elbow = collect(_generate_equidistant_parametrization(kv_bend, orders[1], 0.0, π/2))
+	reverse!(elbow)
 
-	anglesx = _generate_equidistant_parametrization(knot_vectors[1], orders[1], 0.0, π/4) 
-	reverse!(anglesx)
-
-	bend_points = Vec{sdim,T}[]
-	for θ in anglesx
-		x = R*cos(θ)
-		y = R*sin(θ)
-		push!(bend_points, Vec((x,0.0,y)))
+	cp_inplane = Vec{sdim,T}[]
+	
+	#First create the points inplane, and then extrude it
+	for θ in elbow
+		x = -R*cos(θ) + R
+		z = -R*sin(θ) + R
+		push!(cp_inplane, Vec((x,0.0,z)))
+	end
+	
+	cp_dist = abs(elbow[end÷2] - elbow[(end÷2) - 1]) * R
+	straght = collect((R+cp_dist):cp_dist:(R+L1))
+	@show R+cp_dist, cp_dist, R+L1
+	@show straght
+	
+	for x in (straght)
+		pushfirst!(cp_inplane, Vec((x, 0.0, 0.0)))
 	end
 
-	anglesx[end÷2 - 1] - 
+	for z in (straght)
+		push!(cp_inplane, Vec((0.0, 0.0, z)))
+	end
+	
+	#...extrusion
+	kv_y = _create_knotvector(T, nel_bend[2], orders[2], multiplicity[2])
+	width_points = _generate_linear_parametrization(kv_y, orders[2], -w/2, w/2) 
 
+	control_points = Vec{sdim,T}[]
+	for y in width_points
+		for xz in cp_inplane
+			push!(control_points, Vec(xz[1], y, xz[3]))
+		end
+	end
 
+	#Since it is not clear how many elements exist in x-direction, recreate the knotvector along specimen
+	nbasefuncs = length(cp_inplane)
+	nelx = nbasefuncs - orders[1]
+	@show nelx
+	kv_x = _create_knotvector(T, nelx, orders[1], multiplicity[1])
+	@show cp_inplane
+	#error("sdf")
+
+	return IGA.NURBSMesh(Tuple([kv_x,kv_y]), orders, control_points)
 end
 
 function generate_curved_nurbsmesh(nel::NTuple{3,Int}, orders::NTuple{3,Int}, _angle::T, _radius::T, _width::T, thickeness::T; multiplicity::NTuple{3,Int}=(1,1)) where T
