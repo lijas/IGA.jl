@@ -226,14 +226,3 @@ for order in [3]#,3,4]#sort(collect(keys(ndofs_iga)))
 
     display(fig)
 end
-
-
-#=
-
-mesh = IGA.generate_curved_nurbsmesh((20,20), (2,2), (pi/1,pi/2), (20.0,20.0))
-grid = BezierGrid(mesh)
-
-vtkfile = IGA.vtk_grid("test_curved", grid)
-IGA.vtk_save(vtkfile)
-
-=#

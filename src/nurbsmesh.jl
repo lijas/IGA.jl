@@ -11,13 +11,10 @@ getT(g::BezierGrid) = eltype(first(g.nodes).x)
 function BezierGrid(cells::Vector{C},
 		nodes::Vector{JuAFEM.Node{dim,T}},
 		weights::AbstractVector{T},
-		extraction_operator::AbstractVector{BezierExtractionOperator{T}};
-		cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-		nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-		facesets::Dict{String,Set{Tuple{Int,Int}}}=Dict{String,Set{Tuple{Int,Int}}}(),
-		boundary_matrix::SparseArrays.SparseMatrixCSC{Bool,Int}=SparseArrays.spzeros(Bool, 0, 0)) where {dim,C,T}
+		extraction_operator::AbstractVector{BezierExtractionOperator{T}}) where {dim,C,T}
 
-	grid = JuAFEM.Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
+	
+	grid = JuAFEM.Grid(cells, nodes)
 
 	return BezierGrid{typeof(grid)}(grid, weights, extraction_operator)
 end
