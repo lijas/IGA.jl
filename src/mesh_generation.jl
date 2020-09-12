@@ -1,4 +1,8 @@
-
+#To see mesh of generated nurbs geometry:
+# mesh = IGA.generate_doubly_curved_nurbsmesh((20,20), (2,2), r1 = 25.0, r2 = 3.0, α1 = pi/2, α2 = pi)
+# grid = BezierGrid(mesh)
+# vtkfile = IGA.vtk_grid("test_curved2", grid)
+# IGA.vtk_save(vtkfile)
 
 function _create_knotvector(T, nelx, p, m)
 	nbasefunks_x= nelx+p
@@ -105,15 +109,7 @@ function generate_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _size::NT
 	end
 
 	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
-	
-#=	point = zeros(T,sdim)
-	points = Vec{sdim,T}[]
-	count = 1
-	Base.Cartesian.@nloops $sdim i j->(1:length(cp_coords[j])) d->point[d] = cp_coords[d][i_d] begin
-		t = Base.Cartesian.@ntuple $sdim j -> point[i_j]
-		points[count] = Vec{$sdim,T}(t)
-		count += 1
-	end=#
+
 
     return mesh
 
@@ -143,7 +139,8 @@ function generate_nurbsmesh(nel::NTuple{1,Int}, orders::NTuple{1,Int}, _size::NT
 
 	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
-#=	point = zeros(T,sdim)
+	#=	
+	point = zeros(T,sdim)
 	points = Vec{sdim,T}[]
 	count = 1
 	Base.Cartesian.@nloops $sdim i j->(1:length(cp_coords[j])) d->point[d] = cp_coords[d][i_d] begin
@@ -320,6 +317,46 @@ function generate_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _a
 			_v = (r*cos(ax), yy,  r*sin(ax))
 
 			push!(control_points, Vec{sdim,T}((_v...,)))
+		end
+	end
+
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	
+    return mesh
+
+end
+
+function generate_doubly_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}; r1::T, r2::T, α1::T, α2::T, multiplicity::NTuple{2,Int}=(1,1)) where T
+
+	pdim = 2
+	sdim = 3
+
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
+	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
+
+	cp_arc1 = Vec{sdim,T}[]
+	cp_arc2 = Vec{sdim,T}[]
+	control_points = Vec{sdim,T}[]
+
+	#Main arc (around x)
+	anglesx = _generate_linear_parametrization(knot_vectors[1], orders[1], 0.0, α1)
+	for ax in anglesx
+		_v = (0.0, -r1*sin(ax), r1*cos(ax))
+		push!(cp_arc1, Vec(_v))
+	end
+
+	#Second arc (around y)
+	anglesy = _generate_linear_parametrization(knot_vectors[2], orders[2], -α2/2, α2/2)
+	for ay in anglesy
+		_v = (r2*sin(ay), 0.0, r2*cos(ay)) .- (0,0,r2)
+		push!(cp_arc2, Vec(_v))
+	end
+
+	#Combine
+	for (ax, cp1) in zip(anglesx, cp_arc1)
+		R = Tensor{2,3,T}(Tuple([1 0 0; 0 cos(ax) -sin(ax); 0 sin(ax) cos(ax)]))
+		for cp2 in cp_arc2
+			push!(control_points, cp1 + R⋅cp2)
 		end
 	end
 
