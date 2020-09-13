@@ -24,7 +24,7 @@
     
     #
     #Check if nurbs splines are equal to C*B
-    mesh = IGA.generate_nurbsmesh((10,10), order, (1.0,1.0), 2)
+    mesh = IGA.generate_nurbsmesh((10,10), order, (1.0,1.0), sdim=2)
     bspline_ip = IGA.BSplineInterpolation{2,Float64}(mesh.INN, mesh.IEN, mesh.knot_vectors, mesh.orders)
     bern_ip = BernsteinBasis{2, mesh.orders}()
     
@@ -72,7 +72,7 @@ end
 end
 
 
-function ke_element_mat!(Ke, X::Vector{Vec{dim, T}}, fe_values::CellValues{dim}) where {dim,T}
+function ke_element_mat!(Ke, X::Vector{Vec{dim, T}}, fe_values::JuAFEM.Values{dim}) where {dim,T}
 
 
     E = 200e9
