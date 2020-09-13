@@ -326,6 +326,33 @@ function generate_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}, _a
 
 end
 
+function generate_curved_nurbsmesh(nel::NTuple{1,Int}, orders::NTuple{1,Int}, _angle::T, _radius::T, _width::T; multiplicity::NTuple{1,Int}=(1,)) where T
+
+	pdim = 1
+	sdim = 2
+
+	rx = _radius
+	αᵢ = _angle
+	w = _width
+
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
+	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
+
+	anglesx = _generate_linear_parametrization(knot_vectors[1], orders[1], 0.0, αᵢ)
+	reverse!(anglesx)
+	
+	control_points = Vec{sdim,T}[]
+	for ax in anglesx
+		_v = (rx*cos(ax),  rx*sin(ax))
+		push!(control_points, Vec{sdim,T}((_v...,)))
+	end
+
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	
+    return mesh
+
+end
+
 function generate_doubly_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}; r1::T, r2::T, α1::T, α2::T, multiplicity::NTuple{2,Int}=(1,1)) where T
 
 	pdim = 2
@@ -550,113 +577,35 @@ function get_nurbs_griddata(orders::NTuple{pdim,Int}, knot_vectors::NTuple{pdim,
 	return cells, nodes
 end
 
-function get_nurbs_meshdata(order::NTuple{1,Int}, nbf::NTuple{1,Int})
+function get_nurbs_meshdata(orders::NTuple{dim,Int}, nbf::NTuple{dim,Int}) where dim
 
-	T = Float64
-	n = nbf[1]
-	p,= order[1]
+	nel = prod(nbf .- orders) #(n-p)*(m-q)*(l-r)
+	nnp = prod(nbf) #n*m*l
+	nen = prod(orders.+1) #(p+1)*(q+1)*(r+1)
 
-	nel = (n-p)
-	nnp = n
-	nen = (p+1)
-
-	INN = zeros(Int ,nnp,1)
+	INN = zeros(Int, nnp, dim)
 	IEN = zeros(Int, nen, nel)
 
 	A = 0; e = 0
+    dims = 1:dim
 
-		for i in 1:n
-			A += 1
-
-			INN[A,1] = i
-
-			if i >= (p+1) 
-				e += 1	
-
-					for iloc in 0:p
-						B = A - iloc
-						b = iloc+1
-						IEN[b,e] = B
-					end
-
-			end
-		end
-
-	return nel, nnp, nen, INN, IEN
-end
-
-function get_nurbs_meshdata(order::NTuple{2,Int}, nbf::NTuple{2,Int})
-
-	T = Float64
-	n,m = nbf
-	p,q = order
-
-	nel = (n-p)*(m-q)
-	nnp = n*m
-	nen = (p+1)*(q+1)
-
-	INN = zeros(Int ,nnp,2)
-	IEN = zeros(Int, nen, nel)
-
-	A = 0; e = 0
-	for j in 1:m
-		for i in 1:n
-			A += 1
-
-			INN[A,1] = i
-			INN[A,2] = j
-
-			if i >= (p+1) && j >= (q+1)
-				e += 1	
-				for jloc in 0:q
-					for iloc in 0:p
-						B = A - jloc*n - iloc
-						b = jloc*(p+1) + iloc+1
-						IEN[b,e] = B
-					end
+    for i in Tuple.(CartesianIndices(nbf))
+        A += 1
+        INN[A, dims] .= i
+        if all(i .>= (orders.+1))
+            e+=1
+			for loc in Tuple.(CartesianIndices(orders.+1))
+				loc = loc .- 1
+				B = A
+				b = 1
+                for d in dim:-1:1
+                    _d = dims[1:d-1]
+					B -= loc[d] * prod(nbf[_d])
+                    b += loc[d] * prod(orders[_d] .+ 1)
 				end
-			end
-		end
-	end
-	return nel, nnp, nen, INN, IEN
-end
-
-function get_nurbs_meshdata(order::NTuple{3,Int}, nbf::NTuple{3,Int})
-
-	n,m,l = nbf
-	p,q,r = order
-
-	nel = (n-p)*(m-q)*(l-r)
-	nnp = n*m*l
-	nen = (p+1)*(q+1)*(r+1)
-
-	INN = zeros(Int ,nnp, 3)
-	IEN = zeros(Int, nen, nel)
-
-	A = 0; e = 0
-	for k in 1:l
-		for j in 1:m
-			for i in 1:n
-				A += 1
-
-				INN[A,1] = i
-				INN[A,2] = j
-				INN[A,3] = k
-
-				if i >= (p+1) && j >= (q+1) && k >= (r+1)
-					e += 1	
-					for kloc in 0:r
-						for jloc in 0:q
-							for iloc in 0:p
-								B = A - kloc*n*m - jloc*n - iloc
-								b = kloc*(p+1)*(q+1) + jloc*(p+1) + iloc+1
-								IEN[b,e] = B
-							end
-						end
-					end
-				end
-			end
-		end
-	end
+                IEN[b,e] = B
+            end
+        end
+    end
 	return nel, nnp, nen, INN, IEN
 end
