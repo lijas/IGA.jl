@@ -380,9 +380,9 @@ function generate_doubly_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,I
 	end
 
 	#Combine
-	for (ax, cp1) in zip(anglesx, cp_arc1)
-		R = Tensor{2,3,T}(Tuple([1 0 0; 0 cos(ax) -sin(ax); 0 sin(ax) cos(ax)]))
-		for cp2 in cp_arc2
+	for cp2 in cp_arc2
+		for (ax, cp1) in zip(anglesx, cp_arc1)
+			R = Tensor{2,3,T}(Tuple([1 0 0; 0 cos(ax) -sin(ax); 0 sin(ax) cos(ax)]))
 			push!(control_points, cp1 + R⋅cp2)
 		end
 	end
