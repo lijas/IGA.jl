@@ -25,50 +25,91 @@
 
 end
 
-@testset "bezier_controlpoints_transform" begin
-
-    dim = 3
-    T = Float64
-
-    orders = (4,4,4)
-    size = (5.0,4.0,2.0)
-
-    #
-    mesh = generate_nurbs_patch(:cube, (20,20,20), orders; size=size, multiplicity=(1,1,1))
-    grid = BezierGrid(mesh)
-    addcellset!(grid, "all", (x)->true)
-
-    bern_ip = BernsteinBasis{dim, mesh.orders}()
-
-    #
-    C,nbe = IGA.compute_bezier_extraction_operators(mesh.orders, mesh.knot_vectors)
-    
-    #Cell values
-    qr = JuAFEM.QuadratureRule{dim,JuAFEM.RefCube}(2)
-    cv = IGA.BezierValues(JuAFEM.CellVectorValues(qr, bern_ip)) 
-
-    #Face values
-    qr = JuAFEM.QuadratureRule{dim-1,JuAFEM.RefCube}(2)
-    fv = IGA.BezierValues(JuAFEM.FaceVectorValues(qr, bern_ip)) 
-
-    bezier_operators = IGA.bezier_extraction_to_vectors(C)
-
-    #Test volume
-    for cellid in 1:getcellset!(grid, "all")
+function _calculate_volume(cv, grid, cellset, bezier_operators)
+    V = 0.0
+    for cellid in cellset
         Ce = bezier_operators[cellid]
 
         set_bezier_operator!(cv, Ce)
-        Xᴮ = getcoordinates(grid, cellid)
+        X = getcoordinates(grid, cellid)
+        Xᴮ = compute_bezier_points(Ce, X)
 
         reinit!(cv, Xᴮ)
 
-        for qp in getnquadpoints(cv)
-            V += getdetJdV(qp)
+        for qp in 1:getnquadpoints(cv)
+            V += getdetJdV(cv, qp)
         end
     end
+    return V
+end
 
-    @test V ≈ prod(V)
+function _calculate_area(fv, grid, faceset, bezier_operators)
+    A = 0.0
+    for (cellid, faceidx) in faceset
+        Ce = bezier_operators[cellid]
 
+        set_bezier_operator!(fv, Ce)
+        X = getcoordinates(grid, cellid)
+        Xᴮ = compute_bezier_points(Ce, X)
+
+        reinit!(fv, Xᴮ, faceidx)
+
+        for qp in 1:getnquadpoints(fv)
+            A += getdetJdV(fv, qp)
+        end
+    end
+    return A
+end
+
+
+function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; meshkwargs...) where {sdim}
+    mesh = generate_nurbs_patch(meshsymbol, nels, orders; meshkwargs...)
+    grid = BezierGrid(mesh)
+
+    bern_ip = BernsteinBasis{sdim, mesh.orders}()
+
+    #
+    C,nbe = IGA.compute_bezier_extraction_operators(mesh.orders, mesh.knot_vectors)
+    bezier_operators = IGA.bezier_extraction_to_vectors(C)
+    
+    #Cell values
+    qr = JuAFEM.QuadratureRule{sdim,JuAFEM.RefCube}(3)
+    cv = IGA.BezierValues(JuAFEM.CellVectorValues(qr, bern_ip)) 
+
+    #Face values
+    qr = JuAFEM.QuadratureRule{sdim-1,JuAFEM.RefCube}(3)
+    fv = IGA.BezierValues(JuAFEM.FaceVectorValues(qr, bern_ip)) 
+
+
+    return grid, cv, fv, bezier_operators
+end
+
+function test_cube()
+    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (2,3,4), (1,1,1), size=(2.0,3.0,4.0))
+    addcellset!(grid, "all", (x)->true)
+    addfaceset!(grid, "left", (x)->x[1]≈0.0)
+    addfaceset!(grid, "right", (x)->x[1]≈2.0)
+    addfaceset!(grid, "top", (x)->x[3]≈4.0)
+
+    #Volume
+    V = _calculate_volume(cv, grid, getcellset(grid, "all"), bezier_operators)
+    @test V ≈ prod((2.0,3.0,4.0))
+
+    #Area
+    A = _calculate_area(fv, grid, getfaceset(grid, "left"), bezier_operators)
+    @test A ≈ prod((3.0,4.0))
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "right"), bezier_operators)
+    @test A ≈ prod((3.0,4.0))
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "top"), bezier_operators)
+    @test A ≈ prod((3.0,2.0))
+
+end
+
+@testset "nurbs_patches" begin
+    test_cube()
+    test_singly_curved()
 end
 
 @testset "Bezier transformation" begin

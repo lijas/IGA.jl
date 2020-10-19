@@ -27,8 +27,10 @@ function BezierGrid(mesh::NURBSMesh{sdim}) where {sdim}
     M = (2,4,6)[sdim]
 	_BezierCell = BezierCell{sdim,ncontrolpoints_per_cell,mesh.orders,M}
 	cells = [_BezierCell(Tuple(mesh.IEN[:,ie])) for ie in 1:getncells(mesh)]
-
-	C, nbe = compute_bezier_extraction_operators(mesh.orders, mesh.knot_vectors)
+    @show size(mesh.IEN)
+    C, nbe = compute_bezier_extraction_operators(mesh.orders, mesh.knot_vectors)
+    @show getncells(mesh)
+    @show nbe
 	@assert nbe == length(cells)
 
 	Cvec = bezier_extraction_to_vectors(C)
@@ -81,6 +83,12 @@ function get_bezier_coordinates(grid::BezierGrid, ic::Int)
 	
 	get_bezier_coordinates!(x,w,grid,ic)
 	return x,w
+end
+
+function JuAFEM.getcoordinates(grid::BezierGrid, cell::Int)
+    dim = JuAFEM.getdim(grid); T = getT(grid)
+    nodeidx = grid.cells[cell].nodes
+    return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim,T}}
 end
 
 

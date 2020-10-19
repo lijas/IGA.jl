@@ -25,7 +25,7 @@ struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 		#Remove elements which are zero length
 		to_remove = Int[]
 		for e in 1:nel
-			nurbs_coords = [INN[IEN[1,e],d] for d in 1:pdim]
+			nurbs_coords = [INN[IEN[end,e],d] for d in 1:pdim]
 			for d in 1:pdim
 				if knot_vectors[d][nurbs_coords[d]] == knot_vectors[d][nurbs_coords[d]+1]
 					push!(to_remove, e)
@@ -34,6 +34,7 @@ struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 			end
 		end
 		to_keep = setdiff(collect(1:nel), to_remove)
+
 		IEN = IEN[:, to_keep] #IEN = IEN[end:-1:1, to_keep]
 		new{pdim,sdim,T}(knot_vectors,orders,control_points,weights,IEN,INN)
 	end

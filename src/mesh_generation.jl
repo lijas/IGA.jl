@@ -590,6 +590,7 @@ function generate_nurbs_meshdata(orders::NTuple{dim,Int}, nbf::NTuple{dim,Int}) 
             end
         end
 	end
-	IEN .= reverse(IEN, dims=2)
+	IEN .= reverse(IEN, dims=1)
+
 	return nel, nnp, nen, INN, IEN
 end
