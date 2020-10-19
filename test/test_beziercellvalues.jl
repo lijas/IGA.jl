@@ -24,7 +24,7 @@
     
     #
     #Check if nurbs splines are equal to C*B
-    mesh = IGA.generate_nurbsmesh((10,10), order, (1.0,1.0), sdim=2)
+    mesh = IGA.generate_nurbs_patch((10,10), order, (1.0,1.0), sdim=2)
     bspline_ip = IGA.BSplineInterpolation{2,Float64}(mesh.INN, mesh.IEN, mesh.knot_vectors, mesh.orders)
     bern_ip = BernsteinBasis{2, mesh.orders}()
     
@@ -139,7 +139,7 @@ end
     L = 10.0; b= 1.3; h = 0.1;
 
     #Check if nurbs splines are equal to C*B
-    mesh = IGA.generate_nurbsmesh((10,5,5), order, (L,b,h))
+    mesh = IGA.generate_nurbs_patch((10,5,5), order, (L,b,h))
     grid = IGA.convert_to_grid_representation(mesh)
 
     #iga with no bezier extraction

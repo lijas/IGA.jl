@@ -1,7 +1,7 @@
 
 
-function JuAFEM.reinit!(cv::JuAFEM.CellVectorValues{dim}, coords::Tuple{AbstractVector{Vec{dim,T}}, AbstractVector{T}}) where {dim,T}
-    JuAFEM.reinit!(cv, coords[1], coords[2])
+function JuAFEM.reinit!(cv::JuAFEM.CellVectorValues{dim}, xw::Tuple{AbstractVector{Vec{dim,T}}, AbstractVector{T}}) where {dim,T}
+    JuAFEM.reinit!(cv, xw...)
 end
 
 function JuAFEM.reinit!(cv::JuAFEM.CellVectorValues{dim}, x::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}) where {dim,T}
@@ -13,8 +13,7 @@ function JuAFEM.reinit!(cv::JuAFEM.CellVectorValues{dim}, x::AbstractVector{Vec{
 
     @inbounds for i in 1:length(cv.qr_weights)
         weight = cv.qr_weights[i]
-        @show x
-        @show w
+
         Wb = zero(T)
         dWb = zero(Vec{dim,T})
         for j in 1:n_geom_basefuncs
@@ -27,7 +26,7 @@ function JuAFEM.reinit!(cv::JuAFEM.CellVectorValues{dim}, x::AbstractVector{Vec{
             Ra = (w[j]*Wb*cv.dMdξ[j, i] - w[j]*cv.M[j,i]*dWb)
             fecv_J = x[j] ⊗ Ra
         end
-        @show fecv_J
+
         detJ = det(fecv_J)
         detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
         cv.detJdV[i] = detJ * weight

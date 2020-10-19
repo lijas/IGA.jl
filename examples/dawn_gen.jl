@@ -10,7 +10,7 @@ function blabla()
     order = 3
     dim = 2
 
-    mesh = IGA.generate_nurbsmesh((nelx, nely), (order,order), (L,h))
+    mesh = IGA.generate_nurbs_patch((nelx, nely), (order,order), (L,h))
     grid = IGA.BezierGrid(mesh)
     addnodeset!(grid, "left", (x) -> x[1]≈0.0)
     addnodeset!(grid, "top", (x) -> x[2]≈h)

@@ -1,46 +1,8 @@
 
-export compute_bezier_extraction_operators
-export BezierExtractionOperator, compute_bezier_points
+export compute_bezier_extraction_operators, compute_bezier_points
 
-
-function compute_bezier_points(Ce::AbstractMatrix{T}, control_points::AbstractVector{Vec{sdim,T}}) where {T,sdim}
-	error("dont use")
-	n_new_points = size(Ce,2)
-	bezierpoints = zeros(Vec{sdim,T}, n_new_points)
-	for i in 1:n_new_points
-		for (ic, p) in enumerate(control_points)
-			bezierpoints[i] += Ce[ic,i]*p
-		end
-	end
-	return bezierpoints
-
-end
-
-
-#function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}) where {sdim,T}
-function compute_bezier_points_dim1(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}) where {T2,T}
-
-	@assert(length(control_points) == length(Ce))
-	n_points = length(first(Ce))#length(control_points)#length(first(Ce))
-	bezierpoints = zeros(T2, n_points)
-
-	for (ic, p) in enumerate(control_points)
-		ce = Ce[ic]
-
-		for i in 1:(n_points)
-			bezierpoints[i] += ce[i]*control_points[ic]
-		end
-	end
-
-	return bezierpoints
-
-end
 
 function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1) where {T2,T}
-
-	if dim==1
-		compute_bezier_points_dim1(Ce, control_points)
-	end
 
 	@assert(length(control_points) == length(Ce)*dim)
 	n_points = length(first(Ce))#length(control_points)#length(first(Ce))
@@ -72,8 +34,7 @@ function compute_bezier_extraction_operators(p::Int, q::Int, r::Int, knot1::Vect
 	for k in 1:nbe3
 		for j in 1:nbe2
 			for i in 1:nbe1
-				_C = kron(Ce2[j],Ce1[i])
-				_C = kron(Ce3[k], _C)
+				_C = kron(Ce3[k], Ce2[j],Ce1[i])
 				push!(C,_C)
 			end
 		end
@@ -176,12 +137,12 @@ function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdi
 
 end
 
-function knotinsertion(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
+function knotinsertion(Ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
 
-    n = length(ξ) - p - 1
+    n = length(Ξ) - p - 1
     m = n+1
 
-    k = findfirst(ξᵢ -> ξᵢ>ξᴺ, ξ)-1
+    k = findfirst(ξᵢ -> ξᵢ>ξᴺ, Ξ)-1
 
     @assert((k>p))
     C = zeros(T,m,n)
@@ -192,7 +153,7 @@ function knotinsertion(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
         if i<=k-p
             α = 1.0
         elseif k-p+1<=i<=k
-            α = (ξᴺ - ξ[i])/(ξ[i+p] - ξ[i])
+            α = (ξᴺ - Ξ[i])/(Ξ[i+p] - Ξ[i])
         elseif i>=k+1
              α = 0.0
         end
@@ -201,7 +162,7 @@ function knotinsertion(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
     end
     C[m,n] = 1
     
-    new_knot_vector = copy(ξ)
+    new_knot_vector = copy(Ξ)
     insert!(new_knot_vector,k+1,ξᴺ)
     return C, new_knot_vector
 end

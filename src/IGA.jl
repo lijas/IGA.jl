@@ -1,84 +1,70 @@
 module IGA
 
-
 using Reexport
 
 @reexport using Tensors
+
 using LinearAlgebra
-import SparseArrays
 using StaticArrays
 using TimerOutputs
 using WriteVTK
 
-#import InteractiveUtils
-
+import SparseArrays
 import JuAFEM
+
+export BezierExtractionOperator
 
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 
 include("utils.jl")
-include("splines/bsplines.jl")
 include("nurbsmesh.jl")
 include("mesh_generation.jl")
+include("bezier_grid.jl")
 include("bezier_extraction.jl")
 include("splines/bezier.jl")
-include("nurbs.jl")
+include("splines/bezier_values.jl")
+include("splines/bsplines.jl")
+include("nurbs_cell_values.jl")
 
-#using Plots; pyplot();
-#include("plot_utils.jl")
 
-
-#const BezierCell{dim,N,order} = JuAFEM.AbstractCell{dim,N,4}
-struct BezierCell{dim,N,order} <: JuAFEM.AbstractCell{dim,N,4}
+"""
+BezierCell
+Type parameters specify:
+`dim` = dimension
+`N` = number of nodes/controlpoints
+`order` = tuple with order in each parametric dimension (does not need to be equal to `dim`)
+`M` = number of faces (4 in 2d, 6 in 3d)
+"""
+struct BezierCell{dim,N,order,M} <: JuAFEM.AbstractCell{dim,N,M}
     nodes::NTuple{N,Int}
-    function BezierCell{dim,N,order}(nodes::NTuple{N,Int}) where {dim,N,order} 
+    function BezierCell{dim,N,order,M}(nodes::NTuple{N,Int}) where {dim,N,order,M} 
         @assert(order isa Tuple)
         @assert(prod(order.+1)==N)
-		return new{dim,N,order}(nodes)
+		return new{dim,N,order,M}(nodes)
     end
 end
 
-_bernstein_ordering(::BezierCell{dim,N,orders}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())
-
-JuAFEM.faces(c::BezierCell{2,9,(2,2)}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), 
-                                         (c.nodes[3],c.nodes[6],c.nodes[9]),
-                                         (c.nodes[9],c.nodes[8],c.nodes[7]),
-                                         (c.nodes[7],c.nodes[4],c.nodes[1]))
+#This is a bit of a hack to get JuAFEMs Dofhandler to distribute dofs correctly:
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
-#beam/shell element in 2d
-JuAFEM.edges(c::BezierCell{2,3,(2,)}) = ((c.nodes[1],), (c.nodes[3],))
-JuAFEM.faces(c::BezierCell{2,3,(2,)}) = ((c.nodes[1], c.nodes[3]), ((c.nodes[3], c.nodes[1])))
+_bernstein_ordering(::BezierCell{dim,N,orders}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())                                        
 
-#Shell elements
-#JuAFEM.faces(c::BezierCell{3,25,(4,4)}) = (c.nodes, reverse(c.nodes))
-#JuAFEM.faces(c::BezierCell{3,16,(3,3)}) = (c.nodes, reverse(c.nodes))
-JuAFEM.edges(c::BezierCell{3,9,(2,)}) =  ((c.nodes[1],c.nodes[2],c.nodes[3]), 
-                                        (c.nodes[3],c.nodes[6],c.nodes[9]),
-                                        (c.nodes[9],c.nodes[8],c.nodes[7]),
-                                        (c.nodes[7],c.nodes[4],c.nodes[1]))
 #Dim 2
 function JuAFEM.faces(c::BezierCell{2,N,order}) where {N,order}
-    #own dispatch
     length(order)==1 && return _faces_line(c)
     length(order)==2 && return _faces_quad(c)
 end
-_faces_line(c::BezierCell{2,N,order}) where {N,order} = (c.nodes, reverse(c.nodes))
+_faces_line(c::BezierCell{2,N,order}) where {N,order} = (c.nodes,) #Only one face
 _faces_quad(c::BezierCell{2,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.faces(BernsteinBasis{2,order}() )))
 
 #Dim 3                                        
-JuAFEM.vertices(c::BezierCell{3,9,(3,)}) = c.nodes
-#JuAFEM.edges(c::BezierCell{3,16,(3,)}) = (Tuple(c.nodes[[1,2,3,4]]), Tuple(c.nodes[[4,8,12,16]]), Tuple(c.nodes[[16,15,14,13]]), Tuple(c.nodes[[13,9,5,1]]))
-
 function JuAFEM.faces(c::BezierCell{3,N,order}) where {N,order}
-    #own dispatch
     length(order)==2 && return _faces_quad(c)
     length(order)==3 && return _faces_hexa(c)
 end
-_faces_quad(c::BezierCell{3,N,order}) where {N,order} = (c.nodes, reverse(c.nodes))
+_faces_quad(c::BezierCell{3,N,order}) where {N,order} = (c.nodes,) #Only on face
 _faces_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.faces(BernsteinBasis{3,order}() )))
 
-#
 function JuAFEM.edges(c::BezierCell{3,N,order}) where {N,order}
     #own dispatch
     length(order)==2 && return _edges_quad(c)
@@ -88,62 +74,16 @@ _edges_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), 
 _edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.edges(BernsteinBasis{3,order}() )))
 
 
-JuAFEM.default_interpolation(::Type{BezierCell{dim,N,order}}) where {dim,N,order}= BernsteinBasis{length(order),order}()
-JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"
+JuAFEM.default_interpolation(::Type{BezierCell{dim,N,order}}) where {dim,N,order} = BernsteinBasis{length(order),order}()
+#JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"
 
 #
 function JuAFEM.cell_to_vtkcell(::Type{BezierCell{2,N,order}}) where {N,order}
     if length(order) == 2
         return JuAFEM.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
+    elseif length(order) == 3
+        return JuAFEM.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
     end
-end
-
-function WriteVTK.vtk_grid(filename::AbstractString, grid::JuAFEM.Grid{G}, beo::Vector{BezierExtractionOperator{T}}) where {G,T} #BezierGrid{G}
-    dim = JuAFEM.getdim(grid)
-    
-    cls = MeshCell[]
-    coords = zeros(Vec{dim,T}, JuAFEM.getnnodes(grid))
-    for (cellid, cell) in enumerate(grid.cells)
-        celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
-        if typeof(cell) <: BezierCell
-            ordering = _bernstein_ordering(cell)
-            coords[collect(cell.nodes)] = compute_bezier_points(beo[cellid], JuAFEM.getcoordinates(grid, cellid))
-            push!(cls, MeshCell(celltype, collect(cell.nodes[ordering])))
-        else
-            push!(cls, MeshCell(celltype, collect(cell.nodes)))
-        end
-    end
-    #coords = reshape(reinterpret(T, JuAFEM.getnodes(grid)), (dim, JuAFEM.getnnodes(grid)))
-    _coords = reshape(reinterpret(T, coords), (dim, JuAFEM.getnnodes(grid)))
-    return WriteVTK.vtk_grid(filename, _coords, cls)
-end
-
-function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid)
-    dim = JuAFEM.getdim(grid)
-    T = eltype(first(grid.nodes).x)
-    
-    cls = MeshCell[]
-    coords = zeros(Vec{dim,T}, JuAFEM.getnnodes(grid))
-    weights = zeros(T, JuAFEM.getnnodes(grid))
-    ordering = _bernstein_ordering(first(grid.cells))
-
-    @show ordering
-
-    for (cellid, cell) in enumerate(grid.cells)
-        celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
-        
-        x,w = get_bezier_coordinates(grid, cellid)
-        coords[collect(cell.nodes)] .= x
-        weights[collect(cell.nodes)] .= w
-
-        push!(cls, MeshCell(celltype, collect(cell.nodes[ordering])))
-    end
-    #coords = reshape(reinterpret(T, JuAFEM.getnodes(grid)), (dim, JuAFEM.getnnodes(grid)))
-    _coords = reshape(reinterpret(T, coords), (dim, JuAFEM.getnnodes(grid)))
-    vtkfile = WriteVTK.vtk_grid(filename, _coords, cls)
-
-    vtkfile["RationalWeights", VTKPointData()] = weights
-    return vtkfile
 end
 
 end #end module

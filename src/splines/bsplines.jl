@@ -1,5 +1,9 @@
 export BSplineBasis
 
+"""
+Interpolation for bsplines.
+    Not really used, since bezier-interpolation + bezier-extraction is prefered. 
+"""
 struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order}
 	knot_vector::NTuple{dim,Vector{T}}
 
@@ -9,9 +13,11 @@ struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,orde
         @assert(first(first(knots))==T(-1))
 		return new{dim,T,Tuple(order)}(knots)
     end
+
     function BSplineBasis(knots::Vector{T}, order::Int) where {T} 
 		return new{1,T,Tuple(order)}((knots,))
     end
+    
 end
 
 getnbasefunctions_dim(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = Tuple([length(basis.knot_vector[i]) - order[i] - 1 for i in 1:dim])

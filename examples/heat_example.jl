@@ -53,7 +53,7 @@ function goiga(nelx,nely, order, multiplicity)
     Lx = 1.0
     Ly = 1.0*2
 
-    nurbsmesh = IGA.generate_nurbsmesh((nelx, nely),(order,order),(Lx,Ly),multiplicity=multiplicity)
+    nurbsmesh = IGA.generate_nurbs_patch((nelx, nely),(order,order),(Lx,Ly),multiplicity=multiplicity)
     grid = IGA.convert_to_grid_representation(nurbsmesh)
     
     #@show nurbsmesh.knot_vectors

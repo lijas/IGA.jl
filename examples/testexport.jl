@@ -51,7 +51,7 @@ function test_export()
     Lx = 1.0
     Ly = 1.0*2
 
-    nurbsmesh = IGA.generate_nurbsmesh((1 + order, 1 + order),(order,order),(Lx,Ly))
+    nurbsmesh = IGA.generate_nurbs_patch((1 + order, 1 + order),(order,order),(Lx,Ly))
     grid = IGA.convert_to_grid_representation(nurbsmesh)
 
     for node in grid.nodes

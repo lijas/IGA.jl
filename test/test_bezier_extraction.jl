@@ -31,43 +31,44 @@ end
     T = Float64
 
     orders = (4,4,4)
+    size = (5.0,4.0,2.0)
 
-    #Check if nurbs splines are equal to C*B
-    mesh = IGA.generate_nurbsmesh((20,20,20), orders, (5.0,4.0,2.0))
-    grid = IGA.convert_to_grid_representation(mesh)
+    #
+    mesh = generate_nurbs_patch(:cube, (20,20,20), orders; size=size, multiplicity=(1,1,1))
+    grid = BezierGrid(mesh)
+    addcellset!(grid, "all", (x)->true)
 
-    bspline_ip = IGA.BSplineInterpolation{dim,Float64}(mesh.INN, mesh.IEN, mesh.knot_vectors, mesh.orders)
     bern_ip = BernsteinBasis{dim, mesh.orders}()
 
     #
-    C,nbe = IGA.compute_bezier_extraction_operators(mesh.orders..., mesh.knot_vectors...)
+    C,nbe = IGA.compute_bezier_extraction_operators(mesh.orders, mesh.knot_vectors)
+    
+    #Cell values
     qr = JuAFEM.QuadratureRule{dim,JuAFEM.RefCube}(2)
-    cv = JuAFEM.CellVectorValues(qr, bern_ip)
+    cv = IGA.BezierValues(JuAFEM.CellVectorValues(qr, bern_ip)) 
 
-    Cvecs = IGA.bezier_extraction_to_vectors(C)
-    bern_cv = IGA.BezierValues(cv) 
+    #Face values
+    qr = JuAFEM.QuadratureRule{dim-1,JuAFEM.RefCube}(2)
+    fv = IGA.BezierValues(JuAFEM.FaceVectorValues(qr, bern_ip)) 
 
-    for ie in [1,2,3, getncells(grid)]#1:getncells(grid)
+    bezier_operators = IGA.bezier_extraction_to_vectors(C)
 
-        coords = getcoordinates(grid, ie)
-        bezier_coords = IGA.compute_bezier_points(Cvecs[ie], coords)
+    #Test volume
+    for cellid in 1:getcellset!(grid, "all")
+        Ce = bezier_operators[cellid]
 
-        IGA.set_bezier_operator!(bern_cv, Cvecs[ie])
-        IGA.set_current_cellid!(bspline_ip, ie)
+        set_bezier_operator!(cv, Ce)
+        Xᴮ = getcoordinates(grid, cellid)
 
-        reinit!(bern_cv, coords)
+        reinit!(cv, Xᴮ)
 
-        for qp in 1:getnquadpoints(bern_cv)
-            X1 = JuAFEM.spatial_coordinate(bern_cv, qp, bezier_coords)
-            X2 = zero(Vec{dim,T})
-            for i in 1:getnbasefunctions(bspline_ip)
-                N = JuAFEM.value(bspline_ip, i, qr.points[qp])
-                X2 += N*reverse(coords)[i]
-            end
-            @test X2 ≈ X1
+        for qp in getnquadpoints(cv)
+            V += getdetJdV(qp)
         end
-
     end
+
+    @test V ≈ prod(V)
+
 end
 
 @testset "Bezier transformation" begin
