@@ -37,9 +37,10 @@ Type parameters specify:
 """
 struct BezierCell{dim,N,order,M} <: JuAFEM.AbstractCell{dim,N,M}
     nodes::NTuple{N,Int}
-    function BezierCell{dim,N,order,M}(nodes::NTuple{N,Int}) where {dim,N,order,M} 
+    function BezierCell{dim,N,order}(nodes::NTuple{N,Int}) where {dim,N,order} 
         @assert(order isa Tuple)
         @assert(prod(order.+1)==N)
+        M = (2,4,6)[dim]
 		return new{dim,N,order,M}(nodes)
     end
 end
