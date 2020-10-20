@@ -25,12 +25,13 @@ function BezierGrid(mesh::NURBSMesh{sdim}) where {sdim}
 	nodes = [JuAFEM.Node(x) for x in mesh.control_points]
 
     M = (2,4,6)[sdim]
-	_BezierCell = BezierCell{sdim,ncontrolpoints_per_cell,mesh.orders,M}
-	cells = [_BezierCell(Tuple(mesh.IEN[:,ie])) for ie in 1:getncells(mesh)]
-    @show size(mesh.IEN)
+    CellType = BezierCell{sdim,ncontrolpoints_per_cell,mesh.orders,M}
+    ordering = _bernstein_ordering(CellType)
+
+	cells = [CellType(Tuple(mesh.IEN[ordering,ie])) for ie in 1:getncells(mesh)]
+
     C, nbe = compute_bezier_extraction_operators(mesh.orders, mesh.knot_vectors)
-    @show getncells(mesh)
-    @show nbe
+
 	@assert nbe == length(cells)
 
 	Cvec = bezier_extraction_to_vectors(C)
@@ -60,6 +61,8 @@ function getweights!(w::AbstractVector{T}, grid::BezierGrid, ic::Int) where {T}
 	nodeids = collect(grid.cells[ic].nodes)
 	w .= grid.weights[nodeids]
 end
+
+getweights(grid::BezierGrid) = grid.weights
 
 function get_bezier_coordinates!(bcoords::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}, grid::BezierGrid, ic::Int) where {dim,T}
 
@@ -97,23 +100,17 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid)
     T = eltype(first(grid.nodes).x)
     
     cls = MeshCell[]
-    coords = zeros(Vec{dim,T}, JuAFEM.getnnodes(grid))
     weights = zeros(T, JuAFEM.getnnodes(grid))
-    ordering = _bernstein_ordering(first(grid.cells))
+    #ordering = _bernstein_ordering(first(grid.cells))
 
     for (cellid, cell) in enumerate(grid.cells)
         celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
-        
-        x,w = get_bezier_coordinates(grid, cellid)
-        coords[collect(cell.nodes)] .= x
-        weights[collect(cell.nodes)] .= w
-
-        push!(cls, MeshCell(celltype, collect(cell.nodes[ordering])))
+        push!(cls, MeshCell(celltype, collect(cell.nodes)))
     end
     
-    _coords = reshape(reinterpret(T, coords), (dim, JuAFEM.getnnodes(grid)))
-    vtkfile = WriteVTK.vtk_grid(filename, _coords, cls)
+    coords = reshape(reinterpret(T, grid.nodes), (dim, JuAFEM.getnnodes(grid)))
+    vtkfile = WriteVTK.vtk_grid(filename, coords, cls)
 
-    vtkfile["RationalWeights", VTKPointData()] = weights
+    vtkfile["RationalWeights", VTKPointData()] = getweights(grid)
     return vtkfile
 end

@@ -47,7 +47,7 @@ end
 #This is a bit of a hack to get JuAFEMs Dofhandler to distribute dofs correctly:
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
-_bernstein_ordering(::BezierCell{dim,N,orders}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())                                        
+_bernstein_ordering(::Type{BezierCell{dim,N,orders,M}}) where {dim,N,orders,M} = _bernstein_ordering(BernsteinBasis{dim,orders}())                                        
 
 #Dim 2
 function JuAFEM.faces(c::BezierCell{2,N,order}) where {N,order}
@@ -77,12 +77,23 @@ _edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), 
 JuAFEM.default_interpolation(::Type{BezierCell{dim,N,order}}) where {dim,N,order} = BernsteinBasis{length(order),order}()
 #JuAFEM.celltypes[BezierCell{2,9,2}] = "BezierCell"
 
+juafem_to_vtk_faceorder(::Type{BezierCell{dim,N,order,M}}) where {dim,N,order,M} = 1:M
+juafem_to_vtk_faceorder(::Type{BezierCell{3,N,order,M}}) where {N,order,M} = [5,3,2,4,1,6]
+
 #
-function JuAFEM.cell_to_vtkcell(::Type{BezierCell{2,N,order}}) where {N,order}
+function JuAFEM.cell_to_vtkcell(::Type{BezierCell{2,N,order,M}}) where {N,order,M}
     if length(order) == 2
         return JuAFEM.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
-    elseif length(order) == 3
+    else
+        error("adsf")
+    end
+end
+
+function JuAFEM.cell_to_vtkcell(::Type{BezierCell{3,N,order,M}}) where {N,order,M}
+    if length(order) == 3
         return JuAFEM.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
+    else
+        error("adsf")
     end
 end
 

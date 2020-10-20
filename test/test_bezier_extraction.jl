@@ -2,26 +2,28 @@
     order = 3
     knots = Float64[0,0,0,0, 1,2,3, 4,4,4,4]
 
-    C,nbe = IGA.compute_bezier_extraction_operators(order, knots)
+    C,nbe = IGA.compute_bezier_extraction_operators((order,), (knots,))
     
     #From article about bezier extraction
     #Test univariate bspline extraction
     @test nbe == 4
     @test length(C) == 4
-    @test C[1] ≈ Float64[1 0 0 0; 0 1 0.5 1/4; 0 0 1/2 7/12; 0 0 0 1/6]
-    @test C[2] ≈ Float64[1/4 0 0 0; 7/12 2/3 1/3 1/6; 1/6 1/3 2/3 2/3; 0 0 0 1/6]
-    @test C[3] ≈ Float64[1/6 0 0 0; 2/3 2/3 1/3 1/6; 1/6 1/3 2/3 7/12; 0 0 0 1/4]
-    @test C[4] ≈ Float64[1/6 0 0 0; 7/12 1/2 0 0; 1/4 1/2 1 0; 0 0 0 1]
+    ordering = IGA._bernstein_ordering(BernsteinBasis{1,order}())
+    @test all(C[1] .≈ Float64[1 0 0 0; 0 1 0.5 1/4; 0 0 1/2 7/12; 0 0 0 1/6][ordering,ordering])
+    @test all(C[2] .≈ Float64[1/4 0 0 0; 7/12 2/3 1/3 1/6; 1/6 1/3 2/3 2/3; 0 0 0 1/6][ordering,ordering])
+    @test all(C[3] .≈ Float64[1/6 0 0 0; 2/3 2/3 1/3 1/6; 1/6 1/3 2/3 7/12; 0 0 0 1/4][ordering,ordering])
+    @test all(C[4] .≈ Float64[1/6 0 0 0; 7/12 1/2 0 0; 1/4 1/2 1 0; 0 0 0 1][ordering,ordering])
 
     #Test multivariate extraction operator
     orders = (2,2)
     knots = (Float64[0,0,0,1/3,2/3,1,1,1], Float64[0,0,0,1/3,2/3,1,1,1])
     C,nbe = IGA.compute_bezier_extraction_operators(orders, knots)
+    ordering = IGA._bernstein_ordering(BernsteinBasis{2,orders}())
     @test nbe == 9
     @test length(C) == 9
-    @test C[1] ≈ kron( [1 0 0; 0 1 1/2; 0 0 1/2], [1 0 0; 0 1 1/2; 0 0 1/2])
-    @test C[2] ≈ kron( [1 0 0; 0 1 1/2; 0 0 1/2], [1/2 0 0; 1/2 1 1/2; 0 0 1/2])
-    @test C[9] ≈ kron( [1/2 0 0; 1/2 1 0; 0 0 1], [1/2 0 0; 1/2 1 0; 0 0 1])
+    @test all(C[1] .≈ kron( [1 0 0; 0 1 1/2; 0 0 1/2], [1 0 0; 0 1 1/2; 0 0 1/2])[ordering,ordering])
+    @test all(C[2] .≈ kron( [1 0 0; 0 1 1/2; 0 0 1/2], [1/2 0 0; 1/2 1 1/2; 0 0 1/2])[ordering,ordering])
+    @test all(C[9] .≈ kron( [1/2 0 0; 1/2 1 0; 0 0 1], [1/2 0 0; 1/2 1 0; 0 0 1])[ordering,ordering])
 
 end
 
@@ -85,12 +87,16 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
 end
 
 function test_cube()
-    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (2,3,4), (1,1,1), size=(2.0,3.0,4.0))
+    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (1,1,1), (1,1,1), size=(2.0,3.0,4.0))
     addcellset!(grid, "all", (x)->true)
     addfaceset!(grid, "left", (x)->x[1]≈0.0)
     addfaceset!(grid, "right", (x)->x[1]≈2.0)
     addfaceset!(grid, "top", (x)->x[3]≈4.0)
 
+    @show JuAFEM.faces(grid.cells[1])[1]
+    @show grid.nodes[collect(JuAFEM.faces(grid.cells[1])[1])]
+    #@show grid.nodes[collect(faces(grid.cells[1]).nodes)]
+    @show getfaceset(grid, "left")
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"), bezier_operators)
     @test V ≈ prod((2.0,3.0,4.0))
@@ -107,9 +113,52 @@ function test_cube()
 
 end
 
+function test_singly_curved_3d()
+    grid, cv, fv, bezier_operators = _get_problem_data(:singly_curved, (20,2,1), (2,2,2), α = pi/2, R = 100.0, width = 5.0, thickness = 3.0)
+    addcellset!(grid, "all", (x)->true)
+    addfaceset!(grid, "left", (x)->x[3]≈0.0)
+    addfaceset!(grid, "front", (x)->x[2]≈5.0/2)
+    addfaceset!(grid, "top", (x)-> sqrt(x[1]^2 + x[3]^2) > 100.0 + 3.0/3, all=true)
+
+    #Volume
+    V = _calculate_volume(cv, grid, getcellset(grid, "all"), bezier_operators)
+    @test isapprox(V, pi/2 * 100.0 * 5.0 * 3.0, atol = 10.0)
+
+    #Area
+    A = _calculate_area(fv, grid, getfaceset(grid, "left"), bezier_operators)
+    @test A ≈ 5.0*3.0
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "front"), bezier_operators)
+    @test isapprox(A, pi/2 * 100.0 * 3.0, atol = 2.0)
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "top"), bezier_operators)
+    @test isapprox(A, (100+5.0/2)*pi/2 * 5.0, atol = 10.0) 
+
+end
+
+function test_singly_curved_2d()
+    grid, cv, fv, bezier_operators = _get_problem_data(:singly_curved, (20,2), (2,2), α = pi/2, R = 100.0, thickness = 3.0)
+    addcellset!(grid, "all", (x)->true)
+    addfaceset!(grid, "left", (x)->x[2]≈0.0)
+    addfaceset!(grid, "top", (x)-> sqrt(x[1]^2 + x[2]^2) > 100.0 + 3.0/3, all=true)
+
+    #Volume
+    V = _calculate_volume(cv, grid, getcellset(grid, "all"), bezier_operators)
+    @test isapprox(V, pi/2 * 100.0 * 3.0, atol = 1.0)
+
+    #Area
+    A = _calculate_area(fv, grid, getfaceset(grid, "left"), bezier_operators)
+    @test A ≈ 3.0
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "top"), bezier_operators)
+    @test isapprox(A, (100+5.0/2)*pi/2, atol = 2.0)
+
+end
+
 @testset "nurbs_patches" begin
     test_cube()
-    test_singly_curved()
+    test_singly_curved_2d()
+    test_singly_curved_3d()
 end
 
 @testset "Bezier transformation" begin

@@ -22,41 +22,50 @@ function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::
 
 end
 
-compute_bezier_extraction_operators(o::NTuple{pdim,Int}, U::NTuple{pdim,Vector{T}}) where {pdim,T} = 
-	compute_bezier_extraction_operators(o...,U...)
+"""
+	compute_bezier_extraction_operators2(orders::NTuple{pdim,Int}, knots::NTuple{pdim,Vector{T}})
 
-function compute_bezier_extraction_operators(p::Int, q::Int, r::Int, knot1::Vector{T}, knot2::Vector{T}, knot3::Vector{T}) where T
-
-	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
-	Ce2, nbe2 = compute_bezier_extraction_operators(q, knot2)
-	Ce3, nbe3 = compute_bezier_extraction_operators(r, knot3)
-	C = Vector{eltype(Ce1)}()
-	for k in 1:nbe3
-		for j in 1:nbe2
-			for i in 1:nbe1
-				_C = kron(Ce3[k], Ce2[j],Ce1[i])
-				push!(C,_C)
+Computes the bezier extraction operator in each parametric direction, and uses the kron operator to combine them
+"""
+@generated function compute_bezier_extraction_operators(orders::NTuple{pdim,Int}, knots::NTuple{pdim,Vector{T}}) where {pdim,T} 
+	quote
+		#Get bezier extraction vector in each dimension
+		#
+		Ce = Vector{SparseArrays.SparseMatrixCSC{Float64,Int64}}[]
+		nels = Int[]
+		for d in 1:pdim
+			_Ce, _nel = _compute_bezier_extraction_operators(orders[d], knots[d])
+			push!(Ce, _Ce)
+			push!(nels, _nel)
+		end
+		
+		#Tensor prodcut of the bezier extraction operators
+		#
+		C = Vector{eltype(first(Ce))}()
+		Base.Cartesian.@nloops $pdim i (d)->1:nels[d] begin
+			#kron not defined for 1d, so special case for pdim==1
+			if $pdim == 1
+				_C = Ce[1][i_1]
+			else
+				_C = Base.Cartesian.@ncall $pdim kron (d)->Ce[$pdim-d+1][i_{$pdim-d+1}]
 			end
+			push!(C, _C)
 		end
+
+		#Reorder
+		#
+		ordering = _bernstein_ordering(BernsteinBasis{pdim,orders}())
+		nel = prod(nels)
+		C_reorder = Vector{eltype(first(Ce))}()
+		for i in 1:nel
+			push!(C_reorder, C[i][ordering,ordering])
+		end
+
+		return C_reorder, nel
 	end
-	return C, nbe1*nbe2*nbe3
 end
 
-function compute_bezier_extraction_operators(p::Int, q::Int, knot1::Vector{T}, knot2::Vector{T}) where T
-
-	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
-	Ce2, nbe2 = compute_bezier_extraction_operators(q, knot2)
-	C = Vector{eltype(Ce1)}()
-	for j in 1:nbe2
-		for i in 1:nbe1
-			_C = kron(Ce2[j],Ce1[i])
-			push!(C,_C)
-		end
-	end
-	return C, nbe1*nbe2
-end
-
-function compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
+function _compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
 	a = p+1
 	b = a+1
 	nb = 1

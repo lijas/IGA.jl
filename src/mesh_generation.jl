@@ -221,7 +221,7 @@ function generate_nurbs_patch(::Val{:nasa_specimen}, nel_bend::NTuple{2,Int}, or
 	return IGA.NURBSMesh(Tuple([kv_x,kv_y]), orders, control_points)
 end
 
-function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; α::T, R::T, width::T, thickness::T, multiplicity::NTuple{3,Int}=(1,1)) where T
+function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; α::T, R::T, width::T, thickness::T, multiplicity::NTuple{3,Int}=(1,1,1)) where T
 
 	pdim = 3
 	sdim = 3
@@ -234,28 +234,10 @@ function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{3,Int}, orders:
 
 	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
 
-	#anglesx = range(0.0, stop=αᵢ, length = nbasefuncs[1])
-	#anglesy = range(-αⱼ/2, stop=αⱼ/2 , length = nbasefuncs[2])
-	
-	anglesx = Float64[]
-	for ix in 1:(length(knot_vectors[1])-1-orders[1])
-		ax = αᵢ*sum([knot_vectors[1][ix+j] for j in 1:orders[1]])/orders[1]
-		push!(anglesx, ax)
-	end
+	anglesx = _generate_linear_parametrization(knot_vectors[1], orders[1], 0.0, α) 
+	widthy = _generate_linear_parametrization(knot_vectors[2], orders[2], -w/2, w/2)
+	thickenessz = _generate_linear_parametrization(knot_vectors[3], orders[3], -thickness/2, thickness/2)
 	reverse!(anglesx)
-	
-	widthy = Float64[]
-	for iy in 1:(length(knot_vectors[2])-1-orders[2])
-		ay = w*(sum([knot_vectors[2][iy+j] for j in 1:orders[2]])/orders[2])
-		push!(widthy, ay)
-	end
-
-	thickenessz = Float64[]
-	for iz in 1:(length(knot_vectors[3])-1-orders[3])
-		ay = (sum([knot_vectors[3][iz+j] for j in 1:orders[3]])/orders[3]) - 0.5
-		push!(thickenessz, ay*thickness)
-	end
-	
 	
 	control_points = Vec{sdim,T}[]
 	for tz in thickenessz
@@ -276,7 +258,36 @@ function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{3,Int}, orders:
 
 end
 
-function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; α::T, R::T, width::T, multiplicity::NTuple{2,Int}=(1,1)) where T
+function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; α::T, R::T, width::T = -1.0, thickness::T, multiplicity::NTuple{2,Int}=(1,1)) where T
+
+	#Note width is not used
+	pdim = 2
+	sdim = 2
+
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
+
+	anglesx = _generate_linear_parametrization(knot_vectors[1], orders[1], 0.0, α) 
+    thickenessz = _generate_linear_parametrization(knot_vectors[2], orders[2], -thickness/2, thickness/2)
+	reverse!(anglesx)
+	
+	
+	control_points = Vec{sdim,T}[]
+	for tz in thickenessz
+		for ax in anglesx
+			dir = (cos(ax),sin(ax))
+			_v = dir .* R .+ dir.*tz
+
+			push!(control_points, Vec{sdim,T}((_v[1], _v[2])))
+		end
+	end
+
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	
+    return mesh
+
+end
+
+function generate_nurbs_patch(::Val{:singly_curved_shell}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; α::T, R::T, width::T, multiplicity::NTuple{2,Int}=(1,1)) where T
 
 	pdim = 2
 	sdim = 3
@@ -309,14 +320,13 @@ function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{2,Int}, orders:
 
 end
 
-function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{1,Int}, orders::NTuple{1,Int}; α::T, R::T, width::T, multiplicity::NTuple{1,Int}=(1,)) where T
+function generate_nurbs_patch(::Val{:singly_curved_beam}, nel::NTuple{1,Int}, orders::NTuple{1,Int}; α::T, R::T, multiplicity::NTuple{1,Int}=(1,)) where T
 
 	pdim = 1
 	sdim = 2
 
 	rx = R
 	αᵢ = α
-	w = width
 
 	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
