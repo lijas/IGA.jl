@@ -43,14 +43,20 @@ end
 
 _faces_line(::BernsteinBasis{2,order}) where {order} = (ntuple(i -> i, order),)
 
-function _faces_quad(::BernsteinBasis{2,order}) where {order}
+function _faces_quad(ip::BernsteinBasis{2,order}) where {order}
     dim = 2
     faces = Tuple[]
+
+    ordering = _bernstein_ordering(ip)
+
     ci = CartesianIndices((order .+ 1))
     ind = reshape(1:prod(order .+ 1), (order .+ 1)...)
-
+   # @show ind
     # bottom
     a = ci[:,1]; 
+    #@show ind[:,1][:]
+    #@show Tuple(ind[a])
+    #asdf
     push!(faces, Tuple(ind[a]))
 
     # left
@@ -59,12 +65,13 @@ function _faces_quad(::BernsteinBasis{2,order}) where {order}
 
     # top
     a = ci[:,end]; 
-    push!(faces, reverse(Tuple(ind[a])))
+    push!(faces, Tuple(ind[a]))
 
     # right
     a = ci[1,:]; 
-    push!(faces, reverse(Tuple(ind[a])))
-
+    push!(faces, Tuple(ind[a]))
+   # @show faces
+    
     return Tuple(faces)   
 
 end
@@ -368,19 +375,19 @@ function _bernstein_ordering(::BernsteinBasis{3,orders}) where {orders}
 
     # Faces (vtk orders left face first, but juafem orders bottom first)
     # Face, bottom
-    face = ci[1, 2:end-1, 2:end-1][:] # left
+    face = ci[2:end-1, 2:end-1, 1][:] # bottom
+    append!(ordering, ind[face])
+    
+    face = ci[2:end-1, 1, 2:end-1][:] # front
     append!(ordering, ind[face])
     
     face = ci[end, 2:end-1, 2:end-1][:] # right
     append!(ordering, ind[face])
     
-    face = ci[2:end-1, 1, 2:end-1][:] # front
-    append!(ordering, ind[face])
-
     face = ci[2:end-1, end, 2:end-1][:] # back
     append!(ordering, ind[face])
     
-    face = ci[2:end-1, 2:end-1, 1][:] # bottom
+    face = ci[1, 2:end-1, 2:end-1][:] # left
     append!(ordering, ind[face])
 
     face = ci[2:end-1, 2:end-1, end][:] # top

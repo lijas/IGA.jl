@@ -25,7 +25,7 @@ function BezierGrid(mesh::NURBSMesh{sdim}) where {sdim}
 	nodes = [JuAFEM.Node(x) for x in mesh.control_points]
 
     M = (2,4,6)[sdim]
-    CellType = BezierCell{sdim,ncontrolpoints_per_cell,mesh.orders,M}
+    CellType = BezierCell{sdim,ncontrolpoints_per_cell,mesh.orders}
     ordering = _bernstein_ordering(CellType)
 
 	cells = [CellType(Tuple(mesh.IEN[ordering,ie])) for ie in 1:getncells(mesh)]

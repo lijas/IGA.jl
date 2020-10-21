@@ -87,16 +87,12 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
 end
 
 function test_cube()
-    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (1,1,1), (1,1,1), size=(2.0,3.0,4.0))
+    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (2,2,2), (2,2,2), size=(2.0,3.0,4.0))
     addcellset!(grid, "all", (x)->true)
     addfaceset!(grid, "left", (x)->x[1]≈0.0)
     addfaceset!(grid, "right", (x)->x[1]≈2.0)
     addfaceset!(grid, "top", (x)->x[3]≈4.0)
 
-    @show JuAFEM.faces(grid.cells[1])[1]
-    @show grid.nodes[collect(JuAFEM.faces(grid.cells[1])[1])]
-    #@show grid.nodes[collect(faces(grid.cells[1]).nodes)]
-    @show getfaceset(grid, "left")
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"), bezier_operators)
     @test V ≈ prod((2.0,3.0,4.0))
@@ -110,6 +106,29 @@ function test_cube()
 
     A = _calculate_area(fv, grid, getfaceset(grid, "top"), bezier_operators)
     @test A ≈ prod((3.0,2.0))
+
+end
+
+function test_square()
+    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (1,1,), (2,2,), size=(2.0,3.0,))
+    addcellset!(grid, "all", (x)->true)
+    addfaceset!(grid, "left", (x)->x[1]≈0.0)
+    addfaceset!(grid, "right", (x)->x[1]≈2.0)
+    addfaceset!(grid, "top", (x)->x[2]≈3.0)
+
+    #Volume
+    V = _calculate_volume(cv, grid, getcellset(grid, "all"), bezier_operators)
+    @test V ≈ prod((2.0,3.0))
+
+    #Area
+    A = _calculate_area(fv, grid, getfaceset(grid, "left"), bezier_operators)
+    @test A ≈ 3.0
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "right"), bezier_operators)
+    @test A ≈ 3.0
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "top"), bezier_operators)
+    @test A ≈ 2.0
 
 end
 
@@ -157,6 +176,7 @@ end
 
 @testset "nurbs_patches" begin
     test_cube()
+    test_square()
     test_singly_curved_2d()
     test_singly_curved_3d()
 end

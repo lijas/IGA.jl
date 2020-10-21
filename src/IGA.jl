@@ -48,12 +48,13 @@ end
 #This is a bit of a hack to get JuAFEMs Dofhandler to distribute dofs correctly:
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
-_bernstein_ordering(::Type{BezierCell{dim,N,orders,M}}) where {dim,N,orders,M} = _bernstein_ordering(BernsteinBasis{dim,orders}())                                        
+_bernstein_ordering(::Type{BezierCell{dim,N,orders}}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())                                        
+
 
 #Dim 2
 function JuAFEM.faces(c::BezierCell{2,N,order}) where {N,order}
-    length(order)==1 && return _faces_line(c)
-    length(order)==2 && return _faces_quad(c)
+    length(order)==1 && return ((c.nodes[1],c.nodes[2]), ) # return _faces_line(c)
+    length(order)==2 && return ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[4],c.nodes[3]), (c.nodes[1],c.nodes[4])) #return _faces_quad(c)
 end
 _faces_line(c::BezierCell{2,N,order}) where {N,order} = (c.nodes,) #Only one face
 _faces_quad(c::BezierCell{2,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.faces(BernsteinBasis{2,order}() )))
@@ -61,7 +62,8 @@ _faces_quad(c::BezierCell{2,N,order}) where {N,order} = getindex.(Ref(c.nodes), 
 #Dim 3                                        
 function JuAFEM.faces(c::BezierCell{3,N,order}) where {N,order}
     length(order)==2 && return _faces_quad(c)
-    length(order)==3 && return _faces_hexa(c)
+    length(order)==3 && return  ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
+    #length(order)==3 && return ((c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))#return _faces_hexa(c)
 end
 _faces_quad(c::BezierCell{3,N,order}) where {N,order} = (c.nodes,) #Only on face
 _faces_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(JuAFEM.faces(BernsteinBasis{3,order}() )))

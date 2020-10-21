@@ -81,7 +81,7 @@ function generate_nurbs_patch(::Val{:cube}, nel::NTuple{2,Int}, orders::NTuple{2
 
 	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 	nbf = length.(knot_vectors) .- orders .- 1
-	coords = [_generate_linear_parametrization(knot_vectors[i], order[i], 0.0, size[i]) for d in 1:pdim]
+	coords = [_generate_linear_parametrization(knot_vectors[d], orders[d], 0.0, size[d]) for d in 1:pdim]
 	
 	control_points = Vec{sdim,T}[]
 
