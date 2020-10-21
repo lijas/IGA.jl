@@ -18,7 +18,7 @@ function JuAFEM.value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) where
     _n = order .+ 1
     
     #=
-    Get the order of the bernstein basis according to VTK
+    Get the order of the bernstein basis according using in this packade (not the same as VTK)
     The order gets recalculated each time the function is called, so 
         one should not calculate the values in performance critical parts, but rather 
         cache the basis values someway.
@@ -43,34 +43,16 @@ end
 
 _faces_line(::BernsteinBasis{2,order}) where {order} = (ntuple(i -> i, order),)
 
-function _faces_quad(ip::BernsteinBasis{2,order}) where {order}
+function _faces_quad(::BernsteinBasis{2,order}) where {order}
     dim = 2
     faces = Tuple[]
 
-    ordering = _bernstein_ordering(ip)
-
-    ci = CartesianIndices((order .+ 1))
     ind = reshape(1:prod(order .+ 1), (order .+ 1)...)
-   # @show ind
-    # bottom
-    a = ci[:,1]; 
-    #@show ind[:,1][:]
-    #@show Tuple(ind[a])
-    #asdf
-    push!(faces, Tuple(ind[a]))
 
-    # left
-    a = ci[end,:]; 
-    push!(faces, Tuple(ind[a]))
-
-    # top
-    a = ci[:,end]; 
-    push!(faces, Tuple(ind[a]))
-
-    # right
-    a = ci[1,:]; 
-    push!(faces, Tuple(ind[a]))
-   # @show faces
+    push!(faces, Tuple(ind[:,1])) #bot
+    push!(faces, Tuple(ind[end,:]))# left
+    push!(faces, Tuple(ind[:,end]))# top
+    push!(faces, Tuple(ind[1,:]))# right
     
     return Tuple(faces)   
 
@@ -82,37 +64,17 @@ function JuAFEM.faces(c::BernsteinBasis{3,order}) where {order}
 end
 _faces_quad(::BernsteinBasis{3,order}) where {order} = ntuple(i -> i, prod(order .+ 1))
 function _faces_hexa(ip::BernsteinBasis{3,order}) where {order}
-
     @assert(length(order) == 3)
-    ordering = _bernstein_ordering(ip)
 
     faces = Tuple[]
-    ci = reshape(CartesianIndices((order .+ 1))[ordering], (order .+ 1)...)
     ind = reshape(1:prod(order .+ 1), (order .+ 1)...)
     
-    # left
-    a = ci[1,:,:]; 
-    push!(faces, Tuple(ind[a][:]))
-    
-    # right
-    a = ci[end,:,:]; 
-    push!(faces, Tuple(ind[a][:]))
-
-    # front
-    a = ci[:,1,:]; 
-    push!(faces, Tuple(ind[a][:]))
-    
-    # back
-    a = ci[:,end,:]; 
-    push!(faces, Tuple(ind[a][:]))
-
-    # bottom
-    a = ci[:,:,1]; 
-    push!(faces, Tuple(ind[a][:]))
-
-    # top
-    a = ci[:,:,end]; 
-    push!(faces, Tuple(ind[a][:]))
+    push!(faces, Tuple(ind[1,:,:][:]))   # left
+    push!(faces, Tuple(ind[end,:,:][:])) # right
+    push!(faces, Tuple(ind[:,1,:][:]))   # front
+    push!(faces, Tuple(ind[:,end,:][:])) # back
+    push!(faces, Tuple(ind[a][:]))       # bottom
+    push!(faces, Tuple(ind[:,:,1][:]))   # top
 
     return Tuple(faces)
 end
@@ -126,28 +88,27 @@ end
 
 function _edges_hexa(::IGA.BernsteinBasis{3,order}) where {order}
     @assert(length(order) == 3)
+    
     edges = Tuple[]
-    ci = CartesianIndices((order .+ 1))
     ind = reshape(1:prod(order .+ 1), (order .+ 1)...)
 
     # bottom
-    push!(edges, Tuple(ind[ci[:,1,1]]))
-    push!(edges, Tuple(ind[ci[end,:,1]]))
-    push!(edges, Tuple(ind[ci[:,end,1]]))
-    push!(edges, Tuple(ind[ci[1,:,1]]))
+    push!(edges, Tuple(ind[:,1,1]))
+    push!(edges, Tuple(ind[end,:,1]))
+    push!(edges, Tuple(ind[:,end,1]))
+    push!(edges, Tuple(ind[1,:,1]))
 
     # top
-    push!(edges, Tuple(ind[ci[:,1,end]]))
-    push!(edges, Tuple(ind[ci[end,:,end]]))
-    push!(edges, Tuple(ind[ci[:,end,end]]))
-    push!(edges, Tuple(ind[ci[1,:,end]]))
+    push!(edges, Tuple(ind[:,1,end]))
+    push!(edges, Tuple(ind[end,:,end]))
+    push!(edges, Tuple(ind[:,end,end]))
+    push!(edges, Tuple(ind[1,:,end]))
 
     # verticals
-    push!(edges, Tuple(ind[ci[1,1,:]]))
-    push!(edges, Tuple(ind[ci[end,1,:]]))
-    push!(edges, Tuple(ind[ci[1,end,:]]))
-    push!(edges, Tuple(ind[ci[end,end,:]]))
-
+    push!(edges, Tuple(ind[1,1,:]))
+    push!(edges, Tuple(ind[end,1,:]))
+    push!(edges, Tuple(ind[1,end,:]))
+    push!(edges, Tuple(ind[end,end,:]))
 
     return Tuple(edges)
 end
@@ -155,24 +116,12 @@ end
 function _edges_quad(::IGA.BernsteinBasis{3,order}) where {order}
     @assert(length(order) == 2)
     edges = Tuple[]
-    ci = CartesianIndices((order .+ 1))
     ind = reshape(1:prod(order .+ 1), (order .+ 1)...)
 
-    # bottom
-    a = ci[:,1]; 
-    push!(edges, Tuple(ind[a][:]))
-
-    # right
-    a = ci[end,:]; 
-    push!(edges, Tuple(ind[a][:]))
-    
-    # top
-    a = ci[:,end]; 
-    push!(edges, Tuple(reverse(ind[a])[:]))
-
-    # left
-    a = ci[1,:]; 
-    push!(edges, Tuple(reverse(ind[a])[:]))
+    push!(edges, Tuple(ind[:,1][:]))# bottom
+    push!(edges, Tuple(ind[end,:][:]))# right
+    push!(edges, Tuple(reverse(ind[:,end])[:]))# top
+    push!(edges, Tuple(reverse(ind[1,:])[:]))# left
 
     return Tuple(edges)
 end
@@ -239,163 +188,136 @@ The ordering is the same as in VTK: https://blog.kitware.com/wp-content/uploads/
 function _bernstein_ordering(::BernsteinBasis{1,orders}) where {orders}
     @assert(length(orders) == 1)
 
-    dim = 2
-
-    ci = CartesianIndices((orders .+ 1))
     ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)
-
     ordering = Int[]
-    # Corners
-    corner = ci[1]
-    push!(ordering, ind[corner])
 
-    corner = ci[end]
-    push!(ordering, ind[corner])
+    # Corners
+    push!(ordering, ind[1])
+    push!(ordering, ind[end])
 
     # Volume
-    rest = ci[2:end-1]
-    append!(ordering, ind[rest])
+    append!(ordering, ind[2:end-1])
+
     return ordering
 end
 
 function _bernstein_ordering(::BernsteinBasis{2,orders}) where {orders}
     @assert(length(orders) == 2)
 
-    dim = 2
-
-    ci = CartesianIndices((orders .+ 1))
     ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)
+    ordering = Int[]
 
     # Corners
-    ordering = Int[]
-    corner = ci[1,1]
-    push!(ordering, ind[corner])
-
-    corner = ci[end,1]
-    push!(ordering, ind[corner])
-
-    corner = ci[end,end]
-    push!(ordering, ind[corner])
-
-    corner = ci[1,end]
-    push!(ordering, ind[corner])
+    push!(ordering, ind[1,1])
+    push!(ordering, ind[end,1])
+    push!(ordering, ind[end,end])
+    push!(ordering, ind[1,end])
 
     # edges
-    edge = ci[2:end-1,1]
-    append!(ordering, ind[edge])
-    
-    edge = ci[end, 2:end-1]
-    append!(ordering, ind[edge])
-
-    edge = ci[2:end-1,end]
-    append!(ordering, ind[edge])
-
-    edge = ci[1, 2:end-1]
-    append!(ordering, ind[edge])
+    append!(ordering, ind[2:end-1,1])
+    append!(ordering, ind[end, 2:end-1])
+    append!(ordering, ind[2:end-1,end])
+    append!(ordering, ind[1, 2:end-1])
 
     # inner dofs
-    rest = ci[2:end-1, 2:end-1]
-    append!(ordering, ind[rest])
+    append!(ordering, ind[2:end-1, 2:end-1])
     return ordering
 end
 
 function _bernstein_ordering(::BernsteinBasis{3,orders}) where {orders}
     @assert(length(orders) == 3)
-    dim = 3
 
-    ci = CartesianIndices((orders .+ 1))
+    ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)
+    ordering = Int[]
+    
+    # Corners, bottom
+    push!(ordering, ind[1,1,1])
+    push!(ordering, ind[end,1,1])
+    push!(ordering, ind[end,end,1])
+    push!(ordering, ind[1,end,1])
+    # Corners, top
+    push!(ordering, ind[1,1,end])
+    push!(ordering, ind[end,1,end])
+    push!(ordering, ind[end,end,end])
+    push!(ordering, ind[1,end,end])
+
+    # edges, bottom
+    append!(ordering, ind[2:end-1,1,1])
+    append!(ordering, ind[end, 2:end-1,1])
+    append!(ordering, ind[2:end-1,end,1])
+    append!(ordering, ind[1, 2:end-1,1])
+
+    # edges, top
+    append!(ordering, ind[2:end-1,1,end])
+    append!(ordering, ind[end, 2:end-1,end])
+    append!(ordering, ind[2:end-1,end,end])
+    append!(ordering, ind[1, 2:end-1,end])
+
+    # edges, mid
+    append!(ordering, ind[1,1, 2:end-1])
+    append!(ordering, ind[end,1, 2:end-1])
+    append!(ordering, ind[1, end, 2:end-1])
+    append!(ordering, ind[end, end, 2:end-1])
+
+    # Faces (vtk orders left face first, but juafem orders bottom first)
+    append!(ordering, ind[2:end-1, 2:end-1, 1][:])   # bottom
+    append!(ordering, ind[2:end-1, 1, 2:end-1][:])   # front
+    append!(ordering, ind[end, 2:end-1, 2:end-1][:]) # right
+    append!(ordering, ind[2:end-1, end, 2:end-1][:]) # back
+    append!(ordering, ind[1, 2:end-1, 2:end-1][:])   # left
+    append!(ordering, ind[2:end-1, 2:end-1, end][:]) # top
+
+    # Inner dofs
+    append!(ordering, ind[2:end-1, 2:end-1, 2:end-1][:])
+
+    return ordering
+end
+
+#Almost the same orderign as _bernstein_ordering, but some changes for faces and edges
+_vtk_ordering(::Type{BezierCell{dim,N,orders,M}}) where {dim,N,orders,M} = _vtk_ordering(BernsteinBasis{dim,orders}())   
+function _vtk_ordering(::BernsteinBasis{3,orders}) where {orders}
+    @assert(length(orders) == 3)
+
     ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)
 
     # Corners, bottom
     ordering = Int[]
-    corner = ci[1,1,1]
-    push!(ordering, ind[corner])
-
-    corner = ci[end,1,1]
-    push!(ordering, ind[corner])
-
-    corner = ci[end,end,1]
-    push!(ordering, ind[corner])
-
-    corner = ci[1,end,1]
-    push!(ordering, ind[corner])
-
+    push!(ordering, ind[1,1,1])
+    push!(ordering, ind[end,1,1])
+    push!(ordering, ind[end,end,1])
+    push!(ordering, ind[1,end,1])
     # Corners, top
-    corner = ci[1,1,end]
-    push!(ordering, ind[corner])
-
-    corner = ci[end,1,end]
-    push!(ordering, ind[corner])
-
-    corner = ci[end,end,end]
-    push!(ordering, ind[corner])
-
-    corner = ci[1,end,end]
-    push!(ordering, ind[corner])
+    push!(ordering, ind[1,1,end])
+    push!(ordering, ind[end,1,end])
+    push!(ordering, ind[end,end,end])
+    push!(ordering, ind[1,end,end])
 
     # edges, bottom
-    edge = ci[2:end-1,1,1]
-    append!(ordering, ind[edge])
-    
-    edge = (ci[end, 2:end-1,1])
-    append!(ordering, ind[edge])
-
-    edge = (ci[2:end-1,end,1]) 
-    append!(ordering, ind[edge])
-
-    edge = (ci[1, 2:end-1,1]) 
-    append!(ordering, ind[edge])
-
+    append!(ordering, ind[2:end-1,1,1])
+    append!(ordering, ind[end, 2:end-1,1])
+    append!(ordering, ind[2:end-1,end,1])
+    append!(ordering, ind[1, 2:end-1,1])
     # edges, top
-    edge = ci[2:end-1,1,end]
-    append!(ordering, ind[edge])
-    
-    edge = (ci[end, 2:end-1,end])
-    append!(ordering, ind[edge])
-
-    edge = (ci[2:end-1,end,end]) 
-    append!(ordering, ind[edge])
-
-    edge = (ci[1, 2:end-1,end]) 
-    append!(ordering, ind[edge])
-
+    append!(ordering, ind[2:end-1,1,end])
+    append!(ordering, ind[end, 2:end-1,end])
+    append!(ordering, ind[2:end-1,end,end])
+    append!(ordering, ind[1, 2:end-1,end])
     # edges, mid
-    edge = (ci[1,1, 2:end-1])
-    append!(ordering, ind[edge])
-    
-    edge = (ci[end,1, 2:end-1])
-    append!(ordering, ind[edge])
-
-    edge = (ci[1, end, 2:end-1]) 
-    append!(ordering, ind[edge])
-
-    edge = (ci[end, end, 2:end-1]) 
-    append!(ordering, ind[edge])
-
+    append!(ordering, ind[1,1, 2:end-1])
+    append!(ordering, ind[end,1, 2:end-1])
+    append!(ordering, ind[1, end, 2:end-1])
+    append!(ordering, ind[end, end, 2:end-1])
 
     # Faces (vtk orders left face first, but juafem orders bottom first)
-    # Face, bottom
-    face = ci[2:end-1, 2:end-1, 1][:] # bottom
-    append!(ordering, ind[face])
-    
-    face = ci[2:end-1, 1, 2:end-1][:] # front
-    append!(ordering, ind[face])
-    
-    face = ci[end, 2:end-1, 2:end-1][:] # right
-    append!(ordering, ind[face])
-    
-    face = ci[2:end-1, end, 2:end-1][:] # back
-    append!(ordering, ind[face])
-    
-    face = ci[1, 2:end-1, 2:end-1][:] # left
-    append!(ordering, ind[face])
-
-    face = ci[2:end-1, 2:end-1, end][:] # top
-    append!(ordering, ind[face])
+    append!(ordering, ind[1, 2:end-1, 2:end-1][:])   # left
+    append!(ordering, ind[end, 2:end-1, 2:end-1][:]) # right
+    append!(ordering, ind[2:end-1, 1, 2:end-1][:])   # front
+    append!(ordering, ind[2:end-1, end, 2:end-1][:]) # back
+    append!(ordering, ind[2:end-1, 2:end-1, 1][:])   # bottom
+    append!(ordering, ind[2:end-1, 2:end-1, end][:]) # top
 
     # Inner dofs
-    volume = ci[2:end-1, 2:end-1, 2:end-1][:]
-    append!(ordering, ind[volume])
+    append!(ordering, ind[2:end-1, 2:end-1, 2:end-1][:])
 
     return ordering
 end
