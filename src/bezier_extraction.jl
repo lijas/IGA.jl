@@ -1,7 +1,11 @@
 
 export compute_bezier_extraction_operators, compute_bezier_points
 
+"""
+	compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1)
 
+Given a BezierExtractionOperator and control points for a cell, compute the bezier controlpoints.
+"""
 function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1) where {T2,T}
 
 	@assert(length(control_points) == length(Ce)*dim)
@@ -25,7 +29,7 @@ end
 """
 	compute_bezier_extraction_operators2(orders::NTuple{pdim,Int}, knots::NTuple{pdim,Vector{T}})
 
-Computes the bezier extraction operator in each parametric direction, and uses the kron operator to combine them
+Computes the bezier extraction operator in each parametric direction, and uses the kron operator to combine them.
 """
 @generated function compute_bezier_extraction_operators(orders::NTuple{pdim,Int}, knots::NTuple{pdim,Vector{T}}) where {pdim,T} 
 	quote

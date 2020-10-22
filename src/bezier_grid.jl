@@ -95,11 +95,17 @@ function JuAFEM.getcoordinates(grid::BezierGrid, cell::Int)
 end
 
 juafem_to_vtk_order(::Type{<:JuAFEM.AbstractCell{dim,N,M}}) where {dim,N,M} = 1:N
-function juafem_to_vtk_order(celltype::Type{BezierCell{3,N,order,M}}) where {N,order,M}
-	igaorder = _bernstein_ordering(celltype)
-	vtkorder = _vtk_ordering(celltype)
 
-	return [findfirst(ivtk-> ivtk == iiga, vtkorder) for iiga in igaorder]
+# Store the juafem to vtk order in a cache for specific cell type
+let cache = Dict{Type{<:BezierCell}, Vector{Int}}()
+	global function juafem_to_vtk_order(celltype::Type{BezierCell{3,N,order,M}}) where {N,order,M}
+		get!(cache, x) do 
+			igaorder = _bernstein_ordering(celltype)
+			vtkorder = _vtk_ordering(celltype)
+
+			return [findfirst(ivtk-> ivtk == iiga, vtkorder) for iiga in igaorder]
+		end
+	end
 end
 
 function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid)
@@ -109,8 +115,8 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid)
     cls = MeshCell[]
     weights = zeros(T, JuAFEM.getnnodes(grid))
 	
-	reorder = juafem_to_vtk_order(typeof(first(grid.cells))) #Should move inside loop (but for now assume all cells are similar)
     for (cellid, cell) in enumerate(grid.cells)
+		reorder = juafem_to_vtk_order(typeof(first(grid.cells)))
         celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, collect(cell.nodes[reorder])))
     end

@@ -172,9 +172,13 @@ function test_singly_curved_2d()
     A = _calculate_area(fv, grid, getfaceset(grid, "top"), bezier_operators)
     @test isapprox(A, (100+5.0/2)*pi/2, atol = 2.0)
 
+    vtk_grid("singly_curved.vtu", grid) do vtk
+        #
+    end
+    
 end
 
-@testset "nurbs_patches" begin
+@testset "Geometries, vtk-outputing and integration" begin
     test_cube()
     test_square()
     test_singly_curved_2d()

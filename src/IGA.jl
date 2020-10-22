@@ -16,17 +16,6 @@ export BezierExtractionOperator
 
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 
-include("utils.jl")
-include("nurbsmesh.jl")
-include("mesh_generation.jl")
-include("bezier_grid.jl")
-include("bezier_extraction.jl")
-include("splines/bezier.jl")
-include("splines/bezier_values.jl")
-include("splines/bsplines.jl")
-include("nurbs_cell_values.jl")
-
-
 """
 BezierCell
 Type parameters specify:
@@ -45,11 +34,22 @@ struct BezierCell{dim,N,order,M} <: JuAFEM.AbstractCell{dim,N,M}
     end
 end
 
-#This is a bit of a hack to get JuAFEMs Dofhandler to distribute dofs correctly:
+include("utils.jl")
+include("nurbsmesh.jl")
+include("mesh_generation.jl")
+include("bezier_grid.jl")
+include("bezier_extraction.jl")
+include("splines/bezier.jl")
+include("splines/bezier_values.jl")
+include("splines/bsplines.jl")
+include("nurbs_cell_values.jl")
+
+#Normaly the verices function should only return the 8 corner nodes of the hexa (or 4 in 2d),
+# but since JuAFEM can not distribute dofs on faces if number of facedofs > 1, this 
+# vertices function return all vertices
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
 _bernstein_ordering(::Type{<:BezierCell{dim,N,orders}}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())                                        
-
 
 #Dim 2
 function JuAFEM.faces(c::BezierCell{2,N,order}) where {N,order}
