@@ -13,6 +13,7 @@ import SparseArrays
 import JuAFEM
 
 export BezierExtractionOperator
+export BezierCell
 
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 
