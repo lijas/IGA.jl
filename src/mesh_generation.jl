@@ -388,36 +388,38 @@ end
 
 function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; width::T, radius::T, multiplicity::NTuple{2,Int}=(1,1)) where T
 
-	@assert( orders[1] ==2 && orders[2] ==2 ) 
+	@assert( orders[1] >=2 && orders[2] >=2 ) 
 
-	nx = nel[1] + orders[1] 
-	ny = nel[2] + orders[2] 
+	kvxi = _create_knotvector(T, nel[1]*2, orders[1], multiplicity[1]) 
+	kveta = _create_knotvector(T, nel[2], orders[2], multiplicity[2]) 
+	nbfxi = length(kvxi)-1-orders[1]
+	nbfeta = length(kveta)-1-orders[2]
 
-	kvx = _create_knotvector(T, nel[1]*2, orders[1], multiplicity[1]) 
-	kvy = _create_knotvector(T, nel[2], orders[2], multiplicity[2]) 
 
-	coordsx = range(-radius, stop=-width, length=nx)
-	scale = log.(range(0.63, stop = 1.0, length=nx)) .+ 1.0
+	coordsx = range(-radius, stop=-width, length=nbfeta)
+	scale = log.(range(0.63, stop = 1.0, length=nbfeta)) .+ 1.0
 
 	control_points = Vec{2,T}[]
 	for (ix,xx) in enumerate(coordsx)
 		diag = abs(xx)
-		coordsy = range(0.0, stop = diag * scale[ix], length = ny-1)
+		coordsy = range(0.0, stop = diag * scale[ix], length = floor(Int,nbfxi/2))
 
 		#Up
 		for yy in coordsy
 			push!(control_points, Vec((xx, yy)))
 		end
 
+		if isodd(nbfxi)
+			push!(control_points, Vec( (diag, diag) ))
+		end
+
 		#Right
 		for yy in reverse(coordsy)
-			@show yy
 			push!(control_points, Vec( (-yy, abs(xx))) )
 		end
 	end
 
-	mesh = IGA.NURBSMesh((kvx, kvy), orders, control_points)
-
+	mesh = IGA.NURBSMesh((kvxi, kveta), orders, control_points)
 end
 
 function generate_beziergrid_1()
