@@ -127,3 +127,8 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid)
     vtkfile["RationalWeights", VTKPointData()] = getweights(grid)
     return vtkfile
 end
+
+function JuAFEM.MixedDofHandler(grid::BezierGrid{G}) where {G}
+	dim, C, T = G.parameters
+    JuAFEM.MixedDofHandler{dim,C,T,typeof(grid)}(FieldHandler[], JuAFEM.CellVector(Int[],Int[],Int[]), JuAFEM.CellVector(Int[],Int[],Int[]), JuAFEM.CellVector(Vec{dim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
+end

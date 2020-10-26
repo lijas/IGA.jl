@@ -8,9 +8,9 @@ using LinearAlgebra
 using StaticArrays
 using TimerOutputs
 using WriteVTK
+using JuAFEM
 
 import SparseArrays
-import JuAFEM
 
 export BezierExtractionOperator
 export BezierCell
