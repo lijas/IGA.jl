@@ -43,7 +43,16 @@ end
 
 _faces_line(::BernsteinBasis{2,order}) where {order} = (ntuple(i -> i, order),)
 
-function _faces_quad(::BernsteinBasis{2,order}) where {order}
+function _translate(faces, ip::BernsteinBasis)
+    order_translator = _bernstein_ordering(ip)
+    tranl_faces = Tuple[]
+    for face in faces
+        push!(tranl_faces, Tuple([findfirst(i->i==f, order_translator) for f in face]))
+    end
+    return Tuple(tranl_faces)
+end
+
+function _faces_quad(ip::BernsteinBasis{2,order}) where {order}
     dim = 2
     faces = Tuple[]
 
@@ -54,8 +63,7 @@ function _faces_quad(::BernsteinBasis{2,order}) where {order}
     push!(faces, Tuple(ind[:,end]))# top
     push!(faces, Tuple(ind[1,:]))# right
     
-    return Tuple(faces)   
-
+    return _translate(faces, ip)  
 end
 
 function JuAFEM.faces(c::BernsteinBasis{3,order}) where {order}

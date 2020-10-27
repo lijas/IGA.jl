@@ -5,7 +5,7 @@
 # to show how IGA can be solved very similiarly to standard FE codes.
 
 # Start by loading the neccisary packages
-using JuAFEM, IGA, SparseArrays, LinearAlgebra, Printf
+using JuAFEM, IGA, LinearAlgebra
 
 # Next we generate the NURBS patch/mesh, and convert it to a BezierGrid. 
 # The BezierGrid is similiar to the JuAFEM.Grid, but includes the ratianal weights used by the NURBS, 
@@ -104,9 +104,10 @@ end
 function solve()
 
     orders = (2,2)
-    nurbsmesh = generate_nurbs_patch(:plate_with_hole, (5, 5), orders, width = 4.0, radius = 1.0)
+    nurbsmesh = generate_nurbs_patch(:plate_with_hole, (3,3), orders, width = 4.0, radius = 1.0)
     grid = BezierGrid(nurbsmesh)
 
+    addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
     addfaceset!(grid, "left", (x) -> x[1] ≈ -4.0)
     addfaceset!(grid, "bot", (x) -> x[2] ≈ 0.0)
     addfaceset!(grid, "right", (x) -> x[1] ≈ 0.0)
@@ -124,13 +125,13 @@ function solve()
     close!(dh)
 
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "bot"), (x, t) -> (0.0), 2)
-    dbc2 = Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> (0.0), 1)
+    dbc1 = Dirichlet(:u, getfaceset(grid, "bot"), (x, t) -> 0.0, 2)
+    dbc2 = Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.0, 1)
     add!(ch, dbc1)
     add!(ch, dbc2)
     close!(ch)
     update!(ch, 0.0)
-    
+
     stiffmat = get_material(100, 0.3)
     traction = Vec((-1.0, 0.0))
     K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)
