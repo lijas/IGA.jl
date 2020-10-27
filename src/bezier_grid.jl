@@ -1,4 +1,4 @@
-export BezierGrid
+export BezierGrid, get_bezier_coordinates, get_bezier_coordinates!
 
 struct BezierGrid{G<:JuAFEM.Grid} <: JuAFEM.AbstractGrid
 	grid::G

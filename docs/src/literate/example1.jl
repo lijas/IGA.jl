@@ -12,19 +12,19 @@ using JuAFEM, IGA, SparseArrays, LinearAlgebra, Printf
 # and also the bezier extraction operator. 
 
 function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, C::SymmetricTensor{4,2}, cv)
-    n_basefuncs = getnbasefunctions(fe_values)
+    n_basefuncs = getnbasefunctions(cv)
 
     reinit!(cv, Xᴮ)
 
-    δɛ = [zero(SymmetricTensor{2, dim, T}) for i in 1:n_basefuncs]
+    δɛ = [zero(SymmetricTensor{2,2,Float64}) for i in 1:n_basefuncs]
 
-    for q_point in 1:getnquadpoints(fe_values)
+    for q_point in 1:getnquadpoints(cv)
 
         for i in 1:n_basefuncs
-            δɛ[i] = symmetric(shape_gradient(fe_values, q_point, i)) 
+            δɛ[i] = symmetric(shape_gradient(cv, q_point, i)) 
         end
 
-        dΩ = getdetJdV(fe_values, q_point)
+        dΩ = getdetJdV(cv, q_point)
         for i in 1:n_basefuncs
             for j in 1:n_basefuncs
                 ke[i, j] += (δɛ[i] ⊡ C ⊡ δɛ[j]) * dΩ
@@ -33,15 +33,16 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, C:
     end
 end
 
-function integrate_force!(fe::AbstractMatrix, Xᴮ::Vector{Vec{2}}, t::Vec{2}, fv)
+function integrate_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, t::Vec{2}, fv, faceid::Int)
     n_basefuncs = getnbasefunctions(fv)
 
-    reinit!(cv, Xᴮ)
+    reinit!(fv, Xᴮ, faceid)
 
     for q_point in 1:getnquadpoints(fv)
         dA = getdetJdV(fv, q_point)
         for i in 1:n_basefuncs
-            fe[i] += t ⋅ δɛ[j] * dA
+            δu = shape_value(fv, q_point, i)
+            fe[i] += t ⋅ δu * dA
         end
     end
 end
@@ -53,36 +54,39 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
     assembler = start_assemble(K, f)
 
     n = getnbasefunctions(cv)
+    celldofs = zeros(Int, n)
     fe = zeros(n)     # element force vector
     ke = zeros(n, n)  # element tangent matrix
 
-    for celldata in CellIterator(dh)
+    for cellid in 1:getncells(grid)
         fill!(fe, 0.0)
-        fill!(Ke, 0.0)
+        fill!(ke, 0.0)
+        celldofs!(celldofs, dh, cellid)
 
-        extraction_operator = grid.beo[ic]
-        get_bezier_coordinates(grid, X, w, cellid(celldata))
+        extraction_operator = grid.beo[cellid]
+        X, w = get_bezier_coordinates(grid, cellid)
 
-        Xᴮ = compute_bezier_points(grid, X)
-        set_bezier_operator(cv, extraction_operator)
+        Xᴮ = compute_bezier_points(extraction_operator, X)
+        set_bezier_operator!(cv, extraction_operator)
 
         integrate_element!(ke, Xᴮ, stiffmat, cv)
-        assemble!(assembler, celldofs(celldata), ke, fe)
+        assemble!(assembler, celldofs, ke, fe)
     end
 
-    face_cellset = getindex.(getfaceset(grid, "left"),2)
-    for celldata in CellIterator(dh, face_cellset)
+    for (cellid, faceid) in getfaceset(grid, "left")
         fill!(fe, 0.0)
-        fill!(Ke, 0.0)
+        fill!(ke, 0.0)
 
-        extraction_operator = grid.beo[ic]
-        get_bezier_coordinates(grid, X, w, cellid(celldata))
+        celldofs!(celldofs, dh, cellid)
 
-        Xᴮ = compute_bezier_points(grid, X)
-        set_bezier_operator(fv, extraction_operator)
+        extraction_operator = grid.beo[cellid]
+        X, w = get_bezier_coordinates(grid, cellid)
 
-        integrate_force!(fe, Xᴮ, traction, fv)
-        assemble!(assembler, celldofs(celldata), ke, fe)
+        Xᴮ = compute_bezier_points(extraction_operator, X)
+        set_bezier_operator!(fv, extraction_operator)
+
+        integrate_force!(fe, Xᴮ, traction, fv, faceid)
+        assemble!(assembler, celldofs, ke, fe)
     end
 
     return K, f
@@ -120,13 +124,22 @@ function solve()
     close!(dh)
 
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "bot"), (x, t) -> (0.0, 0.0))
-    dbc2 = Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> (0.0, 0.0))
+    dbc1 = Dirichlet(:u, getfaceset(grid, "bot"), (x, t) -> (0.0), 2)
+    dbc2 = Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> (0.0), 1)
     add!(ch, dbc1)
     add!(ch, dbc2)
     close!(ch)
+    update!(ch, 0.0)
     
     stiffmat = get_material(100, 0.3)
-    traction = Vec((1.0, 0.0))
-    assemble_problem(dh, grid, cv, fv, stiffmat, traction)
+    traction = Vec((-1.0, 0.0))
+    K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)
+
+    apply!(K, f, ch)
+    a = K\f
+    
+    vtkgrid = vtk_grid("filevt.vtu", grid)
+    vtk_point_data(vtkgrid, dh, a, :u)
+    vtk_save(vtkgrid)
+
 end
