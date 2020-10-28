@@ -18,7 +18,7 @@ function JuAFEM.value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) where
     _n = order .+ 1
     
     #=
-    Get the order of the bernstein basis according using in this packade (not the same as VTK)
+    Get the order of the bernstein basis according using in this package (not the same as VTK)
     The order gets recalculated each time the function is called, so 
         one should not calculate the values in performance critical parts, but rather 
         cache the basis values someway.
@@ -33,49 +33,40 @@ function JuAFEM.value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) where
     return val
 end
 
-JuAFEM.vertices(ip::BernsteinBasis{dim,order}) where {dim,order} = ntuple(i -> i, JuAFEM.getnbasefunctions(ip))
+JuAFEM.vertices(ip::BernsteinBasis{dim,orders}) where {dim,orders} = ntuple(i -> i, JuAFEM.getnbasefunctions(ip))
 
 # 2D
-function JuAFEM.faces(c::BernsteinBasis{2,order}) where {order}
-    length(order) == 1 && return _faces_line(c)
-    length(order) == 2 && return _faces_quad(c)
+function JuAFEM.faces(c::BernsteinBasis{2,orders}) where {orders}
+    length(orders) == 1 && return _faces_line(c)
+    length(orders) == 2 && return _faces_quad(c)
 end
 
-_faces_line(::BernsteinBasis{2,order}) where {order} = (ntuple(i -> i, order),)
+_faces_line(::BernsteinBasis{2,orders}) where {orders} = (ntuple(i -> i, orders),)
 
-function _translate(faces, ip::BernsteinBasis)
-    order_translator = _bernstein_ordering(ip)
-    tranl_faces = Tuple[]
-    for face in faces
-        push!(tranl_faces, Tuple([findfirst(i->i==f, order_translator) for f in face]))
-    end
-    return Tuple(tranl_faces)
-end
-
-function _faces_quad(ip::BernsteinBasis{2,order}) where {order}
+function _faces_quad(ip::BernsteinBasis{2,orders}) where {orders}
     dim = 2
     faces = Tuple[]
 
-    ind = reshape(1:prod(order .+ 1), (order .+ 1)...)
-
+    ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
+    
     push!(faces, Tuple(ind[:,1])) #bot
     push!(faces, Tuple(ind[end,:]))# left
     push!(faces, Tuple(ind[:,end]))# top
     push!(faces, Tuple(ind[1,:]))# right
     
-    return _translate(faces, ip)  
+    return Tuple(faces) 
 end
 
-function JuAFEM.faces(c::BernsteinBasis{3,order}) where {order}
-    length(order) == 2 && return _faces_quad(c)
-    length(order) == 3 && return _faces_hexa(c)
+function JuAFEM.faces(c::BernsteinBasis{3,orders}) where {orders}
+    length(orders) == 2 && return _faces_quad(c)
+    length(orders) == 3 && return _faces_hexa(c)
 end
-_faces_quad(::BernsteinBasis{3,order}) where {order} = ntuple(i -> i, prod(order .+ 1))
-function _faces_hexa(ip::BernsteinBasis{3,order}) where {order}
-    @assert(length(order) == 3)
+_faces_quad(::BernsteinBasis{3,orders}) where {orders} = ntuple(i -> i, prod(orders .+ 1))
+function _faces_hexa(ip::BernsteinBasis{3,orders}) where {orders}
+    @assert(length(orders) == 3)
 
     faces = Tuple[]
-    ind = reshape(1:prod(order .+ 1), (order .+ 1)...)
+    ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
     push!(faces, Tuple(ind[1,:,:][:]))   # left
     push!(faces, Tuple(ind[end,:,:][:])) # right
@@ -88,17 +79,17 @@ function _faces_hexa(ip::BernsteinBasis{3,order}) where {order}
 end
 # 
 
-function JuAFEM.edges(c::BernsteinBasis{3,order}) where {order}
-    length(order) == 2 && return _edges_quad(c)
-    length(order) == 3 && return _edges_hexa(c)
+function JuAFEM.edges(c::BernsteinBasis{3,orders}) where {orders}
+    length(orders) == 2 && return _edges_quad(c)
+    length(orders) == 3 && return _edges_hexa(c)
 end
 
 
-function _edges_hexa(::IGA.BernsteinBasis{3,order}) where {order}
-    @assert(length(order) == 3)
+function _edges_hexa(ip::IGA.BernsteinBasis{3,orders}) where {orders}
+    @assert(length(orders) == 3)
     
     edges = Tuple[]
-    ind = reshape(1:prod(order .+ 1), (order .+ 1)...)
+    ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
 
     # bottom
     push!(edges, Tuple(ind[:,1,1]))
@@ -121,10 +112,10 @@ function _edges_hexa(::IGA.BernsteinBasis{3,order}) where {order}
     return Tuple(edges)
 end
 
-function _edges_quad(::IGA.BernsteinBasis{3,order}) where {order}
-    @assert(length(order) == 2)
+function _edges_quad(ip::IGA.BernsteinBasis{3,orders}) where {orders}
+    @assert(length(orders) == 2)
     edges = Tuple[]
-    ind = reshape(1:prod(order .+ 1), (order .+ 1)...)
+    ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
 
     push!(edges, Tuple(ind[:,1][:]))# bottom
     push!(edges, Tuple(ind[end,:][:]))# right
@@ -161,7 +152,6 @@ function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_
     T = Float64
 
     _n = order .+ 1
-    _n = (_n...,) # if dim is 1d, make it into tuple
     
     coords = Vec{dim_s,T}[]
 
