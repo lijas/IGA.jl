@@ -35,6 +35,8 @@ struct BezierCell{dim,N,order,M} <: JuAFEM.AbstractCell{dim,N,M}
     end
 end
 
+getorders(::BezierCell{dim,N,orders}) where {dim,N,orders} = orders
+
 include("utils.jl")
 include("nurbsmesh.jl")
 include("mesh_generation.jl")
@@ -92,6 +94,14 @@ end
 function JuAFEM.cell_to_vtkcell(::Type{BezierCell{3,N,order,M}}) where {N,order,M}
     if length(order) == 3
         return JuAFEM.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
+    else
+        error("adsf")
+    end
+end
+
+function JuAFEM.cell_to_vtkcell(::Type{BezierCell{1,N,order,M}}) where {N,order,M}
+    if length(order) == 1
+        return JuAFEM.VTKCellTypes.VTK_BEZIER_CURVE
     else
         error("adsf")
     end

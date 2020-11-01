@@ -1,11 +1,11 @@
 export BezierGrid, get_bezier_coordinates, get_bezier_coordinates!
 
-struct BezierGrid{G<:JuAFEM.Grid} <: JuAFEM.AbstractGrid
-	grid::G
+struct BezierGrid{dim,C<:JuAFEM.AbstractCell,T<:Real} <: JuAFEM.AbstractGrid
+	grid::JuAFEM.Grid{dim,C,T}
 	weights::Vector{Float64} #JuaFEM.CellVector{Float64}
 	beo::Vector{BezierExtractionOperator{Float64}}
 end
-JuAFEM.getdim(g::BezierGrid) = JuAFEM.getdim(g.grid)
+JuAFEM.getdim(g::BezierGrid{dim}) where {dim} = dim
 getT(g::BezierGrid) = eltype(first(g.nodes).x)
 
 function BezierGrid(cells::Vector{C},
@@ -16,27 +16,25 @@ function BezierGrid(cells::Vector{C},
 	
 	grid = JuAFEM.Grid(cells, nodes)
 
-	return BezierGrid{typeof(grid)}(grid, weights, extraction_operator)
+	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
 end
 
 function BezierGrid(mesh::NURBSMesh{sdim}) where {sdim}
 
-	ncontrolpoints_per_cell = length(mesh.IEN[:,1])
-	nodes = [JuAFEM.Node(x) for x in mesh.control_points]
-
+	N = length(mesh.IEN[:,1])
+	
     M = (2,4,6)[sdim]
-    CellType = BezierCell{sdim,ncontrolpoints_per_cell,mesh.orders}
+    CellType = BezierCell{sdim,N,mesh.orders}
     ordering = _bernstein_ordering(CellType)
-
+	
 	cells = [CellType(Tuple(mesh.IEN[ordering,ie])) for ie in 1:getncells(mesh)]
+	nodes = [Node(x)                                for x  in mesh.control_points]
 
     C, nbe = compute_bezier_extraction_operators(mesh.orders, mesh.knot_vectors)
 
 	@assert nbe == length(cells)
 
 	Cvec = bezier_extraction_to_vectors(C)
-
-	#grid = JuAFEM.Grid(cells,nodes)
 
 	return BezierGrid(cells, nodes, mesh.weights, Cvec)
 end
@@ -73,6 +71,7 @@ function get_bezier_coordinates!(bcoords::AbstractVector{Vec{dim,T}}, w::Abstrac
 
 	bcoords .= inv.(compute_bezier_points(C, w)) .* compute_bezier_points(C, w.*bcoords)
 	w .= compute_bezier_points(C, w)
+
 	return nothing
 end
 
@@ -112,23 +111,39 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid)
     dim = JuAFEM.getdim(grid)
     T = eltype(first(grid.nodes).x)
     
-    cls = MeshCell[]
-    weights = zeros(T, JuAFEM.getnnodes(grid))
-	
+	cls = MeshCell[]
+	beziercoords = Vec{dim,T}[]
+    weights = T[]
+	cellorders = Int[]
+	offset = 0
     for (cellid, cell) in enumerate(grid.cells)
 		reorder = juafem_to_vtk_order(typeof(first(grid.cells)))
-        celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
-        push!(cls, MeshCell(celltype, collect(cell.nodes[reorder])))
+		@show reorder
+		
+		vtktype = JuAFEM.cell_to_vtkcell(typeof(cell))
+		for p in getorders(cell)
+			push!(cellorders, p)
+		end
+		x,w = get_bezier_coordinates(grid, cellid)
+		@show x
+	    append!(beziercoords,  x)
+		append!(weights,  w)
+
+		cellnodes = (1:length(cell.nodes)) .+ offset
+		@show cellnodes
+		offset += length(cell.nodes)
+        push!(cls, MeshCell(vtktype, collect(cellnodes)))
     end
     
-    coords = reshape(reinterpret(T, grid.nodes), (dim, JuAFEM.getnnodes(grid)))
-    vtkfile = WriteVTK.vtk_grid(filename, coords, cls)
+    coords = reshape(reinterpret(T, beziercoords), (dim, length(beziercoords)))
+    vtkfile = WriteVTK.vtk_grid(filename, coords, cls, compress = 0)#, append = false)
 
-    vtkfile["RationalWeights", VTKPointData()] = getweights(grid)
+	vtkfile["RationalWeights", VTKPointData()] = weights
+	#vtkfile["HigherOrderDegrees", VTKCellData()] = reshape(cellorders, 1, length(grid.cells))
+	
     return vtkfile
 end
 
-function JuAFEM.MixedDofHandler(grid::BezierGrid{G}) where {G}
-	dim, C, T = G.parameters
+function JuAFEM.MixedDofHandler(grid::BezierGrid{dim,C,T}) where {dim,C,T}
     JuAFEM.MixedDofHandler{dim,C,T,typeof(grid)}(FieldHandler[], JuAFEM.CellVector(Int[],Int[],Int[]), JuAFEM.CellVector(Int[],Int[],Int[]), JuAFEM.CellVector(Vec{dim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end

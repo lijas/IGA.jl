@@ -37,26 +37,7 @@ JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = JuAFEM.
 set_bezier_operator!(bcv::BezierValues, beo::BezierExtractionOperator{T}) where T = bcv.current_beo[]=beo
 _cellvaluestype(::BezierValues{dim_s,T,CV}) where {dim_s,T,CV} = CV
 
-function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T,CV<:JuAFEM.FaceValues}
-    JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
-    bcv.cv_store.current_face[] = faceid
-
-    _reinit_bezier!(bcv, faceid)
-end
-
-function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T,CV<:JuAFEM.CellValues}
-    JuAFEM.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
-
-    _reinit_bezier!(bcv, 1)
-end
-
-JuAFEM.reinit!(bcv::BezierValues, coords::Tuple{AbstractVector{Vec{dim_s,T}}, AbstractArray{T}}) where {dim_s,T} = JuAFEM.reinit!(bcv, coords[1], coords[2])
-
-function JuAFEM.reinit!(bcv::BezierValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractArray{T}) where {dim_s,T}
-    JuAFEM.reinit!(bcv.cv_bezier, x, w) #call the normal reinit function first
-    _reinit_bezier!(bcv, 1)
-end
-
+#Function that computs basefunction values from bezier function values and the extraction operator, N = C*B
 function _reinit_bezier!(bcv::BezierValues{dim_s}, faceid::Int) where {dim_s}
 
     cv_store = bcv.cv_store
@@ -102,4 +83,128 @@ function _reinit_bezier!(bcv::BezierValues{dim_s}, faceid::Int) where {dim_s}
         end
     end
 
+end
+
+function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T,CV<:JuAFEM.FaceValues}
+    JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
+    bcv.cv_store.current_face[] = faceid
+
+    _reinit_bezier!(bcv, faceid)
+end
+
+function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T,CV<:JuAFEM.CellValues}
+    JuAFEM.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
+
+    _reinit_bezier!(bcv, 1)
+end
+
+#
+# NURBS Function values needs to be treated differently than other basis values, since they have weights-factors aswell
+#
+const BezierCoords{dim_s,T} = Tuple{AbstractVector{Vec{dim_s,T}}, AbstractVector{T}}
+JuAFEM.reinit!(bcv::BezierValues, x_w::BezierCoords{dim_s,T}) where {dim_s,T} = JuAFEM.reinit!(bcv, x_w...)
+JuAFEM.reinit!(bcv::BezierValues, x_w::BezierCoords{dim_s,T}, faceid::Int) where {dim_s,T} = JuAFEM.reinit!(bcv, x_w..., faceid)
+
+function JuAFEM.reinit!(bcv::BezierValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractVector{T}) where {dim_s,T}
+    JuAFEM.reinit!(bcv.cv_bezier, x, w) #call the normal reinit function first
+    _reinit_bezier!(bcv, 1)
+end
+
+function JuAFEM.reinit!(bcv::BezierValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractVector{T}, faceid::Int) where {dim_s,T}
+    JuAFEM.reinit!(bcv.cv_bezier, x, w, faceid) #call the normal reinit function first
+    bcv.cv_store.current_face[] = faceid
+    _reinit_bezier!(bcv, faceid)
+end
+
+"""
+JuAFEM.reinit!(cv::JuAFEM.CellVectorValues{dim}, xᴮ::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}) where {dim,T}
+
+Similar to JuAFEM's reinit method, but in IGA with NURBS, the weights is also needed.
+    `xᴮ` - Bezier coordinates
+    `w`  - weights for nurbs mesh (not bezier weights)
+"""
+function JuAFEM.reinit!(cv::JuAFEM.CellValues{dim}, xᴮ::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}) where {dim,T}
+    n_geom_basefuncs = JuAFEM.getngeobasefunctions(cv)
+    n_func_basefuncs = JuAFEM.getn_scalarbasefunctions(cv)
+    @assert length(xᴮ) == n_geom_basefuncs == length(w)
+    isa(cv, JuAFEM.CellVectorValues) && (n_func_basefuncs *= dim)
+
+
+    @inbounds for i in 1:length(cv.qr_weights)
+        weight = cv.qr_weights[i]
+
+        W = zero(T)
+        dWdξ = zero(Vec{dim,T})
+        for j in 1:n_geom_basefuncs
+            W += w[j]*cv.M[j, i]
+            dWdξ += w[j]*cv.dMdξ[j, i]
+        end
+        
+        fecv_J = zero(Tensor{2,dim})
+        for j in 1:n_geom_basefuncs
+            dRdξ = w[j]*(inv(W)*cv.dMdξ[j, i] - dWdξ*inv(W^2)*cv.M[j,i])
+            fecv_J += xᴮ[j] ⊗ dRdξ
+        end
+
+        detJ = det(fecv_J)
+        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        cv.detJdV[i] = detJ * weight
+        Jinv = inv(fecv_J)
+        for j in 1:n_func_basefuncs
+            cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
+        end
+    end
+end
+
+"""
+JuAFEM.reinit!(cv::JuAFEM.CellVectorValues{dim}, xᴮ::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}) where {dim,T}
+
+Similar to JuAFEM's reinit method, but in IGA with NURBS, the weights is also needed.
+    `xᴮ` - Bezier coordinates
+    `w`  - weights for nurbs mesh (not bezier weights)
+"""
+function reinit!(fv::FaceValues{dim}, xᴮ::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}, face::Int) where {dim,T}
+    n_geom_basefuncs = JuAFEM.getngeobasefunctions(fv)
+    n_func_basefuncs = JuAFEM.getn_scalarbasefunctions(fv)
+    @assert length(xᴮ) == n_geom_basefuncs
+    isa(fv, FaceVectorValues) && (n_func_basefuncs *= dim)
+
+    fv.current_face[] = face
+    cb = JuAFEM.getcurrentface(fv)
+
+    @inbounds for i in 1:length(fv.qr_weights)
+        weight = fv.qr_weights[i]
+
+        W = zero(T)
+        dWdξ = zero(Vec{dim,T})
+        for j in 1:n_geom_basefuncs
+            W += w[j]*fv.M[j, i]
+            dWdξ += w[j]*fv.dMdξ[j, i]
+        end
+        
+        fefv_J = zero(Tensor{2,dim})
+        for j in 1:n_geom_basefuncs
+            dRdξ = w[j]*(inv(W)*fv.dMdξ[j, i] - dWdξ*inv(W^2)*fv.M[j,i])
+            fefv_J += xᴮ[j] ⊗ dRdξ
+        end
+
+        weight_norm = JuAFEM.weighted_normal(fefv_J, fv, cb)
+        fv.normals[i] = weight_norm / norm(weight_norm)
+        detJ = norm(weight_norm)
+
+        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        fv.detJdV[i, cb] = detJ * weight
+        Jinv = inv(fefv_J)
+        for j in 1:n_func_basefuncs
+            fv.dNdx[j, i, cb] = fv.dNdξ[j, i, cb] ⋅ Jinv
+        end
+    end
+end
+
+function JuAFEM.reinit!(cv::JuAFEM.CellValues{dim}, xw::BezierCoords{dim,T}) where {dim,T}
+    JuAFEM.reinit!(cv, xw...)
+end
+
+function JuAFEM.reinit!(cv::JuAFEM.FaceValues{dim}, xw::BezierCoords{dim,T}, faceid::Int) where {dim,T}
+    JuAFEM.reinit!(cv, xw..., faceid)
 end

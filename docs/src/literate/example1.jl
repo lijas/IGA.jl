@@ -11,10 +11,10 @@ using JuAFEM, IGA, LinearAlgebra
 # The BezierGrid is similiar to the JuAFEM.Grid, but includes the ratianal weights used by the NURBS, 
 # and also the bezier extraction operator. 
 
-function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, C::SymmetricTensor{4,2}, cv)
+function integrate_element!(ke::AbstractMatrix, Xᴮw::Tuple{Vector{Vec{2,Float64}}, Vector{Float64}}, C::SymmetricTensor{4,2}, cv)
     n_basefuncs = getnbasefunctions(cv)
 
-    reinit!(cv, Xᴮ)
+    reinit!(cv, Xᴮw)
 
     δɛ = [zero(SymmetricTensor{2,2,Float64}) for i in 1:n_basefuncs]
 
@@ -33,10 +33,10 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, C:
     end
 end
 
-function integrate_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, t::Vec{2}, fv, faceid::Int)
+function integrate_force!(fe::AbstractVector, Xᴮw::Tuple{Vector{Vec{2,Float64}}, Vector{Float64}}, t::Vec{2}, fv, faceid::Int)
     n_basefuncs = getnbasefunctions(fv)
 
-    reinit!(fv, Xᴮ, faceid)
+    reinit!(fv, Xᴮw, faceid)
 
     for q_point in 1:getnquadpoints(fv)
         dA = getdetJdV(fv, q_point)
@@ -64,12 +64,10 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         celldofs!(celldofs, dh, cellid)
 
         extraction_operator = grid.beo[cellid]
-        X, w = get_bezier_coordinates(grid, cellid)
-
-        Xᴮ = compute_bezier_points(extraction_operator, X)
+        Xᴮ, w = get_bezier_coordinates(grid, cellid)
         set_bezier_operator!(cv, extraction_operator)
 
-        integrate_element!(ke, Xᴮ, stiffmat, cv)
+        integrate_element!(ke, (Xᴮ,w), stiffmat, cv)
         assemble!(assembler, celldofs, ke, fe)
     end
 
@@ -80,12 +78,10 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         celldofs!(celldofs, dh, cellid)
 
         extraction_operator = grid.beo[cellid]
-        X, w = get_bezier_coordinates(grid, cellid)
-
-        Xᴮ = compute_bezier_points(extraction_operator, X)
+        Xᴮ, w = get_bezier_coordinates(grid, cellid)
         set_bezier_operator!(fv, extraction_operator)
 
-        integrate_force!(fe, Xᴮ, traction, fv, faceid)
+        integrate_force!(fe, (Xᴮ, w), traction, fv, faceid)
         assemble!(assembler, celldofs, ke, fe)
     end
 
@@ -104,7 +100,8 @@ end
 function solve()
 
     orders = (2,2)
-    nurbsmesh = generate_nurbs_patch(:plate_with_hole, (3,3), orders, width = 4.0, radius = 1.0)
+    nurbsmesh = generate_nurbs_patch(:plate_with_hole, (1,1), orders, width = 4.0, radius = 1.0)
+    nurbsmesh = IGA.generate_beziergrid_2()
     grid = BezierGrid(nurbsmesh)
 
     addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
@@ -140,7 +137,7 @@ function solve()
     a = K\f
     
     vtkgrid = vtk_grid("filevt.vtu", grid)
-    vtk_point_data(vtkgrid, dh, a, :u)
+   # vtk_point_data(vtkgrid, dh, a, :u)
     vtk_save(vtkgrid)
 
 end

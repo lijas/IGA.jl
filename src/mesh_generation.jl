@@ -386,6 +386,7 @@ function generate_doubly_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,I
 
 end
 
+
 function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; width::T, radius::T, multiplicity::NTuple{2,Int}=(1,1)) where T
 
 	@assert( orders[1] >=2 && orders[2] >=2 ) 
@@ -421,6 +422,7 @@ function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int}, order
 
 	mesh = IGA.NURBSMesh((kvxi, kveta), orders, control_points)
 end
+
 
 function generate_beziergrid_1()
 
@@ -495,11 +497,14 @@ function generate_beziergrid_2()
 		Vec((0.0,   4.0))
     ]
     
-	w = [1,1,1, 
-		 0.5(1 + 1/sqrt(2)), 1,1,
-		 0.5(1 + 1/sqrt(2)), 1,1,
-		 1,1,1]
+	w = Float64[1, 0.5(1 + 1/sqrt(2)), 0.5(1 + 1/sqrt(2)), 1, 
+				1,1,1,1,
+				1,1,1,1]
 
+	#w = [1,1,1, 
+	#			0.5(1 + 1/sqrt(2)), 1,1,
+#				0.5(1 + 1/sqrt(2)), 1,1,#
+#				1,1,1]
 
     knot_vectors = (Float64[0, 0, 0, 1/5, 1, 1, 1],
                     Float64[0, 0, 0, 1, 1, 1])
@@ -533,10 +538,6 @@ function generate_beziergrid_2(nel::NTuple{2,Int})
 		 0.5(1 + 1/sqrt(2)), 1,1,
 		 1,1,1]
 
-	w = Float64[1,1,1, 
-		 1,1,1,
-		 1,1,1,
-		 1,1,1]
 
     knot_vectors = (Float64[0, 0, 0, 1/2, 1, 1, 1],
                     Float64[0, 0, 0, 1, 1, 1])
@@ -559,7 +560,7 @@ function generate_beziergrid_2(nel::NTuple{2,Int})
 	@assert( all(w .≈ 1.0) )
 	mesh = NURBSMesh(knot_vectors, orders, cp, w)
 
-	return BezierGrid(mesh)
+	return mesh
 
 end
 
