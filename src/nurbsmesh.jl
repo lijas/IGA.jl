@@ -41,7 +41,7 @@ struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 
 end
 
-getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
+JuAFEM.getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
 getnbasefuncs_per_cell(mesh::NURBSMesh) = length(mesh.IEN[:,1])
 JuAFEM.getnbasefunctions(mesh::NURBSMesh) = maximum(mesh.IEN)
 

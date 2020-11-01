@@ -163,7 +163,7 @@ Similar to JuAFEM's reinit method, but in IGA with NURBS, the weights is also ne
     `xᴮ` - Bezier coordinates
     `w`  - weights for nurbs mesh (not bezier weights)
 """
-function reinit!(fv::FaceValues{dim}, xᴮ::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}, face::Int) where {dim,T}
+function JuAFEM.reinit!(fv::FaceValues{dim}, xᴮ::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}, face::Int) where {dim,T}
     n_geom_basefuncs = JuAFEM.getngeobasefunctions(fv)
     n_func_basefuncs = JuAFEM.getn_scalarbasefunctions(fv)
     @assert length(xᴮ) == n_geom_basefuncs

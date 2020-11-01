@@ -423,61 +423,6 @@ function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int}, order
 	mesh = IGA.NURBSMesh((kvxi, kveta), orders, control_points)
 end
 
-
-function generate_beziergrid_1()
-
-	cp = [
-		Vec((0.0,   1.0)),   
-		Vec((0.2612,   1.0)),   
-		Vec((0.7346,   0.7346)),   
-		Vec((1.0,   0.2612)),   
-		Vec((1.0,   0.0)),   
-		Vec((0.0,   1.25)),   
-		Vec((0.3265,   1.25)),   
-		Vec((0.9182,   0.9182)),   
-		Vec((1.25,   0.3265)),   
-		Vec((1.25,   0.0)),   
-		Vec((0.0,   1.75)),   
-		Vec((0.4571,   1.75)),   
-		Vec((1.2856,   1.2856)),   
-		Vec((1.75,   0.4571)),   
-		Vec((1.75,   0.0)),   
-		Vec((0.0,   2.25)),   
-		Vec((0.5877,   2.25)),   
-		Vec((1.6528,   1.6528)),   
-		Vec((2.25,   0.5877)),   
-		Vec((2.25,   0.0)),   
-		Vec((0.0,   2.5)),   
-		Vec((0.6530,   2.5)),   
-		Vec((1.8365,   1.8365)),   
-		Vec((2.5,   0.6530)),   
-		Vec((2.5,   0.0))
-    ]
-    
-    w = [1.0, 0.9024, 0.8373, 0.9024, 1.0,
-         1.0, 0.9024, 0.8373, 0.9024, 1.0,
-         1.0, 0.9024, 0.8373, 0.9024, 1.0,
-         1.0, 0.9024, 0.8373, 0.9024, 1.0,
-         1.0, 0.9024, 0.8373, 0.9024, 1.0]
-
-    knot_vectors = (Float64[0, 0, 0, 1/3, 2/3, 1, 1, 1],
-                    Float64[0, 0, 0, 1/3, 2/3, 1, 1, 1])
-    orders = (2,2)
-
-	#Create intermidate nurbsmesh represention 
-	#mesh = NURBSMesh(knot_vectors, orders, cp, w)
-
-	cells, nodes = get_nurbs_griddata(orders, knot_vectors, cp)
-
-	#Bezier extraction operator
-	C, nbe = compute_bezier_extraction_operators(orders, knot_vectors)
-	@assert(nbe == 9)
-	Cvec = bezier_extraction_to_vectors(C)
-
-	return BezierGrid(cells, nodes, w, Cvec)
-
-end
-
 function generate_beziergrid_2()
 
 
@@ -514,50 +459,27 @@ function generate_beziergrid_2()
 
 end
 
-function generate_beziergrid_2(nel::NTuple{2,Int})
+function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int})
 
 	@assert(nel[1]>=2 && nel[2]>=1)
-	
-	cp = [
-		Vec((-1.0,   0.0)),   
-		Vec((-1.0, sqrt(2)-1)),   
-		Vec((1-sqrt(2),   1.0)),   
-		Vec((0.0,   1.0)),   
-		Vec((-2.5,   0.0)),   
-		Vec((-2.5,   0.75)),   
-		Vec((-0.75,   2.5)),   
-		Vec((0.0,   2.5)),   
-		Vec((-4.0,   0.0)),   
-		Vec((-4.0,   4.0)),   
-		Vec((-4.0,   4.0)),   
-		Vec((0.0,   4.0))
-    ]
-    
-	w = [1,1,1, 
-		 0.5(1 + 1/sqrt(2)), 1,1,
-		 0.5(1 + 1/sqrt(2)), 1,1,
-		 1,1,1]
+	@assert(iseven(nel[1]))
 
-
-    knot_vectors = (Float64[0, 0, 0, 1/2, 1, 1, 1],
-                    Float64[0, 0, 0, 1, 1, 1])
+	cp = [Vec((-1.0,   0.0)), Vec((-1.0, sqrt(2)-1)), Vec((1-sqrt(2),1.0)), Vec((0.0,1.0)), Vec((-2.5,   0.0)), Vec((-2.5,   0.75)), Vec((-0.75,   2.5)), Vec((0.0,   2.5)), Vec((-4.0,   0.0)), Vec((-4.0,   4.0)), Vec((-4.0,   4.0)),   Vec((0.0,   4.0))]
+    w = Float64[1, 0.5(1 + 1/sqrt(2)), 0.5(1 + 1/sqrt(2)), 1,1,1,1, 1,1,1,1,1]
+    knot_vectors = (Float64[0, 0, 0, 1/2, 1, 1, 1], Float64[0, 0, 0, 1, 1, 1])
     orders = (2,2)
 
-	#Create intermidate nurbsmesh represention 
-	rangex = range(0.0, stop = 1.0, length=nel[1])[2:end-1]
-	rangey = range(0.0, stop = 1.0, length=nel[1]+1)[2:end-1]
-	for xi in rangex
-		if xi == 0.5
-			continue
-		end
-		knotinsertion!(knot_vectors, orders, cp, w, xi, dir=1)
+	#Add elements via knot insertion
+	rangeξ = range(0.0, stop = 1.0, length=nel[1])
+	for ξ in rangeξ[2:end-1]
+		knotinsertion!(knot_vectors, orders, cp, w, ξ, dir=1)
 	end
-	rangex = range(0.0, stop = 1.0, length=nel[1]+1)[2:end-1]
-	for xi in rangex
-		knotinsertion!(knot_vectors, orders, cp, w, xi, dir=2)
+	
+	rangeη = range(0.0, stop = 1.0, length=nel[2]+1)
+	for η in rangeη[2:end-1]
+		knotinsertion!(knot_vectors, orders, cp, w, η, dir=2)
 	end
 
-	@assert( all(w .≈ 1.0) )
 	mesh = NURBSMesh(knot_vectors, orders, cp, w)
 
 	return mesh

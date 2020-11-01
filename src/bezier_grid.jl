@@ -124,13 +124,14 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid)
 		for p in getorders(cell)
 			push!(cellorders, p)
 		end
+
 		x,w = get_bezier_coordinates(grid, cellid)
-		@show x
+
 	    append!(beziercoords,  x)
 		append!(weights,  w)
 
 		cellnodes = (1:length(cell.nodes)) .+ offset
-		@show cellnodes
+
 		offset += length(cell.nodes)
         push!(cls, MeshCell(vtktype, collect(cellnodes)))
     end
@@ -141,6 +142,57 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid)
 	vtkfile["RationalWeights", VTKPointData()] = weights
 	#vtkfile["HigherOrderDegrees", VTKCellData()] = reshape(cellorders, 1, length(grid.cells))
 	
+    return vtkfile
+end
+
+function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler{dim,C,T,G}, u::Vector, suffix="") where {dim,C,T,G<:BezierGrid}
+	@assert isconcretetype(C)
+	N = JuAFEM.nnodes(C)
+
+    fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
+
+    for name in fieldnames
+        @debug println("exporting field $(name)")
+        field_dim = JuAFEM.getfielddim(dh, name)
+        space_dim = field_dim == 2 ? 3 : field_dim
+        data = fill(NaN, space_dim, N*getncells(dh.grid))  # set default value
+
+        for fh in dh.fieldhandlers
+            # check if this fh contains this field, otherwise continue to the next
+            field_pos = findfirst(i->i == name, JuAFEM.getfieldnames(fh))
+            if field_pos == 0 && continue end
+
+            cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
+            offset = dof_range(fh, name)
+
+			nodecount = 0
+            for cellnum in cellnumbers
+				cell = dh.grid.cells[cellnum]
+                n = ndofs_per_cell(dh, cellnum)
+                eldofs = zeros(Int, n)
+                _celldofs = celldofs!(eldofs, dh, cellnum)
+				
+				#Transform into values on bezier mesh
+				bezier_extraction = dh.grid.beo[cellnum]
+				ub = compute_bezier_points(bezier_extraction, u[_celldofs[offset]], dim = field_dim)
+				
+                counter = 1
+				for _ in cell.nodes
+					nodecount += 1
+                    for d in 1:field_dim
+                        data[d, nodecount] = ub[counter]
+                        counter += 1
+                    end
+                    if field_dim == 2
+                        # paraview requires 3D-data so pad with zero
+                        data[3, nodecount] = 0
+                    end
+                end
+            end
+        end
+        vtk_point_data(vtkfile, data, string(name, suffix))
+    end
+
     return vtkfile
 end
 
