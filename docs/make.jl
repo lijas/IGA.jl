@@ -1,11 +1,11 @@
 using Documenter
 using IGA
 
-#include("generate.jl")
+include("generate.jl")
 
-#=GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
+GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "example1.md",
-    )]=#
+    )]
 
 makedocs(
     sitename = "IGA",
@@ -15,7 +15,7 @@ makedocs(
     strict = false,
     pages = Any[
         "Home" => "index.md",
-        "Examples" => ["examples/example1.md", "examples/a2.md"],
+        "Examples" => GENERATEDEXAMPLES,
         "Iga2" => "Isogeom.md",
         "Someelse" => ["someelse/index.md", "someelse/Isogeom.md"],
     ]
