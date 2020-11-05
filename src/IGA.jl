@@ -46,6 +46,7 @@ include("splines/bezier.jl")
 include("splines/bezier_values.jl")
 include("splines/bsplines.jl")
 include("nurbs_cell_values.jl")
+include("L2_projection.jl")
 
 #Normaly the verices function should only return the 8 corner nodes of the hexa (or 4 in 2d),
 # but since JuAFEM can not distribute dofs on faces if number of facedofs > 1, this 

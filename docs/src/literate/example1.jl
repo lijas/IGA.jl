@@ -5,11 +5,11 @@
 # In this example we will solve a simple elasticity problem; an infinite plate with a hole.
 # The main goal of the tutorial is to show how one can solve the problem using Isogeometric Analysis (IGA), 
 # or in other words, solving the a FE-problem with splines as the basis/shape functions.
-# Most of the code will be the same as in standard FE-codes, except for some parts, which will be discussed later.
+# By using so called bezier extraction, we will see that most of the structure of the code will be the same as in standard FE-codes (however many differences are happening "under the hood").
 
 #md # !!! note 
-#md #     This tutorial expects the reader to be familiar with the JuAFEM package. In particular JuAFEM.DofHandler and JuAFEM.CellValues.
-#md #     The tutorial also expects the reader be familiar with the concept of "bezier extraction" in IGA.
+#md #     It is expected that the reader already be familiar with IGA and the concept of "bezier extraction".
+#md #     It is also expected that the reader is familiar with the JuAFEM package. In particular JuAFEM.DofHandler and JuAFEM.CellValues.
 
 # Start by loading the neccisary packages
 using JuAFEM, IGA, LinearAlgebra
@@ -17,6 +17,7 @@ using JuAFEM, IGA, LinearAlgebra
 # Next we define the functions for the integration of the element stiffness matrix and the traction force.
 # These functions will be the same as for a normal finite elment problem, but
 # with the difference that we need the cell coorinates AND cell weights (the weigts from the NURBS shape functions), to reinitilize the shape values, dNdx.
+# Read this section[LINK!], to see how the shape values are reinitilized. 
 function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
     n_basefuncs = getnbasefunctions(cv)
 
@@ -71,18 +72,19 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         fill!(ke, 0.0)
         celldofs!(celldofs, dh, cellid)
 
-        # This part differs from normal finite elment code. Instead of only getting the cell coordinates, 
-        # we also get the cell weights, and transform them to the bezier mesh. Furthermore, we pass the bezier extraction operator to the CellValues/Beziervalues.
+        # In a normal finite elment code, this is the point where we usually get the coordinates of the element `X = getcoordinates(grid, cellid)`. In this case, however, 
+        # we also require the cell weights, and we need to transform them to the bezier mesh. 
         extr = grid.beo[cellid] # Extraction operator
-        X = getcoordinates!(grid.grid, ic)
-        w = getweights!(w, grid, ic)
-        wᴮ = compute_bezier_points(C, w)
-        Xᴮ .= inv.(wᴮ) .* compute_bezier_points(C, w.*bcoords)
+        X = getcoordinates(grid.grid, cellid) #Nurbs coords
+        w = IGA.getweights(grid, cellid)       #Nurbs weights
+        wᴮ = compute_bezier_points(extr, w)
+        Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)
 
 #md # !!! tip 
 #md #     Since the operations above are quite common in IGA, there is a helper-function called `get_bezier_coordinates(grid, cellid)`, 
 #md #     which return the bezier coorinates and weights directly.
 
+        # Furthermore, we pass the bezier extraction operator to the CellValues/Beziervalues.
         set_bezier_operator!(cv, extr)
         
         integrate_element!(ke, Xᴮ, w, stiffmat, cv)
@@ -118,13 +120,42 @@ function get_material(; E, ν)
     return SymmetricTensor{4, 2}(g)
 end;
 
+# We also create a function that calculates the stress in a quadrature point given the cell displacement vector and such...
+function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+    
+    celldofs = zeros(Int, ndofs_per_cell(dh))
+
+    #Store the stresses in each qp for all cells
+    cellstresses = Vector{SymmetricTensor{2,2,Float64,3}}[]
+
+    for cellid in 1:getncells(dh.grid)
+        
+        extr = dh.grid.beo[cellid]
+        Xᴮ, w = get_bezier_coordinates(dh.grid, cellid)
+        
+        set_bezier_operator!(cv, extr)
+        reinit!(cv, (Xᴮ, w))
+        celldofs!(celldofs, dh, cellid)
+
+        ue = u[celldofs]
+        qp_stresses = SymmetricTensor{2,2,Float64,3}[]
+        for qp in 1:getnquadpoints(cv)
+            ɛ = symmetric(function_gradient(cv, qp, ue))
+            σ = C ⊡ ε
+            push!(qp_stresses, σ)
+        end
+        push!(cellstresses, qp_stresses)
+    end
+    
+    return cellstresses
+end
+
 # Now we have all parts to solve the problem.
-# We begin by generating the mesh. This package includes a couple of different functions that can generate different nurbs patches.
-# In this example, we will generate the the patch called "plate with hole". Note, currently this function can only generate second order basefunctions. 
-# First define the order of the basefunctions (in the ξ and η directions).
+# We begin by generating the mesh. IGA.jl includes a couple of different functions that can generate different nurbs patches.
+# In this example, we will generate the patch called "plate with hole". Note, currently this function can only generate the patch with second order basefunctions. 
 function solve(test)
     orders = (2,2) # Order in the ξ and η directions .
-    nels = (2,1) # Number of elements
+    nels = (10,10) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
 
     # Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this 
@@ -133,7 +164,7 @@ function solve(test)
     grid = BezierGrid(nurbsmesh)
 
     # Next, create some facesets. This is done in the same way as in normal JuAFEM-code. One thing to note however, is that the nodes/controlpoints, 
-    # does not neccisily lay on exactly the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
+    # does not neccisily lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
     # use the JuAFEM functions below.
     addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
     addfaceset!(grid, "left", (x) -> x[1] ≈ -4.0)
@@ -171,14 +202,26 @@ function solve(test)
     # Solve
 
     apply!(K, f, ch)
-    a = K\f
+    u = K\f
     
-    # Output result to VTK
-    vtkgrid = vtk_grid("filevt.vtu", grid)
-    vtk_point_data(vtkgrid, dh, a, :u)
+    # Now we want to export the results to VTK. So we calculate the stresses in each gauss-point, and project them to 
+    # the nodes using the L2Projector from JuAFEM. Node that we need to create new CellValues of type CellScalarValues, since the 
+    # L2Projector only works with scalar fields.
+
+    cellstresses = calculate_stress(dh, cv, stiffmat, u)
+
+    csv = BezierValues( CellScalarValues(qr_cell, ip) )
+    projector = L2Projector(csv, ip, grid)
+    σ_nodes = project(cellstresses, projector)
+
+    # Output results to VTK
+    vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
+    vtk_point_data(vtkgrid, dh, u, :u)
+    vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
     vtk_save(vtkgrid)
 
 end;
 
 # Call the function
 solve(1)
+
