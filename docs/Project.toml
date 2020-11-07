@@ -2,3 +2,5 @@
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 IGA = "e7b8d123-e02a-40ba-ad18-d3943ed54f1c"
 JuAFEM = "30d91d44-8115-11e8-1d28-c19a5ac16de8"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
