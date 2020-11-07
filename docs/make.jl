@@ -26,3 +26,7 @@ makedocs(
 #=deploydocs(
     repo = "<repository url>"
 )=#
+deploydocs(
+    repo = "github.com/lijas/IGA.jl.git",
+    push_preview=true,
+)
