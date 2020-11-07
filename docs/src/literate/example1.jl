@@ -1,23 +1,23 @@
-# # Infinte plate with hole
+# # Infinite plate with hole
 #
 # ![](plate_with_hole.png)
 #-
 # In this example we will solve a simple elasticity problem; an infinite plate with a hole.
 # The main goal of the tutorial is to show how one can solve the problem using Isogeometric Analysis (IGA), 
-# or in other words, solving the a FE-problem with splines as the basis/shape functions.
+# or in other words, solving a FE-problem with splines as the basis/shape functions.
 # By using so called bezier extraction, we will see that most of the structure of the code will be the same as in standard FE-codes (however many differences are happening "under the hood").
 
 #md # !!! note 
 #md #     It is expected that the reader already be familiar with IGA and the concept of "bezier extraction".
 #md #     It is also expected that the reader is familiar with the JuAFEM package. In particular JuAFEM.DofHandler and JuAFEM.CellValues.
 
-# Start by loading the neccisary packages
+# Start by loading the necessary packages
 using JuAFEM, IGA, LinearAlgebra
 
-# Next we define the functions for the integration of the element stiffness matrix and the traction force.
+# Next we define the functions for the integration of the element stiffness matrix and traction force.
 # These functions will be the same as for a normal finite elment problem, but
-# with the difference that we need the cell coorinates AND cell weights (the weigts from the NURBS shape functions), to reinitilize the shape values, dNdx.
-# Read this section[LINK!], to see how the shape values are reinitilized. 
+# with the difference that we need the cell coorinates AND cell weights (the weights from the NURBS shape functions), to reinitilize the shape values, dNdx.
+# Read this [`page`](../bezier_values.md), to see how the shape values are reinitilized. 
 function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
     n_basefuncs = getnbasefunctions(cv)
 
@@ -54,7 +54,7 @@ function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float6
     end
 end;
 
-# The assembly loop is also written in almost the same way as in a standard finite elment code. The key differences will be described in the next paragraph,
+# The assembly loop is also written in almost the same way as in a standard finite element code. The key differences will be described in the next paragraph,
 function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 
     f = zeros(ndofs(dh))
@@ -110,7 +110,7 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 end;
 
 
-# For simplicity, lets also define a function that returns the elastic stiffness matrix
+# This is a function that returns the elastic stiffness matrix
 function get_material(; E, ν)
     λ = E*ν / ((1 + ν) * (1 - 2ν))
     μ = E / (2(1 + ν))
@@ -120,7 +120,7 @@ function get_material(; E, ν)
     return SymmetricTensor{4, 2}(g)
 end;
 
-# We also create a function that calculates the stress in a quadrature point given the cell displacement vector and such...
+# We also create a function that calculates the stress in each quadrature point, given the cell displacement and such...
 function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
     
     celldofs = zeros(Int, ndofs_per_cell(dh))
@@ -148,23 +148,23 @@ function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vec
     end
     
     return cellstresses
-end
+end;
 
-# Now we have all parts to solve the problem.
+# Now we have all the parts needed to solve the problem.
 # We begin by generating the mesh. IGA.jl includes a couple of different functions that can generate different nurbs patches.
 # In this example, we will generate the patch called "plate with hole". Note, currently this function can only generate the patch with second order basefunctions. 
-function solve(test)
+function solve()
     orders = (2,2) # Order in the ξ and η directions .
     nels = (10,10) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
 
     # Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this 
-    # we transform the NURBS-patch into a BezierGrid. The BezierGrid is identical to the standard JuAFEM.Grid, but includes the NURBS-weights and 
+    # we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `JuAFEM.Grid`, but includes the NURBS-weights and 
     # bezier extraction operators.
     grid = BezierGrid(nurbsmesh)
 
     # Next, create some facesets. This is done in the same way as in normal JuAFEM-code. One thing to note however, is that the nodes/controlpoints, 
-    # does not neccisily lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
+    # does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
     # use the JuAFEM functions below.
     addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
     addfaceset!(grid, "left", (x) -> x[1] ≈ -4.0)
@@ -223,5 +223,5 @@ function solve(test)
 end;
 
 # Call the function
-solve(1)
+solve()
 

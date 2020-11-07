@@ -1,27 +1,39 @@
 export BernsteinBasis
 
 """
-BernsteinBasis subtype of JuAFEM:s interpolation struct
+    BernsteinBasis{dim,order}()
+
+The Bertnstein polynominal spline basis. Usually used as the cell interpolation in 
+IGA, together with bezier extraction + BezierValues.
+
+`dim` - The spacial dimentsion of the interpolation
+`order` - A tuple with the order in each parametric direction. Note, this can be lower than `dim`.
 """  
 struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order} 
-
     function BernsteinBasis{dim,order}() where {dim,order} 
          @assert(length(order) <= dim)
          # Make order into tuple for 1d case
          return new{dim,Tuple(order)}()
     end
-
 end
+
+#= This is a bit of a hack to get JuAFEMs Dofhandler to distribute dofs correctly:
+There are actually dofs on the faces/edges, but define all dofs on the verices instead =#
+JuAFEM.getnbasefunctions(::BernsteinBasis{dim,order}) where {dim,order} = prod(order .+ 1)::Int
+JuAFEM.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
+JuAFEM.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
+JuAFEM.nfacedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
+JuAFEM.ncelldofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
 
 function JuAFEM.value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) where {dim,order}
 
     _n = order .+ 1
     
     #=
-    Get the order of the bernstein basis according using in this package (not the same as VTK)
+    Get the order of the bernstein basis (NOTE: not the same as VTK)
     The order gets recalculated each time the function is called, so 
         one should not calculate the values in performance critical parts, but rather 
-        cache the basis values someway.
+        cache the basis values someway (for example in BezierValues).
     =#
     ordering = _bernstein_ordering(ip)
     coord = Tuple(CartesianIndices(_n)[ordering[i]])
@@ -124,14 +136,6 @@ function _edges_quad(ip::IGA.BernsteinBasis{3,orders}) where {orders}
 
     return Tuple(edges)
 end
-
-#= This is a bit of a hack to get JuAFEMs Dofhandler to distribute dofs correctly:
-  There are actually dofs on the faces/edges, but define all dofs on the verices instead =#
-JuAFEM.getnbasefunctions(::BernsteinBasis{dim,order}) where {dim,order} = prod(order .+ 1)::Int
-JuAFEM.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
-JuAFEM.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
-JuAFEM.nfacedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
-JuAFEM.ncelldofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
 
 function _bernstein_basis_recursive(p::Int, i::Int, xi::T) where T
 	if i == 1 && p == 0

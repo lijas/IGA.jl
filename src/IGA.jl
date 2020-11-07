@@ -18,12 +18,12 @@ export BezierCell
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 
 """
-BezierCell
-Type parameters specify:
-`dim` = dimension
+    BezierCell{dim,N,order,M} <: JuAFEM.AbstractCell{dim,N,M}
+
+`dim` = spacial dimension
 `N` = number of nodes/controlpoints
 `order` = tuple with order in each parametric dimension (does not need to be equal to `dim`)
-`M` = number of faces (4 in 2d, 6 in 3d)
+`M` = number of faces (used by JuAFEM) (4 in 2d, 6 in 3d)
 """
 struct BezierCell{dim,N,order,M} <: JuAFEM.AbstractCell{dim,N,M}
     nodes::NTuple{N,Int}
@@ -47,10 +47,11 @@ include("splines/bezier_values.jl")
 include("splines/bsplines.jl")
 include("nurbs_cell_values.jl")
 include("L2_projection.jl")
+include("VTK.jl")
 
 #Normaly the verices function should only return the 8 corner nodes of the hexa (or 4 in 2d),
-# but since JuAFEM can not distribute dofs on faces if number of facedofs > 1, this 
-# vertices function return all vertices
+#but since the cell connectivity in IGA is different compared to normal FE elements,
+#we can only distribute cells on the nodes/controlpoints
 JuAFEM.vertices(c::BezierCell) = c.nodes
 
 _bernstein_ordering(::Type{<:BezierCell{dim,N,orders}}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())                                        

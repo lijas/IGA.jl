@@ -54,11 +54,10 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         celldofs!(celldofs, dh, cellid)
 
         extr = grid.beo[cellid] # Extraction operator
-        X = getcoordinates!(grid.grid, ic)
-        w = getweights!(w, grid, ic)
-        wᴮ = compute_bezier_points(C, w)
-        Xᴮ .= inv.(wᴮ) .* compute_bezier_points(C, w.*bcoords)
-
+        X = getcoordinates(grid.grid, cellid) #Nurbs coords
+        w = IGA.getweights(grid, cellid)       #Nurbs weights
+        wᴮ = compute_bezier_points(extr, w)
+        Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)
 
         set_bezier_operator!(cv, extr)
 
@@ -93,9 +92,38 @@ function get_material(; E, ν)
     return SymmetricTensor{4, 2}(g)
 end;
 
-function solve(test)
+function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+
+    celldofs = zeros(Int, ndofs_per_cell(dh))
+
+    #Store the stresses in each qp for all cells
+    cellstresses = Vector{SymmetricTensor{2,2,Float64,3}}[]
+
+    for cellid in 1:getncells(dh.grid)
+
+        extr = dh.grid.beo[cellid]
+        Xᴮ, w = get_bezier_coordinates(dh.grid, cellid)
+
+        set_bezier_operator!(cv, extr)
+        reinit!(cv, (Xᴮ, w))
+        celldofs!(celldofs, dh, cellid)
+
+        ue = u[celldofs]
+        qp_stresses = SymmetricTensor{2,2,Float64,3}[]
+        for qp in 1:getnquadpoints(cv)
+            ɛ = symmetric(function_gradient(cv, qp, ue))
+            σ = C ⊡ ε
+            push!(qp_stresses, σ)
+        end
+        push!(cellstresses, qp_stresses)
+    end
+
+    return cellstresses
+end;
+
+function solve()
     orders = (2,2) # Order in the ξ and η directions .
-    nels = (2,1) # Number of elements
+    nels = (10,10) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
 
     grid = BezierGrid(nurbsmesh)
@@ -129,15 +157,22 @@ function solve(test)
     K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)
 
     apply!(K, f, ch)
-    a = K\f
+    u = K\f
 
-    vtkgrid = vtk_grid("filevt.vtu", grid)
-    vtk_point_data(vtkgrid, dh, a, :u)
+    cellstresses = calculate_stress(dh, cv, stiffmat, u)
+
+    csv = BezierValues( CellScalarValues(qr_cell, ip) )
+    projector = L2Projector(csv, ip, grid)
+    σ_nodes = project(cellstresses, projector)
+
+    vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
+    vtk_point_data(vtkgrid, dh, u, :u)
+    vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
     vtk_save(vtkgrid)
 
 end;
 
-solve(1)
+solve()
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
 

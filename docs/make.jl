@@ -15,9 +15,8 @@ makedocs(
     strict = false,
     pages = Any[
         "Home" => "index.md",
+        "Manual" => ["bezier_values.md"],
         "Examples" => GENERATEDEXAMPLES,
-        "Iga2" => "Isogeom.md",
-        "Someelse" => ["someelse/index.md", "someelse/Isogeom.md"],
     ]
 )
 

@@ -4,4 +4,5 @@ docs/build/
 docs/site/
 docs/src/examples/
 *.vtu
+*.vtk
 *.png
