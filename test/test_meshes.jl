@@ -48,11 +48,11 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
     
     #Cell values
     qr = JuAFEM.QuadratureRule{sdim,JuAFEM.RefCube}(3)
-    cv = IGA.BezierValues(JuAFEM.CellVectorValues(qr, bern_ip)) 
+    cv = IGA.BezierCellValues(JuAFEM.CellVectorValues(qr, bern_ip)) 
 
     #Face values
     qr = JuAFEM.QuadratureRule{sdim-1,JuAFEM.RefCube}(3)
-    fv = IGA.BezierValues(JuAFEM.FaceVectorValues(qr, bern_ip)) 
+    fv = IGA.BezierFaceValues(JuAFEM.FaceVectorValues(qr, bern_ip)) 
 
 
     return grid, cv, fv, bezier_operators

@@ -12,7 +12,7 @@
     qr = JuAFEM.QuadratureRule{dim,JuAFEM.RefCube}(2)
     cv = CellScalarValues(qr,b1)
     
-    bcv = BezierValues(cv)
+    bcv = BezierCellValues(cv)
     
     
     IGA.set_bezier_operator!(bcv, Cvec[1])
@@ -34,8 +34,8 @@
     
     cv = CellScalarValues(qr,b1)
     cv2 = CellVectorValues(qr,b1)
-    bern_cv = BezierValues(cv)
-    bern_cv2 = BezierValues(cv2)
+    bern_cv = BezierCellValues(cv)
+    bern_cv2 = BezierCellValues(cv2)
 
     
     random_coords = JuAFEM.reference_coordinates(b1) #zeros(Vec{2,T}, getnbasefunctions(bern_cv) ) #since we dont update "physcial" dNdX, coords can be random
@@ -151,7 +151,7 @@ end
     Cvecs = IGA.bezier_extraction_to_vectors(C)
     qr = JuAFEM.QuadratureRule{dim,JuAFEM.RefCube}(2)
     cv = JuAFEM.CellScalarValues(qr, bern_ip)
-    bern_cv = IGA.BezierValues(cv) 
+    bern_cv = IGA.BezierCellValues(cv) 
     
     dh = JuAFEM.DofHandler(grid)
     push!(dh, :u, dim)

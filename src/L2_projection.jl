@@ -3,7 +3,7 @@
 # but in IGA we need to call get_bezier_coordinates(grid, cellid).
 # Therefore we have to copy the functions from JuAFEM, even though the code is almost the same
 
-function JuAFEM._assemble_L2_matrix(fe_values::BezierValues, set, dh)
+function JuAFEM._assemble_L2_matrix(fe_values::BezierCellValues, set, dh)
     n = JuAFEM.getn_scalarbasefunctions(fe_values)
     M = create_symmetric_sparsity_pattern(dh)
     assembler = start_assemble(M)
@@ -47,7 +47,7 @@ function JuAFEM._assemble_L2_matrix(fe_values::BezierValues, set, dh)
     return M
 end
 
-function JuAFEM._project(vars, proj::L2Projector{<:BezierValues}, M::Integer) 
+function JuAFEM._project(vars, proj::L2Projector{<:BezierCellValues}, M::Integer) 
 
     # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.

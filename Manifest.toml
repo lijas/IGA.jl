@@ -231,8 +231,8 @@ version = "0.21.1"
 
 [[JuAFEM]]
 deps = ["LinearAlgebra", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
-git-tree-sha1 = "748900bb0b75fb30c69ac2062dcd0e6f22055b9c"
-repo-rev = "iga_refac_ghp"
+git-tree-sha1 = "37f71305052e82162bdfa5db8b3d13701faec5ff"
+repo-rev = "mdh_grid"
 repo-url = "https://github.com/lijas/JuAFEM.jl.git"
 uuid = "30d91d44-8115-11e8-1d28-c19a5ac16de8"
 version = "0.2.0"

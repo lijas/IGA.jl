@@ -1,19 +1,33 @@
-export BezierValues, set_bezier_operator!
+export BezierCellValues, BezierFaceValues, set_bezier_operator!
 
 """
 Wraps a standard `JuAFEM.CellValues`, but multiplies the shape values with the bezier extraction operator each time the 
 `reinit!` function is called. 
 """
-struct BezierValues{dim_s,T<:Real,CV<:JuAFEM.Values} <: JuAFEM.Values{dim_s,T,JuAFEM.RefCube}
+struct BezierCellValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}
     cv_bezier::CV
     cv_store::CV
 
     current_beo::Base.RefValue{BezierExtractionOperator{T}}
 end
 
-function BezierValues(cv::JuAFEM.Values{dim_s,T,JuAFEM.RefCube}) where {dim_s,T}
+struct BezierFaceValues{dim_s,T<:Real,CV<:JuAFEM.FaceValues} <: JuAFEM.FaceValues{dim_s,T,JuAFEM.RefCube}
+    cv_bezier::CV
+    cv_store::CV
+
+    current_beo::Base.RefValue{BezierExtractionOperator{T}}
+end
+
+BezierValues{dim_s,T,CV} = Union{BezierCellValues{dim_s,T,CV}, BezierFaceValues{dim_s,T,CV}}
+
+function BezierCellValues(cv::JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}) where {dim_s,T}
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
-    return BezierValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
+    return BezierCellValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
+end
+
+function BezierFaceValues(cv::JuAFEM.FaceValues{dim_s,T,JuAFEM.RefCube}) where {dim_s,T}
+    undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
+    return BezierFaceValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
 end
 
 JuAFEM.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
