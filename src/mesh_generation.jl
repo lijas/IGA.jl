@@ -346,7 +346,7 @@ function generate_nurbs_patch(::Val{:singly_curved_beam}, nel::NTuple{1,Int}, or
 
 end
 
-function generate_doubly_curved_nurbsmesh(nel::NTuple{2,Int}, orders::NTuple{2,Int}; r1::T, r2::T, α1::T, α2::T, multiplicity::NTuple{2,Int}=(1,1)) where T
+function generate_nurbs_patch(::Val{:doubly_curved}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; r1::T, r2::T, α1::T, α2::T, multiplicity::NTuple{2,Int}=(1,1)) where T
 
 	pdim = 2
 	sdim = 3
