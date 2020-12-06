@@ -119,8 +119,8 @@ end;</code></pre><p>Now we have all the parts needed to solve the problem. We be
     qr_cell = QuadratureRule{2,RefCube}(3)
     qr_face = QuadratureRule{1,RefCube}(3)
 
-    cv = BezierValues( CellVectorValues(qr_cell, ip) )
-    fv = BezierValues( FaceVectorValues(qr_face, ip) )</code></pre><p>Distribute dofs as normal</p><pre><code class="language-">    dh = MixedDofHandler(grid)
+    cv = BezierCellValues( CellVectorValues(qr_cell, ip) )
+    fv = BezierFaceValues( FaceVectorValues(qr_face, ip) )</code></pre><p>Distribute dofs as normal</p><pre><code class="language-">    dh = MixedDofHandler(grid)
     push!(dh, :u, 2, ip)
     close!(dh)</code></pre><p>Add two symmetry boundary condintions. Bottom face should only be able to move in x-direction, and the right boundary should only be able to move in y-direction</p><pre><code class="language-">    ch = ConstraintHandler(dh)
     dbc1 = Dirichlet(:u, getfaceset(grid, &quot;bot&quot;), (x, t) -&gt; 0.0, 2)
@@ -133,7 +133,7 @@ end;</code></pre><p>Now we have all the parts needed to solve the problem. We be
     K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)</code></pre><p>Solve</p><pre><code class="language-">    apply!(K, f, ch)
     u = K\f</code></pre><p>Now we want to export the results to VTK. So we calculate the stresses in each gauss-point, and project them to the nodes using the L2Projector from JuAFEM. Node that we need to create new CellValues of type CellScalarValues, since the L2Projector only works with scalar fields.</p><pre><code class="language-">    cellstresses = calculate_stress(dh, cv, stiffmat, u)
 
-    csv = BezierValues( CellScalarValues(qr_cell, ip) )
+    csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
     projector = L2Projector(csv, ip, grid)
     σ_nodes = project(cellstresses, projector)</code></pre><p>Output results to VTK</p><pre><code class="language-">    vtkgrid = vtk_grid(&quot;plate_with_hole.vtu&quot;, grid)
     vtk_point_data(vtkgrid, dh, u, :u)
@@ -141,4 +141,4 @@ end;</code></pre><p>Now we have all the parts needed to solve the problem. We be
     vtk_save(vtkgrid)
 
 end;
-nothing #hide</code></pre><p>Call the function</p><pre><code class="language-">solve()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../bezier_values/">« BezierValues.jl</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Saturday 14 November 2020 15:10">Saturday 14 November 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+nothing #hide</code></pre><p>Call the function</p><pre><code class="language-">solve()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../bezier_values/">« BezierValues.jl</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Sunday 6 December 2020 19:48">Sunday 6 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

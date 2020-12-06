@@ -137,8 +137,8 @@ function solve()
     qr_cell = QuadratureRule{2,RefCube}(3)
     qr_face = QuadratureRule{1,RefCube}(3)
 
-    cv = BezierValues( CellVectorValues(qr_cell, ip) )
-    fv = BezierValues( FaceVectorValues(qr_face, ip) )
+    cv = BezierCellValues( CellVectorValues(qr_cell, ip) )
+    fv = BezierFaceValues( FaceVectorValues(qr_face, ip) )
 
     dh = MixedDofHandler(grid)
     push!(dh, :u, 2, ip)
@@ -161,7 +161,7 @@ function solve()
 
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
 
-    csv = BezierValues( CellScalarValues(qr_cell, ip) )
+    csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
     projector = L2Projector(csv, ip, grid)
     σ_nodes = project(cellstresses, projector)
 
