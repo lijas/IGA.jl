@@ -1,6 +1,6 @@
 export BezierGrid, getweights, getweights!, get_bezier_coordinates, get_bezier_coordinates!
 
-struct BezierGrid{dim,C<:JuAFEM.AbstractCell,T<:Real} <: JuAFEM.AbstractGrid
+struct BezierGrid{dim,C<:JuAFEM.AbstractCell,T<:Real} <: JuAFEM.AbstractGrid{dim}
 	grid::JuAFEM.Grid{dim,C,T}
 	weights::Vector{Float64} #JuaFEM.CellVector{Float64}
 	beo::Vector{BezierExtractionOperator{Float64}}
@@ -111,5 +111,5 @@ let cache = Dict{Type{<:BezierCell}, Vector{Int}}()
 end
 
 function JuAFEM.MixedDofHandler(grid::BezierGrid{dim,C,T}) where {dim,C,T}
-    JuAFEM.MixedDofHandler{dim,C,T,typeof(grid)}(FieldHandler[], JuAFEM.CellVector(Int[],Int[],Int[]), JuAFEM.CellVector(Int[],Int[],Int[]), JuAFEM.CellVector(Vec{dim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
+    JuAFEM.MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], JuAFEM.CellVector(Int[],Int[],Int[]), JuAFEM.CellVector(Int[],Int[],Int[]), JuAFEM.CellVector(Vec{dim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end

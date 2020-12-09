@@ -3,13 +3,10 @@ module IGA
 using Reexport
 
 @reexport using Tensors
+@reexport using JuAFEM
 
 using LinearAlgebra
-using StaticArrays
-using TimerOutputs
 using WriteVTK
-using JuAFEM
-
 import SparseArrays
 
 export BezierExtractionOperator
