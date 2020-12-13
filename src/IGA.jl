@@ -7,6 +7,7 @@ using Reexport
 
 using LinearAlgebra
 using WriteVTK
+using StaticArrays
 import SparseArrays
 
 export BezierExtractionOperator

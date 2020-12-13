@@ -1,4 +1,4 @@
-export getnbasefunctions, NURBSMesh
+export getnbasefunctions, NURBSMesh, parent_to_parametric_map
 
 """
 Defines a NURBS patch, containing knot vectors, orders, controlpoints, weights and connectivity arrays.
@@ -49,6 +49,20 @@ function JuAFEM.getcoordinates(mesh::NURBSMesh, ie::Int)
 	return mesh.control_points[mesh.IEN[:,ie]]
 end
 
+"""
+parent_to_parametric_map(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pdim})
+
+	Given a coordinate for a cell in the parent domain, ξ, η, ζ, this functions returns the coordinate in 
+	the parametric domain, ξ', η', ζ' coordinate system.
+"""
+function parent_to_parametric_map(nurbsmesh::NURBSMesh{pdim}, cellid::Int, xi::Vec{pdim}) where {pdim}
+
+	Ξ = nurbsmesh.knot_vectors
+	_ni = nurbsmesh.INN[nurbsmesh.IEN[end,cellid],1:pdim]
+
+	#Map to parametric domain from parent domain
+	ξηζ = [0.5*((Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]])*xi[d] + (Ξ[d][_ni[d]+1] + Ξ[d][_ni[d]])) for d in 1:pdim]
+end
 
 #=function JuAFEM.Grid(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
 	ncontrolpoints = length(mesh.IEN[:,1])

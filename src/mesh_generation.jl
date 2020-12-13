@@ -10,32 +10,32 @@ function _create_knotvector(T, nelx, p, m)
 	nknots_x = nbasefunks_x + 1 + p 
 
 	mid_knots = T[]
-	for k in range(zero(T), stop=one(T), length=nknots_x-(p)*2)[2:end-1]
+	for k in range(-one(T), stop=one(T), length=nknots_x-(p)*2)[2:end-1]
 		for _ in 1:m
 			push!(mid_knots, k)
 		end
 	end
 
-	knot_vector_x = [zeros(T, p+1)..., mid_knots..., ones(T, p+1)...]
+	knot_vector_x = [-ones(T, p+1)..., mid_knots..., ones(T, p+1)...]
 end
 
 function _generate_linear_parametrization(knot_vector::Vector{T}, order::Int, from::T, to::T) where T
-    @assert(first(knot_vector)==0.0)
-    @assert(last(knot_vector)==1.0)
+    @assert(first(knot_vector)==-1.0)
+	@assert(last(knot_vector)==1.0)
+	@assert(from <= to)
 
     coords = T[]
     nbasefuncs = (length(knot_vector)-1-order)
 	for ix in 1:nbasefuncs
-		x = ((to-from)*sum([knot_vector[ix+j] for j in 1:order])/order) + from
+		scale = (to-from)/2
+		offset = from + scale
+		x = (sum([knot_vector[ix+j] for j in 1:order])/order)*scale + offset
 		push!(coords, x)
 	end
 	return coords
 end
 
 function _generate_equidistant_parametrization(knot_vector::Vector{T}, order::Int, from::T, to::T) where T
-	@assert(first(knot_vector)==0.0)
-	@assert(last(knot_vector)==1.0)
-
 	return range(from, stop=to, length=length(knot_vector)-1-order)
 end
 

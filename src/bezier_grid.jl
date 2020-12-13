@@ -1,4 +1,4 @@
-export BezierGrid, getweights, getweights!, get_bezier_coordinates, get_bezier_coordinates!
+export BezierGrid, getweights, getweights!, get_bezier_coordinates, get_bezier_coordinates!, get_extraction_operator
 
 struct BezierGrid{dim,C<:JuAFEM.AbstractCell,T<:Real} <: JuAFEM.AbstractGrid{dim}
 	grid::JuAFEM.Grid{dim,C,T}
@@ -72,8 +72,9 @@ function get_bezier_coordinates!(bcoords::AbstractVector{Vec{dim,T}}, w::Abstrac
 	JuAFEM.getcoordinates!(bcoords, grid.grid, ic)
 	getweights!(w, grid, ic)
 
-	bcoords .= inv.(compute_bezier_points(C, w)) .* compute_bezier_points(C, w.*bcoords)
+	bcoords .*= w
 	w .= compute_bezier_points(C, w)
+	bcoords .= inv.(w) .* compute_bezier_points(C, bcoords)
 
 	return nothing
 end
@@ -94,6 +95,10 @@ function JuAFEM.getcoordinates(grid::BezierGrid, cell::Int)
     dim = JuAFEM.getdim(grid); T = getT(grid)
     nodeidx = grid.cells[cell].nodes
     return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim,T}}
+end
+
+function get_extraction_operator(grid::BezierGrid, cellid::Int)
+	return grid.beo[cellid]
 end
 
 juafem_to_vtk_order(::Type{<:JuAFEM.AbstractCell{dim,N,M}}) where {dim,N,M} = 1:N
