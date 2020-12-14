@@ -56,8 +56,8 @@ end
 
     reorder = IGA._bernstein_ordering(ip)
 
-    qr = QuadratureRule{dim,RefCube}(2)
-    qr_face = QuadratureRule{dim-1,RefCube}(1)
+    qr = QuadratureRule{dim,RefCube}(3)
+    qr_face = QuadratureRule{dim-1,RefCube}(3)
 
     cv = BezierCellValues( CellScalarValues(qr, ip) )
     fv = BezierFaceValues( FaceScalarValues(qr_face, ip) )
@@ -112,14 +112,21 @@ end
             #@show (dRdX_patch)
             #@show (R_patch)
 
-            #@show dV_patch, getdetJdV(cv2, iqp)
+            @test getdetJdV(cv, iqp) .≈ getdetJdV(cv2, iqp)
             @test sum(cv.cv_store.N[:,iqp]) ≈ 1
-            @test all(cv.cv_store.dNdξ[:,iqp] .≈ dRdξ_patch)
-            @test all(cv.cv_store.dNdx[:,iqp] .≈ dRdX_patch)
+            @test all(cv.cv_store.N[:,iqp] .≈ cv2.cv_store.N[:,iqp])
+            @test all(cv.cv_store.dNdξ[:,iqp] .≈ cv2.cv_store.dNdξ[:,iqp])
+            @test all(cv.cv_store.dNdx[:,iqp] .≈ cv2.cv_store.dNdx[:,iqp])
+            #@test all(cv.cv_store.dNdξ[:,iqp] .≈ dRdξ_patch)
+            #@test all(cv.cv_store.dNdx[:,iqp] .≈ dRdX_patch)
         end
     end
     
-    addfaceset!(grid, "face1", (x)-> x[1] == 0.0)
+    
+    addfaceset!(grid, "face1", (x)-> x[1] == -4.0)
+    @show length(getfaceset(grid, "face1"))
+    A_cv = 0.0
+    A_patch = 0.0
     for (cellnum, faceidx) in getfaceset(grid, "face1")
 
         Xb, wb = get_bezier_coordinates(grid, cellnum)
@@ -146,12 +153,15 @@ end
             end
 
             J = sum(X .⊗ dRdξ_patch)
-            dV_patch = det(J)*qr.weights[iqp]
+            dV_patch = det(J)*qr_face_side.weights[iqp]
 
             dRdX_patch = similar(dNdξ)
             for i in 1:nb_per_cell
                 dRdX_patch[i] = dRdξ_patch[i] ⋅ inv(J)
             end 
+
+            global A_cv += getdetJdV(fv, iqp)
+            global A_patch+= dV_patch
 
             #@show dV_patch, getdetJdV(cv2, iqp)
             @test sum(fv.cv_store.N[:,iqp, faceidx]) ≈ 1
@@ -159,6 +169,8 @@ end
             @test all(fv.cv_store.dNdx[:,iqp, faceidx] .≈ dRdX_patch)
         end
     end
+
+    @show A_cv, A_patch
     
 
 #end

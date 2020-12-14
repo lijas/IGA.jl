@@ -51,8 +51,10 @@ function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float6
     for q_point in 1:getnquadpoints(fv)
         dA = getdetJdV(fv, q_point)
         A += dA
+        @show t
         for i in 1:n_basefuncs
             δu = shape_value(fv, q_point, i)
+            @show δu
             fe[i] += t ⋅ δu * dA
         end
     end
@@ -101,7 +103,6 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
     A = 0.0
     for (cellid, faceid) in getfaceset(grid, "left")
         fill!(fe, 0.0)
-        fill!(ke, 0.0)
 
         celldofs!(celldofs, dh, cellid)
 
@@ -112,7 +113,8 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         set_bezier_operator!(fv, w.*extr)
 
         A += integrate_traction_force!(fe, Xᴮ, wᴮ, traction, fv, faceid)
-        assemble!(assembler, celldofs, ke, fe)
+        f[celldofs] += fe
+        @show sum(f)
     end
 
     @show V,A
@@ -167,7 +169,7 @@ end;
 # In this example, we will generate the patch called "plate with hole". Note, currently this function can only generate the patch with second order basefunctions. 
 function solve()
     orders = (2,2) # Order in the ξ and η directions .
-    nels = (20,20) # Number of elements
+    nels = (4,3) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
 
     # Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this 
@@ -187,7 +189,7 @@ function solve()
     # reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
     ip = BernsteinBasis{2,orders}()
     qr_cell = QuadratureRule{2,RefCube}(4)
-    qr_face = QuadratureRule{1,RefCube}(4)
+    qr_face = QuadratureRule{1,RefCube}(3)
 
     cv = BezierCellValues( CellVectorValues(qr_cell, ip) )
     fv = BezierFaceValues( FaceVectorValues(qr_face, ip) )
@@ -210,6 +212,9 @@ function solve()
     stiffmat = get_material(E = 100, ν = 0.3)
     traction = Vec((-10.0, 0.0))
     K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)
+
+    @show norm(K)
+    @show sum(f)
 
     # Solve
 
