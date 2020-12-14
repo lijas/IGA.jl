@@ -161,7 +161,7 @@ function _reinit_nurbs!(cv_nurbs::JuAFEM.Values{dim}, cv_bezier::JuAFEM.Values{d
             dRdξ = inv(W)*dBdξ[j, i, cb] - inv(W^2)* dWdξ * B[j, i, cb]
 
             #Jacobian
-            fecv_J += xᴮ[j] ⊗ dRdξ
+            fecv_J += xᴮ[j] ⊗ (w[j]*dRdξ)
 
             #Store nurbs
             if typeof(cv_bezier) <: JuAFEM.VectorValues

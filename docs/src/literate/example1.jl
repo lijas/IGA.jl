@@ -24,7 +24,7 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w:
     reinit!(cv, (Xᴮ, w)) ## Reinit cellvalues by passsing both bezier coords and weights
 
     δɛ = [zero(SymmetricTensor{2,2,Float64}) for i in 1:n_basefuncs]
-
+    V = 0
     for q_point in 1:getnquadpoints(cv)
 
         for i in 1:n_basefuncs
@@ -32,12 +32,14 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w:
         end
 
         dΩ = getdetJdV(cv, q_point)
+        V += dΩ
         for i in 1:n_basefuncs
             for j in 1:n_basefuncs
                 ke[i, j] += (δɛ[i] ⊡ C ⊡ δɛ[j]) * dΩ
             end
         end
     end
+    return V
 end;
 
 function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
@@ -45,13 +47,16 @@ function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float6
 
     reinit!(fv, Xᴮ, w, faceid) ## Reinit cellvalues by passsing both bezier coords and weights
 
+    A = 0.0
     for q_point in 1:getnquadpoints(fv)
         dA = getdetJdV(fv, q_point)
+        A += dA
         for i in 1:n_basefuncs
             δu = shape_value(fv, q_point, i)
             fe[i] += t ⋅ δu * dA
         end
     end
+    return A
 end;
 
 # The assembly loop is also written in almost the same way as in a standard finite element code. The key differences will be described in the next paragraph,
@@ -67,6 +72,7 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
     ke = zeros(n, n)  # element stiffness matrix
 
     ## Assemble internal forces
+    V = 0.0
     for cellid in 1:getncells(grid)
         fill!(fe, 0.0)
         fill!(ke, 0.0)
@@ -87,11 +93,12 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         # Furthermore, we pass the bezier extraction operator to the CellValues/Beziervalues.
         set_bezier_operator!(cv, w.*extr)
         
-        integrate_element!(ke, Xᴮ, wᴮ, stiffmat, cv)
+        V += integrate_element!(ke, Xᴮ, wᴮ, stiffmat, cv)
         assemble!(assembler, celldofs, ke, fe)
     end
 
     ## Assamble external forces
+    A = 0.0
     for (cellid, faceid) in getfaceset(grid, "left")
         fill!(fe, 0.0)
         fill!(ke, 0.0)
@@ -104,9 +111,11 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 
         set_bezier_operator!(fv, w.*extr)
 
-        integrate_traction_force!(fe, Xᴮ, wᴮ, traction, fv, faceid)
+        A += integrate_traction_force!(fe, Xᴮ, wᴮ, traction, fv, faceid)
         assemble!(assembler, celldofs, ke, fe)
     end
+
+    @show V,A
 
     return K, f
 end;
@@ -158,7 +167,7 @@ end;
 # In this example, we will generate the patch called "plate with hole". Note, currently this function can only generate the patch with second order basefunctions. 
 function solve()
     orders = (2,2) # Order in the ξ and η directions .
-    nels = (10,10) # Number of elements
+    nels = (20,20) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
 
     # Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this 
@@ -177,8 +186,8 @@ function solve()
     # Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the 
     # reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
     ip = BernsteinBasis{2,orders}()
-    qr_cell = QuadratureRule{2,RefCube}(3)
-    qr_face = QuadratureRule{1,RefCube}(3)
+    qr_cell = QuadratureRule{2,RefCube}(4)
+    qr_face = QuadratureRule{1,RefCube}(4)
 
     cv = BezierCellValues( CellVectorValues(qr_cell, ip) )
     fv = BezierFaceValues( FaceVectorValues(qr_face, ip) )
