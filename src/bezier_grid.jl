@@ -60,7 +60,8 @@ function getweights!(w::AbstractVector{T}, grid::BezierGrid, ic::Int) where {T}
 	w .= grid.weights[nodeids]
 end
 
-function getweights(grid::BezierGrid, ic::Int) 
+function JuAFEM.getweights(grid::BezierGrid, ic::Int)
+	@show length(grid.cells), ic 
 	nodeids = collect(grid.cells[ic].nodes)
 	return grid.weights[nodeids]
 end

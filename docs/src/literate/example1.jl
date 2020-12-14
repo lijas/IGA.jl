@@ -85,7 +85,7 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 #md #     which return the bezier coorinates and weights directly.
 
         # Furthermore, we pass the bezier extraction operator to the CellValues/Beziervalues.
-        set_bezier_operator!(cv, extr)
+        set_bezier_operator!(cv, w.*extr)
         
         integrate_element!(ke, Xᴮ, w, stiffmat, cv)
         assemble!(assembler, celldofs, ke, fe)
@@ -99,8 +99,10 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         celldofs!(celldofs, dh, cellid)
 
         extr = grid.beo[cellid]
-        Xᴮ, w = get_bezier_coordinates(grid, cellid)
-        set_bezier_operator!(fv, extr)
+        Xᴮ, wᴮ = get_bezier_coordinates(grid, cellid)
+        w = getweights(grid, cellid)
+
+        set_bezier_operator!(fv, w.*extr)
 
         integrate_traction_force!(fe, Xᴮ, w, traction, fv, faceid)
         assemble!(assembler, celldofs, ke, fe)
@@ -131,10 +133,11 @@ function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vec
     for cellid in 1:getncells(dh.grid)
         
         extr = dh.grid.beo[cellid]
-        Xᴮ, w = get_bezier_coordinates(dh.grid, cellid)
-        
-        set_bezier_operator!(cv, extr)
-        reinit!(cv, (Xᴮ, w))
+        Xᴮ, wᴮ = get_bezier_coordinates(dh.grid, cellid)
+        w = getweights(dh.grid, cellid)
+
+        set_bezier_operator!(cv, w.*extr)
+        reinit!(cv, (Xᴮ, wᴮ))
         celldofs!(celldofs, dh, cellid)
 
         ue = u[celldofs]

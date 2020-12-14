@@ -1,5 +1,6 @@
 using IGA
 using Test
+using LinearAlgebra
 
 #Returns the bspline values for specific coordinate in a cell
 function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pdim}) where {pdim,sdim}
@@ -43,17 +44,16 @@ end
 
     reorder = IGA._bernstein_ordering(ip)
 
-    qr = QuadratureRule{dim,RefCube}(1)
+    qr = QuadratureRule{dim,RefCube}(2)
 
     cv = BezierCellValues( CellScalarValues(qr, ip) )
 
     #Try some different cells
-    for cellnum in [3]
+    for cellnum in [1,3,5]
         Xb, wb = get_bezier_coordinates(grid, cellnum)
         C = get_extraction_operator(grid, cellnum)
         w = getweights(grid, cellnum)
-        @show Diagonal(w)
-        @show C
+
         set_bezier_operator!(cv, w.*C)
         reinit!(cv, Xb, wb)
 
