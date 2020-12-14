@@ -430,7 +430,7 @@ function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int})
 
 	cp = [Vec((-1.0,   0.0)), Vec((-1.0, sqrt(2)-1)), Vec((1-sqrt(2),1.0)), Vec((0.0,1.0)), Vec((-2.5,   0.0)), Vec((-2.5,   0.75)), Vec((-0.75,   2.5)), Vec((0.0,   2.5)), Vec((-4.0,   0.0)), Vec((-4.0,   4.0)), Vec((-4.0,   4.0)),   Vec((0.0,   4.0))]
 	w = Float64[1, 0.5(1 + 1/sqrt(2)), 0.5(1 + 1/sqrt(2)), 1,1,1,1, 1,1,1,1,1]
-	w .= 1.0
+	#w .= 1.0
 
     knot_vectors = (Float64[0, 0, 0, 1/2, 1, 1, 1], Float64[0, 0, 0, 1, 1, 1])
     orders = (2,2)

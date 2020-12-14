@@ -87,7 +87,7 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         # Furthermore, we pass the bezier extraction operator to the CellValues/Beziervalues.
         set_bezier_operator!(cv, w.*extr)
         
-        integrate_element!(ke, Xᴮ, w, stiffmat, cv)
+        integrate_element!(ke, Xᴮ, wᴮ, stiffmat, cv)
         assemble!(assembler, celldofs, ke, fe)
     end
 
@@ -104,7 +104,7 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 
         set_bezier_operator!(fv, w.*extr)
 
-        integrate_traction_force!(fe, Xᴮ, w, traction, fv, faceid)
+        integrate_traction_force!(fe, Xᴮ, wᴮ, traction, fv, faceid)
         assemble!(assembler, celldofs, ke, fe)
     end
 

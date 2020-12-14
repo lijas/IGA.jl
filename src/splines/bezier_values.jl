@@ -94,14 +94,14 @@ function _cellvalues_bezier_extraction!(cv_store::JuAFEM.Values{dim_s}, cv_bezie
 
 end
 
-function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T,CV<:JuAFEM.FaceValues}
+function JuAFEM.reinit!(bcv::BezierFaceValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T,CV<:JuAFEM.FaceValues}
     JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
     bcv.cv_store.current_face[] = faceid
 
     _cellvalues_bezier_extraction!(bcv.cv_store, bcv.cv_bezier, bcv.current_beo[], faceid)
 end
 
-function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T,CV<:JuAFEM.CellValues}
+function JuAFEM.reinit!(bcv::BezierCellValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T,CV<:JuAFEM.CellValues}
     JuAFEM.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
 
     _cellvalues_bezier_extraction!(bcv.cv_store, bcv.cv_bezier, bcv.current_beo[], 1)
