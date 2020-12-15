@@ -45,7 +45,7 @@ end;
 function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
     n_basefuncs = getnbasefunctions(fv)
 
-    reinit!(fv, Xᴮ, w, faceid) ## Reinit cellvalues by passsing both bezier coords and weights
+    reinit!(fv, (Xᴮ, w), faceid) ## Reinit cellvalues by passsing both bezier coords and weights
 
     A = 0.0
     for q_point in 1:getnquadpoints(fv)
@@ -169,7 +169,7 @@ end;
 # In this example, we will generate the patch called "plate with hole". Note, currently this function can only generate the patch with second order basefunctions. 
 function solve()
     orders = (2,2) # Order in the ξ and η directions .
-    nels = (4,3) # Number of elements
+    nels = (20,10) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
 
     # Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this 
@@ -226,7 +226,9 @@ function solve()
     # L2Projector only works with scalar fields.
 
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
-
+    for s in cellstresses
+        @show s[2]
+    end
     csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
     projector = L2Projector(csv, ip, grid)
     σ_nodes = project(cellstresses, projector)
@@ -242,3 +244,4 @@ end;
 # Call the function
 solve()
 
+1==1

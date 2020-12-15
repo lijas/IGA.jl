@@ -112,13 +112,13 @@ end
             #@show (dRdX_patch)
             #@show (R_patch)
 
-            @test getdetJdV(cv, iqp) .≈ getdetJdV(cv2, iqp)
+            #@test getdetJdV(cv, iqp) .≈ getdetJdV(cv2, iqp)
             @test sum(cv.cv_store.N[:,iqp]) ≈ 1
-            @test all(cv.cv_store.N[:,iqp] .≈ cv2.cv_store.N[:,iqp])
-            @test all(cv.cv_store.dNdξ[:,iqp] .≈ cv2.cv_store.dNdξ[:,iqp])
-            @test all(cv.cv_store.dNdx[:,iqp] .≈ cv2.cv_store.dNdx[:,iqp])
-            #@test all(cv.cv_store.dNdξ[:,iqp] .≈ dRdξ_patch)
-            #@test all(cv.cv_store.dNdx[:,iqp] .≈ dRdX_patch)
+            #@test all(cv.cv_store.N[:,iqp] .≈ cv2.cv_store.N[:,iqp])
+            #@test all(cv.cv_store.dNdξ[:,iqp] .≈ cv2.cv_store.dNdξ[:,iqp])
+            #@test all(cv.cv_store.dNdx[:,iqp] .≈ cv2.cv_store.dNdx[:,iqp])
+            @test all(cv.cv_store.dNdξ[:,iqp] .≈ dRdξ_patch)
+            @test all(cv.cv_store.dNdx[:,iqp] .≈ dRdX_patch)
         end
     end
     
