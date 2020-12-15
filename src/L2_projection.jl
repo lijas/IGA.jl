@@ -25,10 +25,11 @@ function JuAFEM._assemble_L2_matrix(fe_values::BezierCellValues, set, dh)
 
         fill!(Me, 0)
         extr = dh.grid.beo[cellnum]
-        Xᴮ, w = get_bezier_coordinates(dh.grid, cellnum)
+        Xᴮ, wᴮ = get_bezier_coordinates(dh.grid, cellnum)
+        w = getweights(dh.grid, cellnum)
         
-        set_bezier_operator!(fe_values, extr)
-        reinit!(fe_values, (Xᴮ, w))
+        set_bezier_operator!(fe_values, w.*extr)
+        reinit!(fe_values, (Xᴮ, wᴮ))
 
         ## ∭( v ⋅ u )dΩ
         for q_point = 1:getnquadpoints(fe_values)
@@ -65,10 +66,11 @@ function JuAFEM._project(vars, proj::L2Projector{<:BezierCellValues}, M::Integer
         fill!(fe, 0)
         
         extr = proj.dh.grid.beo[cellnum]
-        Xᴮ, w = get_bezier_coordinates(proj.dh.grid, cellnum)
+        Xᴮ, wᴮ = get_bezier_coordinates(proj.dh.grid, cellnum)
+        w = getweights(proj.dh.grid, cellnum)
         
-        set_bezier_operator!(fe_values, extr)
-        reinit!(fe_values, (Xᴮ, w))
+        set_bezier_operator!(fe_values, w.*extr)
+        reinit!(fe_values, (Xᴮ, wᴮ))
 
         cell_vars = vars[cellnum]
 

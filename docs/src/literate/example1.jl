@@ -84,7 +84,7 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         # we also require the cell weights, and we need to transform them to the bezier mesh. 
         extr = grid.beo[cellid] # Extraction operator
         X = getcoordinates(grid.grid, cellid) #Nurbs coords
-        w = IGA.getweights(grid, cellid)       #Nurbs weights
+        w = getweights(grid, cellid)       #Nurbs weights
         wᴮ = compute_bezier_points(extr, w)
         Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)
 
