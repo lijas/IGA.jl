@@ -8,6 +8,7 @@ using Reexport
 using LinearAlgebra
 using WriteVTK
 import SparseArrays
+using StaticArrays
 
 export BezierExtractionOperator
 export BezierCell

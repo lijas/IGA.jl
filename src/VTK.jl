@@ -35,7 +35,8 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid{dim,C,T}) 
     return vtkfile
 end
 
-function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler{dim,T,G}, u::Vector, suffix="") where {dim,C,T,G<:BezierGrid}
+function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler{dim,T,G}, u::Vector, suffix="") where {dim,T,G<:BezierGrid}
+	C = JuAFEM.getcelltype(dh.grid)
 	@assert isconcretetype(C)
 	N = JuAFEM.nnodes(C)
 
@@ -61,7 +62,7 @@ function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler{dim,T,G}, u::Vecto
                 eldofs = zeros(Int, n)
                 _celldofs = celldofs!(eldofs, dh, cellnum)
 				
-				ub = reinterpret(NTuple{field_dim,T}, u[_celldofs[offset]])
+				ub = reinterpret(SVector{field_dim,T}, u[_celldofs[offset]])
 
 				_distribute_vtk_point_data!(dh.grid.beo[cellnum], data, ub, nodecount)
 				nodecount += length(cell.nodes)
@@ -77,7 +78,7 @@ function _distribute_vtk_point_data!(bezier_extraction,
                                     data::Matrix, 
                                     nodevalues::AbstractVector{ <: Union{SymmetricTensor{order,dim,T,M}, 
                                                                          Tensor{order,dim,T,M}, 
-                                                                         NTuple{M,T}}},
+                                                                         SVector{M,T}}},
                                     nodecount::Int) where {order,dim,M,T}
 
 	#Transform into values on bezier mesh
@@ -99,7 +100,7 @@ function WriteVTK.vtk_point_data(
 	vtkfile::WriteVTK.DatasetFile, 
 	cpvalues::Vector{<:Union{SymmetricTensor{order,dim,T,M}, 
                              Tensor{order,dimv,T,M}, 
-                             NTuple{M,T}}}, 
+                             SVector{M,T}}}, 
 	name::AbstractString, 
 	grid::BezierGrid{dim,C}) where {order,dimv,dim,C,T,M}
 
