@@ -209,6 +209,13 @@ function solve()
     # L2Projector only works with scalar fields.
 
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
+    sigx = []
+    for stress in cellstresses
+        for s in stress
+            push!(sigx, s[1,1])
+        end
+    end
+    @show maximum(sigx)
 
     csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
     projector = L2Projector(csv, ip, grid)
