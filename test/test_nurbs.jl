@@ -16,18 +16,18 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
         
         #Map to parametric domain from parent domain
         ξηζ = [0.5*((Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]])*xi[d] + (Ξ[d][_ni[d]+1] + Ξ[d][_ni[d]])) for d in 1:pdim]
-        _dξdξᴾ = Diagonal([0.5*(Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]]) for d in 1:dim])
-        dξdξᴾ = Tensor{2,pdim}(Tuple((_dξdξᴾ)))
+        _dξdξᴾ = [0.5*(Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]]) for d in 1:pdim]
+        dξdξᴾ = Tensor{2,pdim}(Tuple((_dξdξᴾ[1], 0.0, 0.0, _dξdξᴾ[2])))
 
         value = 1.0
         deriv = ones(Float64, pdim)
         for d in 1:pdim
-            value *= IGA._bspline_basis_value_alg1(orders[d], Ξ[d], ni[d], ξηζ[d])
+            value *= IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
             for d2 in 1:pdim
                 if d == d2
-                    deriv[d2] *= gradient( (xi) -> IGA._bspline_basis_value_alg1(orders[d], Ξ[d], ni[d], xi), ξηζ[d])
+                    deriv[d2] *= gradient( (xi) -> IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], xi), ξηζ[d])
                 else
-                    deriv[d2] *= IGA._bspline_basis_value_alg1(orders[d], Ξ[d], ni[d], ξηζ[d])
+                    deriv[d2] *= IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
                 end
             end
         end

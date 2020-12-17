@@ -24,7 +24,6 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w�
     reinit!(cv, (Xᴮ, wᴮ)) ## Reinit cellvalues by passsing both bezier coords and weights
 
     δɛ = [zero(SymmetricTensor{2,2,Float64}) for i in 1:n_basefuncs]
-    V = 0
     for q_point in 1:getnquadpoints(cv)
 
         for i in 1:n_basefuncs
@@ -32,14 +31,12 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w�
         end
 
         dΩ = getdetJdV(cv, q_point)
-        V += dΩ
         for i in 1:n_basefuncs
             for j in 1:n_basefuncs
                 ke[i, j] += (δɛ[i] ⊡ C ⊡ δɛ[j]) * dΩ
             end
         end
     end
-    return V
 end;
 
 function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
@@ -47,18 +44,13 @@ function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float6
 
     reinit!(fv, (Xᴮ, wᴮ), faceid) ## Reinit cellvalues by passsing both bezier coords and weights
 
-    A = 0.0
     for q_point in 1:getnquadpoints(fv)
         dA = getdetJdV(fv, q_point)
-        A += dA
-        @show t
         for i in 1:n_basefuncs
             δu = shape_value(fv, q_point, i)
-            @show δu
             fe[i] += t ⋅ δu * dA
         end
     end
-    return A
 end;
 
 # The assembly loop is also written in almost the same way as in a standard finite element code. The key differences will be described in the next paragraph,
@@ -74,7 +66,6 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
     ke = zeros(n, n)  # element stiffness matrix
 
     ## Assemble internal forces
-    V = 0.0
     for cellid in 1:getncells(grid)
         fill!(fe, 0.0)
         fill!(ke, 0.0)
@@ -95,12 +86,11 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         # Furthermore, we pass the bezier extraction operator to the CellValues/Beziervalues.
         set_bezier_operator!(cv, w.*extr)
         
-        V += integrate_element!(ke, Xᴮ, wᴮ, stiffmat, cv)
+        integrate_element!(ke, Xᴮ, wᴮ, stiffmat, cv)
         assemble!(assembler, celldofs, ke, fe)
     end
 
     ## Assamble external forces
-    A = 0.0
     for (cellid, faceid) in getfaceset(grid, "left")
         fill!(fe, 0.0)
 
@@ -112,12 +102,10 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 
         set_bezier_operator!(fv, w.*extr)
 
-        A += integrate_traction_force!(fe, Xᴮ, wᴮ, traction, fv, faceid)
+        integrate_traction_force!(fe, Xᴮ, wᴮ, traction, fv, faceid)
         f[celldofs] += fe
-        @show sum(f)
     end
 
-    @show V,A
 
     return K, f
 end;
@@ -237,5 +225,3 @@ end;
 
 # Call the function
 solve()
-
-1==1
