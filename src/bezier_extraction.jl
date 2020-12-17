@@ -113,7 +113,6 @@ function _compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
 
 	#The last C-matrix is not used
 	#pop!(C)
-	@show C[2]
 	C = SparseArrays.sparse.(C[1:nb])
 	return C, nb
 end

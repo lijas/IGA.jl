@@ -1,6 +1,3 @@
-using IGA
-using Test
-using LinearAlgebra
 
 #Returns the bspline values for specific coordinate in a cell
 function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pdim}, reorder) where {pdim,sdim}
@@ -40,14 +37,16 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
     return B[reorder], dBdξ[reorder]
 end
 
-#@testset "nurbs 1" begin
+@testset "Nurbs 1" begin
 
     dim = 2
     orders = (2,2)
     nels = (4,3)
     nb_per_cell = prod(orders.+1)
 
-    #nurbsmesh = generate_nurbs_patch(:cube, nels, orders; size = (5.0,4.0))
+    ##
+    # Build the problem
+    ##
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
 
     grid = BezierGrid(nurbsmesh)
@@ -59,9 +58,9 @@ end
     qr = QuadratureRule{dim,RefCube}(3)
     qr_face = QuadratureRule{dim-1,RefCube}(3)
 
-    cv = BezierCellValues( CellScalarValues(qr, ip) )
     fv = BezierFaceValues( FaceScalarValues(qr_face, ip) )
-    cv2 = BezierCellValues( CellScalarValues(qr, ip) )
+    cv  = BezierCellValues( CellScalarValues(qr, ip) )
+    cv_vector = BezierCellValues( CellVectorValues(qr, ip) )
 
     #Try some different cells
     for cellnum in [1,4,5]
@@ -73,8 +72,8 @@ end
         set_bezier_operator!(cv, w.*C)
         reinit!(cv, Xb, wb)
 
-        set_bezier_operator!(cv2, C)
-        reinit!(cv2, Xb)
+        set_bezier_operator!(cv_vector, w.*C)
+        reinit!(cv_vector, Xb, wb)
 
         for (iqp, ξ) in enumerate(qr.points)
 
@@ -98,35 +97,41 @@ end
                 dRdX_patch[i] = dRdξ_patch[i] ⋅ inv(J)
             end 
 
-            #Get the NURBS from the CellValues
-            #R_CV = shape_gradient.((cv,), iqp, 1:nb_per_cell)
-            #R_CV2 = shape_gradient.((cv2,), iqp, 1:nb_per_cell)
-
-            #@show (cv.cv_store.N)
-            #@show (R_patch)
-
-            #@show (cv.cv_store.dNdξ)
-            #@show (dRdξ_patch)
-
-            #@show (cv.cv_store.dNdx)
-            #@show (dRdX_patch)
-            #@show (R_patch)
-
-            #@test getdetJdV(cv, iqp) .≈ getdetJdV(cv2, iqp)
+            @test dV_patch ≈ getdetJdV(cv, iqp)
             @test sum(cv.cv_store.N[:,iqp]) ≈ 1
-            #@test all(cv.cv_store.N[:,iqp] .≈ cv2.cv_store.N[:,iqp])
-            #@test all(cv.cv_store.dNdξ[:,iqp] .≈ cv2.cv_store.dNdξ[:,iqp])
-            #@test all(cv.cv_store.dNdx[:,iqp] .≈ cv2.cv_store.dNdx[:,iqp])
             @test all(cv.cv_store.dNdξ[:,iqp] .≈ dRdξ_patch)
             @test all(cv.cv_store.dNdx[:,iqp] .≈ dRdX_patch)
+
+            #Check if VectorValues is same as ScalarValues
+            basefunc_count = 1
+            for i in 1:nb_per_cell
+                for comp in 1:dim
+                    N_comp = zeros(Float64, dim)
+                    N_comp[comp] = cv.cv_store.N[i, iqp]
+                    _N = Vec{dim,Float64}((N_comp...,))
+                    
+                    @test all(cv_vector.cv_store.N[basefunc_count, iqp] .≈ _N)
+                    
+                    dN_comp = zeros(Float64, dim, dim)
+                    dN_comp[comp, :] = cv.cv_store.dNdξ[i, iqp]
+                    _dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
+                    
+                    @test all(cv_vector.cv_store.dNdξ[basefunc_count, iqp] .≈ _dNdξ)
+
+                    dN_comp = zeros(Float64, dim, dim)
+                    dN_comp[comp, :] = cv.cv_store.dNdx[i, iqp]
+                    _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
+                    
+                    @test all(cv_vector.cv_store.dNdx[basefunc_count, iqp] .≈ _dNdx)
+
+                    basefunc_count += 1
+                end
+            end
+
         end
     end
     
-    
     addfaceset!(grid, "face1", (x)-> x[1] == -4.0)
-    @show length(getfaceset(grid, "face1"))
-    A_cv = 0.0
-    A_patch = 0.0
     for (cellnum, faceidx) in getfaceset(grid, "face1")
 
         Xb, wb = get_bezier_coordinates(grid, cellnum)
@@ -153,26 +158,20 @@ end
             end
 
             J = sum(X .⊗ dRdξ_patch)
-            dV_patch = det(J)*qr_face_side.weights[iqp]
+            dV_patch = norm(JuAFEM.weighted_normal(J, fv, faceidx))*qr_face_side.weights[iqp]
 
             dRdX_patch = similar(dNdξ)
             for i in 1:nb_per_cell
                 dRdX_patch[i] = dRdξ_patch[i] ⋅ inv(J)
             end 
 
-            global A_cv += getdetJdV(fv, iqp)
-            global A_patch+= dV_patch
-
-            #@show dV_patch, getdetJdV(cv2, iqp)
+            @test dV_patch ≈ getdetJdV(fv, iqp)
             @test sum(fv.cv_store.N[:,iqp, faceidx]) ≈ 1
             @test all(fv.cv_store.dNdξ[:,iqp, faceidx] .≈ dRdξ_patch)
             @test all(fv.cv_store.dNdx[:,iqp, faceidx] .≈ dRdX_patch)
         end
     end
 
-    @show A_cv, A_patch
-    
-
-#end
+end
 
 

@@ -1,4 +1,4 @@
-export getnbasefunctions, NURBSMesh, parent_to_parametric_map
+export NURBSMesh, parent_to_parametric_map
 
 """
 Defines a NURBS patch, containing knot vectors, orders, controlpoints, weights and connectivity arrays.

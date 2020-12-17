@@ -18,10 +18,10 @@ using JuAFEM, IGA, LinearAlgebra
 # These functions will be the same as for a normal finite elment problem, but
 # with the difference that we need the cell coorinates AND cell weights (the weights from the NURBS shape functions), to reinitilize the shape values, dNdx.
 # Read this [`page`](../bezier_values.md), to see how the shape values are reinitilized. 
-function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
+function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
     n_basefuncs = getnbasefunctions(cv)
 
-    reinit!(cv, (Xᴮ, w)) ## Reinit cellvalues by passsing both bezier coords and weights
+    reinit!(cv, (Xᴮ, wᴮ)) ## Reinit cellvalues by passsing both bezier coords and weights
 
     δɛ = [zero(SymmetricTensor{2,2,Float64}) for i in 1:n_basefuncs]
     V = 0
@@ -42,10 +42,10 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w:
     return V
 end;
 
-function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
+function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
     n_basefuncs = getnbasefunctions(fv)
 
-    reinit!(fv, (Xᴮ, w), faceid) ## Reinit cellvalues by passsing both bezier coords and weights
+    reinit!(fv, (Xᴮ, wᴮ), faceid) ## Reinit cellvalues by passsing both bezier coords and weights
 
     A = 0.0
     for q_point in 1:getnquadpoints(fv)
@@ -213,11 +213,7 @@ function solve()
     traction = Vec((-10.0, 0.0))
     K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)
 
-    @show norm(K)
-    @show sum(f)
-
     # Solve
-
     apply!(K, f, ch)
     u = K\f
     
@@ -226,9 +222,7 @@ function solve()
     # L2Projector only works with scalar fields.
 
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
-    for s in cellstresses
-        @show s[2]
-    end
+
     csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
     projector = L2Projector(csv, ip, grid)
     σ_nodes = project(cellstresses, projector)
