@@ -1,12 +1,11 @@
 using JuAFEM, IGA, LinearAlgebra
 
-function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
+function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
     n_basefuncs = getnbasefunctions(cv)
 
-    reinit!(cv, (Xᴮ, w)) ## Reinit cellvalues by passsing both bezier coords and weights
+    reinit!(cv, (Xᴮ, wᴮ)) ## Reinit cellvalues by passsing both bezier coords and weights
 
     δɛ = [zero(SymmetricTensor{2,2,Float64}) for i in 1:n_basefuncs]
-
     for q_point in 1:getnquadpoints(cv)
 
         for i in 1:n_basefuncs
@@ -22,10 +21,10 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w:
     end
 end;
 
-function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
+function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
     n_basefuncs = getnbasefunctions(fv)
 
-    reinit!(fv, Xᴮ, w, faceid) ## Reinit cellvalues by passsing both bezier coords and weights
+    reinit!(fv, (Xᴮ, wᴮ), faceid) ## Reinit cellvalues by passsing both bezier coords and weights
 
     for q_point in 1:getnquadpoints(fv)
         dA = getdetJdV(fv, q_point)
@@ -55,30 +54,32 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 
         extr = grid.beo[cellid] # Extraction operator
         X = getcoordinates(grid.grid, cellid) #Nurbs coords
-        w = IGA.getweights(grid, cellid)       #Nurbs weights
+        w = getweights(grid, cellid)       #Nurbs weights
         wᴮ = compute_bezier_points(extr, w)
         Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)
 
-        set_bezier_operator!(cv, extr)
+        set_bezier_operator!(cv, w.*extr)
 
-        integrate_element!(ke, Xᴮ, w, stiffmat, cv)
+        integrate_element!(ke, Xᴮ, wᴮ, stiffmat, cv)
         assemble!(assembler, celldofs, ke, fe)
     end
 
     # Assamble external forces
     for (cellid, faceid) in getfaceset(grid, "left")
         fill!(fe, 0.0)
-        fill!(ke, 0.0)
 
         celldofs!(celldofs, dh, cellid)
 
         extr = grid.beo[cellid]
-        Xᴮ, w = get_bezier_coordinates(grid, cellid)
-        set_bezier_operator!(fv, extr)
+        Xᴮ, wᴮ = get_bezier_coordinates(grid, cellid)
+        w = getweights(grid, cellid)
 
-        integrate_traction_force!(fe, Xᴮ, w, traction, fv, faceid)
-        assemble!(assembler, celldofs, ke, fe)
+        set_bezier_operator!(fv, w.*extr)
+
+        integrate_traction_force!(fe, Xᴮ, wᴮ, traction, fv, faceid)
+        f[celldofs] += fe
     end
+
 
     return K, f
 end;
@@ -102,10 +103,11 @@ function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vec
     for cellid in 1:getncells(dh.grid)
 
         extr = dh.grid.beo[cellid]
-        Xᴮ, w = get_bezier_coordinates(dh.grid, cellid)
+        Xᴮ, wᴮ = get_bezier_coordinates(dh.grid, cellid)
+        w = getweights(dh.grid, cellid)
 
-        set_bezier_operator!(cv, extr)
-        reinit!(cv, (Xᴮ, w))
+        set_bezier_operator!(cv, w.*extr)
+        reinit!(cv, (Xᴮ, wᴮ))
         celldofs!(celldofs, dh, cellid)
 
         ue = u[celldofs]
@@ -123,7 +125,7 @@ end;
 
 function solve()
     orders = (2,2) # Order in the ξ and η directions .
-    nels = (10,10) # Number of elements
+    nels = (20,10) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
 
     grid = BezierGrid(nurbsmesh)
@@ -134,11 +136,11 @@ function solve()
     addfaceset!(grid, "right", (x) -> x[1] ≈ 0.0)
 
     ip = BernsteinBasis{2,orders}()
-    qr_cell = QuadratureRule{2,RefCube}(3)
+    qr_cell = QuadratureRule{2,RefCube}(4)
     qr_face = QuadratureRule{1,RefCube}(3)
 
-    cv = BezierValues( CellVectorValues(qr_cell, ip) )
-    fv = BezierValues( FaceVectorValues(qr_face, ip) )
+    cv = BezierCellValues( CellVectorValues(qr_cell, ip) )
+    fv = BezierFaceValues( FaceVectorValues(qr_face, ip) )
 
     dh = MixedDofHandler(grid)
     push!(dh, :u, 2, ip)
@@ -161,7 +163,7 @@ function solve()
 
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
 
-    csv = BezierValues( CellScalarValues(qr_cell, ip) )
+    csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
     projector = L2Projector(csv, ip, grid)
     σ_nodes = project(cellstresses, projector)
 
