@@ -1,5 +1,9 @@
 export BSplineBasis
 
+"""
+Interpolation for bsplines.
+    Not really used, since bezier-interpolation + bezier-extraction is prefered. 
+"""
 struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order}
 	knot_vector::NTuple{dim,Vector{T}}
 
@@ -9,9 +13,11 @@ struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,orde
         @assert(first(first(knots))==T(-1))
 		return new{dim,T,Tuple(order)}(knots)
     end
+
     function BSplineBasis(knots::Vector{T}, order::Int) where {T} 
 		return new{1,T,Tuple(order)}((knots,))
     end
+    
 end
 
 getnbasefunctions_dim(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = Tuple([length(basis.knot_vector[i]) - order[i] - 1 for i in 1:dim])
@@ -39,9 +45,6 @@ end
 const BSplineCurve{sdim,T} = BSplineGeometry{1,sdim,T}
 const BSplineSurface{sdim,T} = BSplineGeometry{2,sdim,T}
 
-"""
-Calculates 
-"""
 function JuAFEM.value(curve::BSplineGeometry{pdim,sdim,T}, xi::Vec{sdim,T}) where {pdim,sdim,T}
 
 	S = zero(Vec{dim,T})
@@ -62,6 +65,7 @@ end
 
 """
 Algorithm for calculating one basis functions value, using Cox-debor recursion formula
+    From NURBS-book, alg2.?
 """
 function _bspline_basis_value_alg1(p::Int, knot::Vector{Float64}, i::Int, xi)
 
@@ -147,8 +151,8 @@ function _bspline_basis_value_alg2(p::Int,U::Vector{T},i::Int,u::T2) where {T,T2
 end
 
 """
-Algorithm that evaluates the knowspan in which u (xi) lies.
-From NURBS-bbok A2.1
+Algorithm that evaluates the knotspan in which u (xi) lies.
+From NURBS-book alg2.1
 """
 function _find_span(n::Int ,p::Int,u::T,U::Vector{T}) where T
     @assert(!(u<U[1] || u>U[end]))
@@ -176,8 +180,8 @@ end
 
 """
 Algorithm that finds non zero basis function for u (xi)
-NURBS book A2.2.    
+NURBS book alg2.2.    
 """    
 function _bspline_basis_values()
-
+    #TODO
 end

@@ -21,7 +21,7 @@ function plot_bspline_basis(basis::BSplineBasis{T}) where T
 
 end
 
-function plot_bspline_curve(curve::BSplineCurve{1,T}) where {T}
+function plot_bspline_curve(curve::IGA.BSplineCurve{1,T}) where {T}
 
 	BASIS_FUNCS_Y_OFFSET = 0.0
 	CP_Y_OFFSET = -0.2
@@ -60,7 +60,7 @@ function plot_bspline_curve(curve::BSplineCurve{1,T}) where {T}
 
 end
 
-function plot_bspline_curve(curve::BSplineCurve{dim,T}) where {dim,T}
+function plot_bspline_curve(curve::IGA.BSplineCurve{dim,T}) where {dim,T}
 
 	xivec = curve.basis.knot_vector#range(first(curve.basis.knot_vector), stop=last(curve.basis.knot_vector), length=100)
 	p = curve.basis.p
@@ -142,19 +142,41 @@ function _genometry_value(x,y,z,knot1,knot2,knot3,p1,p2,p3,control_points::Vecto
 
 end
 
-function plot_bspline_mesh(mesh::NURBSMesh{pdim,sdim,T}, u::AbstractVector = [zero(Vec{sdim,T}) for _ in 1:length(mesh.control_points)]) where {pdim,sdim,T}
+function _get_edges(pdim)
+	all(x) = x #pass through methodsd
+	if pdim == 1
+		edges = [all,]
+	elseif pdim == 2
+		edges = [[all,first], [all,last], [first,all], [last,all]]; 
+	elseif pdim == 3
+		edges = [[all,first,first], [all,last,first], [all,first,last], [all,last,last],
+				 [first,all,first], [last,all,first], [first,all,last], [last,all,last],
+				 [first,first,all], [first,last,all], [last,first,all], [last,last,all]]; 
+	end
+	return edges
+end
+
+function plot_bspline_mesh(mesh::NURBSMesh{pdim,sdim,T}, u::AbstractVector = [zero(Vec{sdim,T}) for _ in 1:length(mesh.control_points)]; kwargs...) where {pdim,sdim,T}	
+	fig = Plots.plot(; kwargs...)
+	plot_bspline_mesh!(fig, mesh, u; kwargs...)
+	return fig
+end
+
+function plot_bspline_mesh!(fig, mesh::NURBSMesh{pdim,sdim,T}, u::AbstractVector = [zero(Vec{sdim,T}) for _ in 1:length(mesh.control_points)]; cellset::Union{Vector{Int},Nothing}=nothing, kwargs...) where {pdim,sdim,T}
 
 	knot_vectors = mesh.knot_vectors; orders = mesh.orders
 	INN = mesh.INN
 	IEN = mesh.IEN
 	
-	fig=Plots.plot(reuse=false,legend=:none, axis_ratio=:equal)
+	cellset = (cellset === nothing) ? collect(1:size(IEN,2)) : cellset
 
-	for ie in 1:size(IEN,2) #Loop over all elements
+	edges = _get_edges(pdim)
 
+	for ie in cellset
+		
 		#Nurbs coord
 		basefuncs = IEN[:,ie]
-		nijk = INN[IEN[1,ie],:]
+		nijk = INN[IEN[end,ie],:]
 		
     	#Check if element i zerolength
 		for d in 1:pdim
@@ -172,27 +194,33 @@ function plot_bspline_mesh(mesh::NURBSMesh{pdim,sdim,T}, u::AbstractVector = [ze
 			knot_plot_ranges[d] = range(_first, stop=_last, length=4)
 		end
 
-    	#edge1 = surface_value.(xx, yy[1], Ref(knot1), Ref(knot2), p1,p2, Ref(mesh.control_points))
-    	#plot!(fig,getindex.(edge1,1),getindex.(edge1,2),getindex.(edge1,3), color=:black)
-
-		all(x) = x #pass through methodsddddd
-		if pdim == 1; error("not imp"); end;
-		if pdim == 2; _range_funcs = [[all,first], [all,last], [first,all], [last,all]]; end;
-		if pdim == 3; _range_funcs = [[all,first,first], [all,last,first], [all,first,last], [all,last,last],
-									[first,all,first], [last,all,first], [first,all,last], [last,all,last],
-									[first,first,all], [first,last,all], [last,first,all], [last,last,all]]; end;
-		for _funks in _range_funcs
-			_ranges = [_funks[d](knot_plot_ranges[d]) for d in 1:pdim]
-			ref_knot_vectors = [Ref(knot_vectors[d]) for d in 1:pdim]
-			edge = _genometry_value.(_ranges..., ref_knot_vectors..., orders..., Ref(mesh.control_points .+ u))
-			#plot!(fig, getindex.(edge,1), getindex.(edge,2), getindex.(edge,3), color=:black)
-			plot!(fig, [getindex.(edge,i) for i in 1:sdim]..., color=:black)
+		#Plot cell edges
+		for edge in edges
+			_ranges = [edge[d](knot_plot_ranges[d]) for d in 1:pdim]
+			edge = _genometry_value.(_ranges..., Ref.(knot_vectors)..., orders..., Ref(mesh.control_points .+ u))
+			plot!(fig, [getindex.(edge,i) for i in 1:sdim]...; kwargs...)
 		end
 
 		newpoints = mesh.control_points .+ u
-		scatter!(fig, [getindex.(newpoints[basefuncs],i) for i in 1:sdim]..., marker=:circle, color=:red)
-		scatter!(fig, [getindex.(mesh.control_points[basefuncs],i) for i in 1:sdim]..., marker=:circle, color=:green)
+		#scatter!(fig, [getindex.(newpoints[basefuncs],i) for i in 1:sdim]..., marker=:circle, color=:red)
+		#scatter!(fig, [getindex.(mesh.control_points[basefuncs],i) for i in 1:sdim]..., marker=:circle, color=:green)
 
 	end
-	display(fig)
+
+end
+
+function plot_mesh_edge!(fig, mesh::NURBSMesh{pdim,sdim,T}; edge::Int, kwargs...) where {pdim,sdim,T}
+
+	kv = mesh.knot_vectors; 
+	orders = mesh.orders
+
+	knot_plot_ranges = range.(first.(kv), last.(kv), length = 20)
+
+	edge = _get_edges(pdim)[edge]
+
+	_ranges = [edge[d](knot_plot_ranges[d]) for d in 1:pdim]
+
+	edge = _genometry_value.(_ranges..., Ref.(kv)..., orders..., Ref(mesh.control_points))
+	plot!(fig, [getindex.(edge,i) for i in 1:sdim]...; kwargs...)
+
 end

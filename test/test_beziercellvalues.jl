@@ -12,7 +12,7 @@
     qr = JuAFEM.QuadratureRule{dim,JuAFEM.RefCube}(2)
     cv = CellScalarValues(qr,b1)
     
-    bcv = BezierValues(cv)
+    bcv = BezierCellValues(cv)
     
     
     IGA.set_bezier_operator!(bcv, Cvec[1])
@@ -24,7 +24,7 @@
     
     #
     #Check if nurbs splines are equal to C*B
-    mesh = IGA.generate_nurbsmesh((10,10), order, (1.0,1.0), sdim=2)
+    mesh = IGA.generate_nurbs_patch((10,10), order, (1.0,1.0), sdim=2)
     bspline_ip = IGA.BSplineInterpolation{2,Float64}(mesh.INN, mesh.IEN, mesh.knot_vectors, mesh.orders)
     bern_ip = BernsteinBasis{2, mesh.orders}()
     
@@ -34,8 +34,8 @@
     
     cv = CellScalarValues(qr,b1)
     cv2 = CellVectorValues(qr,b1)
-    bern_cv = BezierValues(cv)
-    bern_cv2 = BezierValues(cv2)
+    bern_cv = BezierCellValues(cv)
+    bern_cv2 = BezierCellValues(cv2)
 
     
     random_coords = JuAFEM.reference_coordinates(b1) #zeros(Vec{2,T}, getnbasefunctions(bern_cv) ) #since we dont update "physcial" dNdX, coords can be random
@@ -139,7 +139,7 @@ end
     L = 10.0; b= 1.3; h = 0.1;
 
     #Check if nurbs splines are equal to C*B
-    mesh = IGA.generate_nurbsmesh((10,5,5), order, (L,b,h))
+    mesh = IGA.generate_nurbs_patch((10,5,5), order, (L,b,h))
     grid = IGA.convert_to_grid_representation(mesh)
 
     #iga with no bezier extraction
@@ -151,7 +151,7 @@ end
     Cvecs = IGA.bezier_extraction_to_vectors(C)
     qr = JuAFEM.QuadratureRule{dim,JuAFEM.RefCube}(2)
     cv = JuAFEM.CellScalarValues(qr, bern_ip)
-    bern_cv = IGA.BezierValues(cv) 
+    bern_cv = IGA.BezierCellValues(cv) 
     
     dh = JuAFEM.DofHandler(grid)
     push!(dh, :u, dim)

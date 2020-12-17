@@ -1,46 +1,12 @@
 
-export compute_bezier_extraction_operators
-export BezierExtractionOperator, compute_bezier_points
+export compute_bezier_extraction_operators, compute_bezier_points
 
+"""
+	compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1)
 
-function compute_bezier_points(Ce::AbstractMatrix{T}, control_points::AbstractVector{Vec{sdim,T}}) where {T,sdim}
-	error("dont use")
-	n_new_points = size(Ce,2)
-	bezierpoints = zeros(Vec{sdim,T}, n_new_points)
-	for i in 1:n_new_points
-		for (ic, p) in enumerate(control_points)
-			bezierpoints[i] += Ce[ic,i]*p
-		end
-	end
-	return bezierpoints
-
-end
-
-
-#function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{Vec{sdim,T}}) where {sdim,T}
-function compute_bezier_points_dim1(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}) where {T2,T}
-
-	@assert(length(control_points) == length(Ce))
-	n_points = length(first(Ce))#length(control_points)#length(first(Ce))
-	bezierpoints = zeros(T2, n_points)
-
-	for (ic, p) in enumerate(control_points)
-		ce = Ce[ic]
-
-		for i in 1:(n_points)
-			bezierpoints[i] += ce[i]*control_points[ic]
-		end
-	end
-
-	return bezierpoints
-
-end
-
+Given a BezierExtractionOperator and control points for a cell, compute the bezier controlpoints.
+"""
 function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1) where {T2,T}
-
-	if dim==1
-		compute_bezier_points_dim1(Ce, control_points)
-	end
 
 	@assert(length(control_points) == length(Ce)*dim)
 	n_points = length(first(Ce))#length(control_points)#length(first(Ce))
@@ -60,42 +26,50 @@ function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::
 
 end
 
-compute_bezier_extraction_operators(o::NTuple{pdim,Int}, U::NTuple{pdim,Vector{T}}) where {pdim,T} = 
-	compute_bezier_extraction_operators(o...,U...)
+"""
+	compute_bezier_extraction_operators2(orders::NTuple{pdim,Int}, knots::NTuple{pdim,Vector{T}})
 
-function compute_bezier_extraction_operators(p::Int, q::Int, r::Int, knot1::Vector{T}, knot2::Vector{T}, knot3::Vector{T}) where T
-
-	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
-	Ce2, nbe2 = compute_bezier_extraction_operators(q, knot2)
-	Ce3, nbe3 = compute_bezier_extraction_operators(r, knot3)
-	C = Vector{eltype(Ce1)}()
-	for k in 1:nbe3
-		for j in 1:nbe2
-			for i in 1:nbe1
-				_C = kron(Ce2[j],Ce1[i])
-				_C = kron(Ce3[k], _C)
-				push!(C,_C)
+Computes the bezier extraction operator in each parametric direction, and uses the kron operator to combine them.
+"""
+@generated function compute_bezier_extraction_operators(orders::NTuple{pdim,Int}, knots::NTuple{pdim,Vector{T}}) where {pdim,T} 
+	quote
+		#Get bezier extraction vector in each dimension
+		#
+		Ce = Vector{SparseArrays.SparseMatrixCSC{Float64,Int64}}[]
+		nels = Int[]
+		for d in 1:pdim
+			_Ce, _nel = _compute_bezier_extraction_operators(orders[d], knots[d])
+			push!(Ce, _Ce)
+			push!(nels, _nel)
+		end
+		
+		#Tensor prodcut of the bezier extraction operators
+		#
+		C = Vector{eltype(first(Ce))}()
+		Base.Cartesian.@nloops $pdim i (d)->1:nels[d] begin
+			#kron not defined for 1d, so special case for pdim==1
+			if $pdim == 1
+				_C = Ce[1][i_1]
+			else
+				_C = Base.Cartesian.@ncall $pdim kron (d)->Ce[$pdim-d+1][i_{$pdim-d+1}]
 			end
+			push!(C, _C)
 		end
+
+		#Reorder
+		#
+		ordering = _bernstein_ordering(BernsteinBasis{pdim,orders}())
+		nel = prod(nels)
+		C_reorder = Vector{eltype(first(Ce))}()
+		for i in 1:nel
+			push!(C_reorder, C[i][ordering,ordering])
+		end
+
+		return C_reorder, nel
 	end
-	return C, nbe1*nbe2*nbe3
 end
 
-function compute_bezier_extraction_operators(p::Int, q::Int, knot1::Vector{T}, knot2::Vector{T}) where T
-
-	Ce1, nbe1 = compute_bezier_extraction_operators(p, knot1)
-	Ce2, nbe2 = compute_bezier_extraction_operators(q, knot2)
-	C = Vector{eltype(Ce1)}()
-	for j in 1:nbe2
-		for i in 1:nbe1
-			_C = kron(Ce2[j],Ce1[i])
-			push!(C,_C)
-		end
-	end
-	return C, nbe1*nbe2
-end
-
-function compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
+function _compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
 	a = p+1
 	b = a+1
 	nb = 1
@@ -176,12 +150,12 @@ function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdi
 
 end
 
-function knotinsertion(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
+function knotinsertion(Ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
 
-    n = length(ξ) - p - 1
+    n = length(Ξ) - p - 1
     m = n+1
 
-    k = findfirst(ξᵢ -> ξᵢ>ξᴺ, ξ)-1
+    k = findfirst(ξᵢ -> ξᵢ>ξᴺ, Ξ)-1
 
     @assert((k>p))
     C = zeros(T,m,n)
@@ -192,7 +166,7 @@ function knotinsertion(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
         if i<=k-p
             α = 1.0
         elseif k-p+1<=i<=k
-            α = (ξᴺ - ξ[i])/(ξ[i+p] - ξ[i])
+            α = (ξᴺ - Ξ[i])/(Ξ[i+p] - Ξ[i])
         elseif i>=k+1
              α = 0.0
         end
@@ -201,7 +175,7 @@ function knotinsertion(ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
     end
     C[m,n] = 1
     
-    new_knot_vector = copy(ξ)
+    new_knot_vector = copy(Ξ)
     insert!(new_knot_vector,k+1,ξᴺ)
     return C, new_knot_vector
 end
