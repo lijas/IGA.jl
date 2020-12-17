@@ -4,7 +4,7 @@ using IGA
 include("generate.jl")
 
 GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
-    "example1.md",
+    "plate_with_hole.md",
     )]
 
 makedocs(
@@ -15,7 +15,7 @@ makedocs(
     strict = false,
     pages = Any[
         "Home" => "index.md",
-        "Manual" => ["bezier_values.md"],
+        "Manual" => ["bsplines_nurbs.md", "bezier_extraction.md"],
         "Examples" => GENERATEDEXAMPLES,
     ]
 )
@@ -29,5 +29,5 @@ makedocs(
 deploydocs(
     repo = "github.com/lijas/IGA.jl.git",
     push_preview=true,
-    devbranch = "refac_ghp"
+    devbranch = "master"
 )

@@ -3,7 +3,7 @@ name: Documentation
 on:
   push:
     branches:
-      - 'refac_ghp'
+      - 'master'
     tags: '*'
   pull_request:
 
