@@ -18,13 +18,12 @@ using JuAFEM, IGA, LinearAlgebra
 # These functions will be the same as for a normal finite elment problem, but
 # with the difference that we need the cell coorinates AND cell weights (the weights from the NURBS shape functions), to reinitilize the shape values, dNdx.
 # Read this [`page`](../bezier_values.md), to see how the shape values are reinitilized. 
-function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
+function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
     n_basefuncs = getnbasefunctions(cv)
 
-    reinit!(cv, (Xᴮ, w)) ## Reinit cellvalues by passsing both bezier coords and weights
+    reinit!(cv, (Xᴮ, wᴮ)) ## Reinit cellvalues by passsing both bezier coords and weights
 
     δɛ = [zero(SymmetricTensor{2,2,Float64}) for i in 1:n_basefuncs]
-
     for q_point in 1:getnquadpoints(cv)
 
         for i in 1:n_basefuncs
@@ -40,10 +39,10 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w:
     end
 end;
 
-function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
+function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
     n_basefuncs = getnbasefunctions(fv)
 
-    reinit!(fv, Xᴮ, w, faceid) ## Reinit cellvalues by passsing both bezier coords and weights
+    reinit!(fv, (Xᴮ, wᴮ), faceid) ## Reinit cellvalues by passsing both bezier coords and weights
 
     for q_point in 1:getnquadpoints(fv)
         dA = getdetJdV(fv, q_point)
@@ -76,7 +75,7 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         # we also require the cell weights, and we need to transform them to the bezier mesh. 
         extr = grid.beo[cellid] # Extraction operator
         X = getcoordinates(grid.grid, cellid) #Nurbs coords
-        w = IGA.getweights(grid, cellid)       #Nurbs weights
+        w = getweights(grid, cellid)       #Nurbs weights
         wᴮ = compute_bezier_points(extr, w)
         Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)
 
@@ -85,26 +84,28 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 #md #     which return the bezier coorinates and weights directly.
 
         # Furthermore, we pass the bezier extraction operator to the CellValues/Beziervalues.
-        set_bezier_operator!(cv, extr)
+        set_bezier_operator!(cv, w.*extr)
         
-        integrate_element!(ke, Xᴮ, w, stiffmat, cv)
+        integrate_element!(ke, Xᴮ, wᴮ, stiffmat, cv)
         assemble!(assembler, celldofs, ke, fe)
     end
 
     ## Assamble external forces
     for (cellid, faceid) in getfaceset(grid, "left")
         fill!(fe, 0.0)
-        fill!(ke, 0.0)
 
         celldofs!(celldofs, dh, cellid)
 
         extr = grid.beo[cellid]
-        Xᴮ, w = get_bezier_coordinates(grid, cellid)
-        set_bezier_operator!(fv, extr)
+        Xᴮ, wᴮ = get_bezier_coordinates(grid, cellid)
+        w = getweights(grid, cellid)
 
-        integrate_traction_force!(fe, Xᴮ, w, traction, fv, faceid)
-        assemble!(assembler, celldofs, ke, fe)
+        set_bezier_operator!(fv, w.*extr)
+
+        integrate_traction_force!(fe, Xᴮ, wᴮ, traction, fv, faceid)
+        f[celldofs] += fe
     end
+
 
     return K, f
 end;
@@ -131,10 +132,11 @@ function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vec
     for cellid in 1:getncells(dh.grid)
         
         extr = dh.grid.beo[cellid]
-        Xᴮ, w = get_bezier_coordinates(dh.grid, cellid)
-        
-        set_bezier_operator!(cv, extr)
-        reinit!(cv, (Xᴮ, w))
+        Xᴮ, wᴮ = get_bezier_coordinates(dh.grid, cellid)
+        w = getweights(dh.grid, cellid)
+
+        set_bezier_operator!(cv, w.*extr)
+        reinit!(cv, (Xᴮ, wᴮ))
         celldofs!(celldofs, dh, cellid)
 
         ue = u[celldofs]
@@ -155,7 +157,7 @@ end;
 # In this example, we will generate the patch called "plate with hole". Note, currently this function can only generate the patch with second order basefunctions. 
 function solve()
     orders = (2,2) # Order in the ξ and η directions .
-    nels = (10,10) # Number of elements
+    nels = (20,10) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
 
     # Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this 
@@ -174,7 +176,7 @@ function solve()
     # Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the 
     # reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
     ip = BernsteinBasis{2,orders}()
-    qr_cell = QuadratureRule{2,RefCube}(3)
+    qr_cell = QuadratureRule{2,RefCube}(4)
     qr_face = QuadratureRule{1,RefCube}(3)
 
     cv = BezierCellValues( CellVectorValues(qr_cell, ip) )
@@ -200,7 +202,6 @@ function solve()
     K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)
 
     # Solve
-
     apply!(K, f, ch)
     u = K\f
     
@@ -224,4 +225,3 @@ end;
 
 # Call the function
 solve()
-
