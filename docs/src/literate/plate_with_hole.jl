@@ -73,8 +73,8 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 
         # In a normal finite elment code, this is the point where we usually get the coordinates of the element `X = getcoordinates(grid, cellid)`. In this case, however, 
         # we also require the cell weights, and we need to transform them to the bezier mesh. 
-        extr = grid.beo[cellid] # Extraction operator
-        X = getcoordinates(grid.grid, cellid) #Nurbs coords
+        extr = get_extraction_operator(grid, cellid) # Extraction operator
+        X = getcoordinates(grid, cellid) #Nurbs coords
         w = getweights(grid, cellid)       #Nurbs weights
         wᴮ = compute_bezier_points(extr, w)
         Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)
@@ -96,7 +96,7 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 
         celldofs!(celldofs, dh, cellid)
 
-        extr = grid.beo[cellid]
+        extr = get_extraction_operator(grid, cellid) 
         Xᴮ, wᴮ = get_bezier_coordinates(grid, cellid)
         w = getweights(grid, cellid)
 
@@ -131,7 +131,7 @@ function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vec
 
     for cellid in 1:getncells(dh.grid)
         
-        extr = dh.grid.beo[cellid]
+        extr = get_extraction_operator(dh.grid, cellid)
         Xᴮ, wᴮ = get_bezier_coordinates(dh.grid, cellid)
         w = getweights(dh.grid, cellid)
 
