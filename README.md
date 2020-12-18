@@ -8,7 +8,9 @@ Small toolbox for Isogeometric anlysis. Built on top of [JuAFEM](https://github.
 
 ## Installation
 
+```
 pkg> add https://github.com/lijas/IGA.jl.git
+```
 
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [docs-dev-url]: https://lijas.github.io/IGA.jl/dev/
