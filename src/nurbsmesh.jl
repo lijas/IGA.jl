@@ -1,7 +1,7 @@
 export getnbasefunctions, NURBSMesh, BezierGrid
 
-struct BezierGrid{G<:JuAFEM.Grid} <: JuAFEM.AbstractGrid
-	grid::G
+struct BezierGrid{dim,C<:JuAFEM.AbstractCell,T<:Real} <: JuAFEM.AbstractGrid{dim}
+	grid::JuAFEM.Grid{dim,C,T}
 	weights::Vector{Float64} #JuaFEM.CellVector{Float64}
 	beo::Vector{BezierExtractionOperator{Float64}}
 end
@@ -16,7 +16,7 @@ function BezierGrid(cells::Vector{C},
 	
 	grid = JuAFEM.Grid(cells, nodes)
 
-	return BezierGrid{typeof(grid)}(grid, weights, extraction_operator)
+	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
 end
 
 #=function BezierGrid(grid::G) where {G}

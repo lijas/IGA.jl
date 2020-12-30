@@ -1,4 +1,4 @@
-export BSplineBasis
+export BSplineBasis, findspan
 
 struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order}
 	knot_vector::NTuple{dim,Vector{T}}
@@ -38,6 +38,8 @@ end
 
 const BSplineCurve{sdim,T} = BSplineGeometry{1,sdim,T}
 const BSplineSurface{sdim,T} = BSplineGeometry{2,sdim,T}
+
+findspan(ip::BSplineBasis{1,T,order}, ξ::T) where {T,order} = _find_span(JuAFEM.getnbasefunctions(ip), order[1], ξ, ip.knot_vector[1])
 
 """
 Calculates 
@@ -151,28 +153,30 @@ Algorithm that evaluates the knowspan in which u (xi) lies.
 From NURBS-bbok A2.1
 """
 function _find_span(n::Int ,p::Int,u::T,U::Vector{T}) where T
-    @assert(!(u<U[1] || u>U[end]))
+    @assert(u <= U[end] && U[1] <= u)
+    
+    u==U[n+1] && return n
 
-    if u==U[end]
-        span = length(U)-1
-        while U[span]==U[span+1]
-            span+=-1
+    low = p
+    high = n+1
+    mid = (low+high)÷2
+
+    while u < U[mid] || u >= U[mid+1]
+        if u < U[mid]; high = mid;
+        else; low = mid;
         end
-    else
-        low = 0
-        high = length(U)
         mid = round(Int64,(low + high)/2)
-
-        while u < U[mid] || u >= U[mid + 1]
-	        if u < U[mid]; high = mid;
-	        else; low = mid;
-	        end
-	        mid = round(Int64,(low + high)/2)
-        end
-        span = round(Int64,(low + high)/2)
     end
+    span = round(Int64,(low + high)/2)
+
     return span
 end
+
+kv = Float64[-1,-1,-1, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0]
+p = 2
+n = length(kv)-p-1
+
+_find_span(n, p, 0.5, kv)
 
 """
 Algorithm that finds non zero basis function for u (xi)
