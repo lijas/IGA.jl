@@ -1,5 +1,5 @@
 #To see mesh of generated nurbs geometry:
-# mesh = IGA.generate_doubly_curved_nurbsmesh((20,20), (2,2), r1 = 25.0, r2 = 3.0, α1 = pi/2, α2 = pi)
+# mesh = IGA.generate_cylinder((20,20), (2,2), r = 4.0, h = 10.0)
 # grid = BezierGrid(mesh)
 # vtkfile = IGA.vtk_grid("test_curved2", grid)
 # IGA.vtk_save(vtkfile)
@@ -149,6 +149,36 @@ function generate_nurbsmesh(nel::NTuple{1,Int}, orders::NTuple{1,Int}, _size::NT
 		count += 1
 	end=#
 
+    return mesh
+
+end
+
+function generate_cylinder(nel::NTuple{2,Int}, orders::NTuple{2,Int}; h::T, r::T, twist_angle::T = 0.0, multiplicity::NTuple{2,Int}=(1,1)) where T
+    @assert(r > 0.0)
+
+	pdim = 2
+	sdim = 3
+
+	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
+	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
+    anglesx = _generate_linear_parametrization(knot_vectors[1], orders[1], 0.0, 2pi) 
+    zcoords = _generate_linear_parametrization(knot_vectors[2], orders[2], 0.0, h) 
+	
+	control_points = Vec{sdim,T}[]
+	for z in zcoords
+		α = twist_angle * z/h
+		for φ in anglesx
+
+            x = r*cos(φ + α)
+            y = r*sin(φ + α)
+            z = z
+
+			push!(control_points, Vec{sdim,T}((x,y,z)))
+		end
+	end
+
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	
     return mesh
 
 end

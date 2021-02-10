@@ -172,11 +172,6 @@ function _find_span(n::Int ,p::Int,u::T,U::Vector{T}) where T
     return span
 end
 
-kv = Float64[-1,-1,-1, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0]
-p = 2
-n = length(kv)-p-1
-
-_find_span(n, p, 0.5, kv)
 
 """
 Algorithm that finds non zero basis function for u (xi)
