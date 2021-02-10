@@ -153,7 +153,7 @@ function generate_nurbsmesh(nel::NTuple{1,Int}, orders::NTuple{1,Int}, _size::NT
 
 end
 
-function generate_cylinder(nel::NTuple{2,Int}, orders::NTuple{2,Int}; h::T, r::T, twist_angle::T = 0.0, multiplicity::NTuple{2,Int}=(1,1)) where T
+function generate_cylinder(nel::NTuple{2,Int}, orders::NTuple{2,Int}; h::T, r::T, α::T = 2*pi, twist_angle::T = 0.0, multiplicity::NTuple{2,Int}=(1,1)) where T
     @assert(r > 0.0)
 
 	pdim = 2
@@ -161,7 +161,7 @@ function generate_cylinder(nel::NTuple{2,Int}, orders::NTuple{2,Int}; h::T, r::T
 
 	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
-    anglesx = _generate_linear_parametrization(knot_vectors[1], orders[1], 0.0, 2pi) 
+    anglesx = _generate_linear_parametrization(knot_vectors[1], orders[1], 0.0, α) 
     zcoords = _generate_linear_parametrization(knot_vectors[2], orders[2], 0.0, h) 
 	
 	control_points = Vec{sdim,T}[]
