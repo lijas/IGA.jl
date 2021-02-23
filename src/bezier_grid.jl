@@ -19,14 +19,12 @@ function BezierGrid(cells::Vector{C},
 	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
 end
 
-function BezierGrid(mesh::NURBSMesh{sdim}) where {sdim}
+function BezierGrid(mesh::NURBSMesh{pdim,sdim}) where {pdim,sdim}
 
 	N = length(mesh.IEN[:,1])
 	
-    M = (2,4,6)[sdim]
     CellType = BezierCell{sdim,N,mesh.orders}
-    ordering = _bernstein_ordering(CellType)
-	
+    ordering = _bernstein_ordering(BezierCell{pdim,N,mesh.orders})
 	cells = [CellType(Tuple(mesh.IEN[ordering,ie])) for ie in 1:getncells(mesh)]
 	nodes = [Node(x)                                for x  in mesh.control_points]
 
@@ -49,7 +47,11 @@ function Base.getproperty(m::BezierGrid, s::Symbol)
     elseif s === :nodesets
 		return getfield(m.grid, :nodesets)
     elseif s === :facesets
-        return getfield(m.grid, :facesets)
+		return getfield(m.grid, :facesets)
+	elseif s === :edgesets
+		return getfield(m.grid, :edgesets)
+	elseif s === :vertexsets
+        return getfield(m.grid, :vertexsets)
     else 
         return getfield(m, s)
     end
