@@ -188,8 +188,6 @@ function generate_nurbs_patch(::Val{:nasa_specimen}, nel_bend::NTuple{2,Int}, or
 	
 	cp_dist = abs(elbow[end÷2] - elbow[(end÷2) - 1]) * R
 	straght = collect((R+cp_dist):cp_dist:(R+L1))
-	@show R+cp_dist, cp_dist, R+L1
-	@show straght
 	
 	for x in (straght)
 		pushfirst!(cp_inplane, Vec((x, 0.0, 0.0)))
@@ -213,10 +211,14 @@ function generate_nurbs_patch(::Val{:nasa_specimen}, nel_bend::NTuple{2,Int}, or
 	#Since it is not clear how many elements exist in x-direction, recreate the knotvector along specimen
 	nbasefuncs = length(cp_inplane)
 	nelx = nbasefuncs - orders[1]
-	@show nelx
 	kv_x = _create_knotvector(T, nelx, orders[1], multiplicity[1])
-	@show cp_inplane
-	#error("sdf")
+
+	#Rotate everything 45 degrees
+	θ = deg2rad(45.0 + 90.0)
+	Rotmat = [cos(θ) 0.0 sin(θ); 0.0 1.0 0.0; -sin(θ) 0.0 cos(θ)] |> Tuple |> Tensor{2,3}
+	for i in eachindex(control_points)
+		control_points[i] = Rotmat ⋅ control_points[i]
+	end
 
 	return IGA.NURBSMesh(Tuple([kv_x,kv_y]), orders, control_points)
 end
