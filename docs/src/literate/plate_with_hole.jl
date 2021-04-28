@@ -209,16 +209,20 @@ function solve()
     # the nodes using the L2Projector from Ferrite. Node that we need to create new CellValues of type CellScalarValues, since the 
     # L2Projector only works with scalar fields.
 
-    cellstresses = calculate_stress(dh, cv, stiffmat, u)
+#md # !!! note 
+#md #     Termporarily disabeling L2-projections due to changes in Ferrite
+#md #     
 
-    csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
-    projector = L2Projector(csv, ip, grid)
-    σ_nodes = project(cellstresses, projector)
+    #cellstresses = calculate_stress(dh, cv, stiffmat, u)
+
+    #csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
+    #projector = L2Projector(csv, ip, grid)
+    #σ_nodes = project(cellstresses, projector)
 
     # Output results to VTK
     vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
     vtk_point_data(vtkgrid, dh, u, :u)
-    vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
+    #vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
     vtk_save(vtkgrid)
 
 end;

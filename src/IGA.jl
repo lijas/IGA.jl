@@ -44,7 +44,7 @@ include("splines/bezier.jl")
 include("splines/bezier_values.jl")
 include("splines/bsplines.jl")
 include("nurbs_cell_values.jl")
-include("L2_projection.jl")
+#include("L2_projection.jl") Disable L2 projection due to update in JUAFEM
 include("VTK.jl")
 
 #Normaly the verices function should only return the 8 corner nodes of the hexa (or 4 in 2d),
