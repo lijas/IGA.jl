@@ -3,7 +3,7 @@ export NURBSMesh, parent_to_parametric_map
 """
 Defines a NURBS patch, containing knot vectors, orders, controlpoints, weights and connectivity arrays.
 """
-struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
+struct NURBSMesh{pdim,sdim,T} #<: Ferrite.AbstractGrid
 	knot_vectors::NTuple{pdim,Vector{T}}
 	orders::NTuple{pdim,Int}
 	control_points::Vector{Vec{sdim,T}}
@@ -41,11 +41,11 @@ struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
 
 end
 
-JuAFEM.getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
+Ferrite.getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
 getnbasefuncs_per_cell(mesh::NURBSMesh) = length(mesh.IEN[:,1])
-JuAFEM.getnbasefunctions(mesh::NURBSMesh) = maximum(mesh.IEN)
+Ferrite.getnbasefunctions(mesh::NURBSMesh) = maximum(mesh.IEN)
 
-function JuAFEM.getcoordinates(mesh::NURBSMesh, ie::Int)
+function Ferrite.getcoordinates(mesh::NURBSMesh, ie::Int)
 	return mesh.control_points[mesh.IEN[:,ie]]
 end
 
@@ -64,12 +64,12 @@ function parent_to_parametric_map(nurbsmesh::NURBSMesh{pdim}, cellid::Int, xi::V
 	ξηζ = [0.5*((Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]])*xi[d] + (Ξ[d][_ni[d]+1] + Ξ[d][_ni[d]])) for d in 1:pdim]
 end
 
-#=function JuAFEM.Grid(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
+#=function Ferrite.Grid(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
 	ncontrolpoints = length(mesh.IEN[:,1])
-	nodes = [JuAFEM.Node(x) for x in mesh.control_points]
+	nodes = [Ferrite.Node(x) for x in mesh.control_points]
 
 	_BezierCell = BezierCell{sdim,ncontrolpoints,mesh.orders}
 	cells = [_BezierCell(Tuple(reverse(mesh.IEN[:,ie]))) for ie in 1:getncells(mesh)]
 
-	return JuAFEM.Grid(cells, nodes)
+	return Ferrite.Grid(cells, nodes)
 end=#

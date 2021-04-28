@@ -1,4 +1,4 @@
-using JuAFEM
+using Ferrite
 using IGA
 
 struct MyLagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
