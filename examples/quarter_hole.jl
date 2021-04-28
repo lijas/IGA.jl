@@ -1,4 +1,4 @@
-using JuAFEM, IGA, LinearAlgebra
+using Ferrite, IGA, LinearAlgebra
 
 function generate_square_with_hole(nel::NTuple{2,Int}, L::T=4.0, R::T = 1.0) where T
 
@@ -47,7 +47,7 @@ function generate_square_with_hole(nel::NTuple{2,Int}, L::T=4.0, R::T = 1.0) whe
 
     empty!(grid.facesets)
 
-    JuAFEM.copy!!(grid.nodes, nodes)
+    Ferrite.copy!!(grid.nodes, nodes)
     return grid
 end
 
@@ -94,7 +94,7 @@ function integrate_traction_force!(fe::AbstractVector, X::Vector{Vec{2,Float64}}
 end;
 
 # The assembly loop is also written in almost the same way as in a standard finite element code. The key differences will be described in the next paragraph,
-function assemble_problem(dh::JuAFEM.AbstractDofHandler, grid, cv, fv, stiffmat, traction)
+function assemble_problem(dh::Ferrite.AbstractDofHandler, grid, cv, fv, stiffmat, traction)
 
     f = zeros(ndofs(dh))
     K = create_sparsity_pattern(dh)
@@ -149,7 +149,7 @@ function get_material(; E, ν)
 end;
 
 # We also create a function that calculates the stress in each quadrature point, given the cell displacement and such...
-function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
     
     celldofs = zeros(Int, ndofs_per_cell(dh))
 
@@ -183,9 +183,9 @@ function solve()
     nels = (30,30) # Number of elements
     grid = generate_square_with_hole(nels) 
 
-    # Next, create some facesets. This is done in the same way as in normal JuAFEM-code. One thing to note however, is that the nodes/controlpoints, 
+    # Next, create some facesets. This is done in the same way as in normal Ferrite-code. One thing to note however, is that the nodes/controlpoints, 
     # does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
-    # use the JuAFEM functions below.
+    # use the Ferrite functions below.
     addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
     addfaceset!(grid, "left", (x) -> x[1] ≈ -4.0)
     addfaceset!(grid, "bot", (x) -> x[2] ≈ 0.0)
@@ -229,7 +229,7 @@ function solve()
     u = K\f
     
     # Now we want to export the results to VTK. So we calculate the stresses in each gauss-point, and project them to 
-    # the nodes using the L2Projector from JuAFEM. Node that we need to create new CellValues of type CellScalarValues, since the 
+    # the nodes using the L2Projector from Ferrite. Node that we need to create new CellValues of type CellScalarValues, since the 
     # L2Projector only works with scalar fields.
 
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
