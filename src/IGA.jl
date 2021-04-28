@@ -80,7 +80,7 @@ _edges_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), 
 _edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(Ferrite.edges(BernsteinBasis{3,order}() )))
 
 
-Ferrite.default_interpolation(::Type{BezierCell{dim,N,order}}) where {dim,N,order} = BernsteinBasis{length(order),order}()
+Ferrite.default_interpolation(::Type{BezierCell{dim,N,order,M}}) where {dim,N,order,M} = BernsteinBasis{length(order),order}()
 
 #
 function Ferrite.cell_to_vtkcell(::Type{BezierCell{2,N,order,M}}) where {N,order,M}
