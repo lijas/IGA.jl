@@ -1,5 +1,5 @@
 using IGA
-using JuAFEM
+using Ferrite
 using Plots; pyplot()
 
 function create_nurbs_mesh1()
@@ -59,7 +59,7 @@ function run()
 			for (j, eta) in enumerate(coord)
 				push!(xx, xi)
 				push!(yy, eta)
-				z = JuAFEM.value(ip, A, Vec{2,Float64}((xi,eta)))
+				z = Ferrite.value(ip, A, Vec{2,Float64}((xi,eta)))
 				push!(zz, z)
 			end
 		end

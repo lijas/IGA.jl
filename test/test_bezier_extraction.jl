@@ -41,8 +41,8 @@ end
 
     #
     C,nbe = IGA.compute_bezier_extraction_operators(mesh.orders..., mesh.knot_vectors...)
-    qr = JuAFEM.QuadratureRule{dim,JuAFEM.RefCube}(2)
-    cv = JuAFEM.CellVectorValues(qr, bern_ip)
+    qr = Ferrite.QuadratureRule{dim,Ferrite.RefCube}(2)
+    cv = Ferrite.CellVectorValues(qr, bern_ip)
 
     Cvecs = IGA.bezier_extraction_to_vectors(C)
     bern_cv = IGA.BezierValues(cv) 
@@ -58,10 +58,10 @@ end
         reinit!(bern_cv, coords)
 
         for qp in 1:getnquadpoints(bern_cv)
-            X1 = JuAFEM.spatial_coordinate(bern_cv, qp, bezier_coords)
+            X1 = Ferrite.spatial_coordinate(bern_cv, qp, bezier_coords)
             X2 = zero(Vec{dim,T})
             for i in 1:getnbasefunctions(bspline_ip)
-                N = JuAFEM.value(bspline_ip, i, qr.points[qp])
+                N = Ferrite.value(bspline_ip, i, qr.points[qp])
                 X2 += N*reverse(coords)[i]
             end
             @test X2 ≈ X1

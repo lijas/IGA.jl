@@ -1,8 +1,8 @@
-using JuAFEM, IGA, SparseArrays
+using Ferrite, IGA, SparseArrays
 using Plots; pyplot()
 
 
-function doassemble(cellvalues::CellValues{dim}, K::SparseMatrixCSC, dh::JuAFEM.AbstractDofHandler, Cvecs=-1) where {dim}
+function doassemble(cellvalues::CellValues{dim}, K::SparseMatrixCSC, dh::Ferrite.AbstractDofHandler, Cvecs=-1) where {dim}
 
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -146,7 +146,7 @@ function gofem(nelx,nely)
 
     ip = Lagrange{dim, RefCube, order}()
     qr = QuadratureRule{dim, RefCube}(4)
-    cellvalues = CellScalarValues(qr, ip, JuAFEM.default_interpolation(Quadrilateral))
+    cellvalues = CellScalarValues(qr, ip, Ferrite.default_interpolation(Quadrilateral))
 
     dh = DofHandler(grid)
     push!(dh, :u, 1, ip)

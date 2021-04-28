@@ -1,14 +1,14 @@
 
 
-function JuAFEM.reinit!(cv::JuAFEM.CellVectorValues{dim}, coords::Tuple{AbstractVector{Vec{dim,T}}, AbstractVector{T}}) where {dim,T}
-    JuAFEM.reinit!(cv, coords[1], coords[2])
+function Ferrite.reinit!(cv::Ferrite.CellVectorValues{dim}, coords::Tuple{AbstractVector{Vec{dim,T}}, AbstractVector{T}}) where {dim,T}
+    Ferrite.reinit!(cv, coords[1], coords[2])
 end
 
-function JuAFEM.reinit!(cv::JuAFEM.CellVectorValues{dim}, x::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}) where {dim,T}
-    n_geom_basefuncs = JuAFEM.getngeobasefunctions(cv)
-    n_func_basefuncs = JuAFEM.getn_scalarbasefunctions(cv)
+function Ferrite.reinit!(cv::Ferrite.CellVectorValues{dim}, x::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}) where {dim,T}
+    n_geom_basefuncs = Ferrite.getngeobasefunctions(cv)
+    n_func_basefuncs = Ferrite.getn_scalarbasefunctions(cv)
     @assert length(x) == n_geom_basefuncs == length(w)
-    isa(cv, JuAFEM.CellVectorValues) && (n_func_basefuncs *= dim)
+    isa(cv, Ferrite.CellVectorValues) && (n_func_basefuncs *= dim)
 
 
     @inbounds for i in 1:length(cv.qr_weights)

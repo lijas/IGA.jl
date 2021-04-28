@@ -170,9 +170,9 @@ function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdi
 		end
 	end
 	
-	JuAFEM.copy!!(knot_vectors[dir], new_knot_vector)
-	JuAFEM.copy!!(control_points, new_cps)
-	JuAFEM.copy!!(weights, new_ws)
+	Ferrite.copy!!(knot_vectors[dir], new_knot_vector)
+	Ferrite.copy!!(control_points, new_cps)
+	Ferrite.copy!!(weights, new_ws)
 
 end
 

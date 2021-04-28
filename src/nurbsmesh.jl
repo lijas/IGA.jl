@@ -1,26 +1,26 @@
 export getnbasefunctions, NURBSMesh, BezierGrid
 
-struct BezierGrid{dim,C<:JuAFEM.AbstractCell,T<:Real} <: JuAFEM.AbstractGrid{dim}
-	grid::JuAFEM.Grid{dim,C,T}
-	weights::Vector{Float64} #JuaFEM.CellVector{Float64}
+struct BezierGrid{dim,C<:Ferrite.AbstractCell,T<:Real} <: Ferrite.AbstractGrid{dim}
+	grid::Ferrite.Grid{dim,C,T}
+	weights::Vector{Float64} #Ferrite.CellVector{Float64}
 	beo::Vector{BezierExtractionOperator{Float64}}
 end
-JuAFEM.getdim(g::BezierGrid) = JuAFEM.getdim(g.grid)
+Ferrite.getdim(g::BezierGrid) = Ferrite.getdim(g.grid)
 getT(g::BezierGrid) = eltype(first(g.nodes).x)
 
 function BezierGrid(cells::Vector{C},
-		nodes::Vector{JuAFEM.Node{dim,T}},
+		nodes::Vector{Ferrite.Node{dim,T}},
 		weights::AbstractVector{T},
 		extraction_operator::AbstractVector{BezierExtractionOperator{T}}) where {dim,C,T}
 
 	
-	grid = JuAFEM.Grid(cells, nodes)
+	grid = Ferrite.Grid(cells, nodes)
 
 	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
 end
 
 #=function BezierGrid(grid::G) where {G}
-	rational_weights = ones(Float64, length(JuAFEM.getnnodes(grid)))
+	rational_weights = ones(Float64, length(Ferrite.getnnodes(grid)))
 	return BezierGrid(grid, rational_weights)
 end=#
 
@@ -49,7 +49,7 @@ function get_bezier_coordinates!(bcoords::AbstractVector{Vec{dim,T}}, w::Abstrac
 
 	C = grid.beo[ic]
 
-	JuAFEM.getcoordinates!(bcoords, grid.grid, ic)
+	Ferrite.getcoordinates!(bcoords, grid.grid, ic)
 	getweights!(w, grid, ic)
 
 	bcoords .= inv.(compute_bezier_points(C, w)) .* compute_bezier_points(C, w.*bcoords)
@@ -59,9 +59,9 @@ end
 
 function get_bezier_coordinates(grid::BezierGrid, ic::Int)
 
-	dim = JuAFEM.getdim(grid); T = getT(grid)
+	dim = Ferrite.getdim(grid); T = getT(grid)
 
-	n = JuAFEM.nnodes_per_cell(grid, ic)
+	n = Ferrite.nnodes_per_cell(grid, ic)
 	w = zeros(T, n)
 	x = zeros(Vec{dim,T}, n)
 	
@@ -69,7 +69,7 @@ function get_bezier_coordinates(grid::BezierGrid, ic::Int)
 	return x,w
 end
 
-struct NURBSMesh{pdim,sdim,T} #<: JuAFEM.AbstractGrid
+struct NURBSMesh{pdim,sdim,T} #<: Ferrite.AbstractGrid
 	knot_vectors::NTuple{pdim,Vector{T}}
 	orders::NTuple{pdim,Int}
 	control_points::Vector{Vec{sdim,T}}
@@ -109,7 +109,7 @@ end
 function BezierGrid(mesh::NURBSMesh{sdim}) where {sdim}
 
 	ncontrolpoints_per_cell = length(mesh.IEN[:,1])
-	nodes = [JuAFEM.Node(x) for x in mesh.control_points]
+	nodes = [Ferrite.Node(x) for x in mesh.control_points]
 
 	_BezierCell = BezierCell{sdim,ncontrolpoints_per_cell,mesh.orders}
 	cells = [_BezierCell(Tuple(reverse(mesh.IEN[:,ie]))) for ie in 1:getncells(mesh)]
@@ -119,52 +119,52 @@ function BezierGrid(mesh::NURBSMesh{sdim}) where {sdim}
 
 	Cvec = bezier_extraction_to_vectors(C)
 
-	#grid = JuAFEM.Grid(cells,nodes)
+	#grid = Ferrite.Grid(cells,nodes)
 
 	return BezierGrid(cells, nodes, mesh.weights, Cvec)
 end
 
 getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
 getnbasefuncs_per_cell(mesh::NURBSMesh) = length(mesh.IEN[:,1])
-JuAFEM.getnbasefunctions(mesh::NURBSMesh) = maximum(mesh.IEN)
-function JuAFEM.getcoordinates(mesh::NURBSMesh, ie::Int)
+Ferrite.getnbasefunctions(mesh::NURBSMesh) = maximum(mesh.IEN)
+function Ferrite.getcoordinates(mesh::NURBSMesh, ie::Int)
 	return mesh.control_points[mesh.IEN[:,ie]]
 end
 function convert_to_grid_representation(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
 
 	ncontrolpoints = length(mesh.IEN[:,1])
-	nodes = [JuAFEM.Node(x) for x in mesh.control_points]
+	nodes = [Ferrite.Node(x) for x in mesh.control_points]
 
 	_BezierCell = BezierCell{sdim,ncontrolpoints,mesh.orders}
 	cells = [_BezierCell(Tuple(reverse(mesh.IEN[:,ie]))) for ie in 1:getncells(mesh)]
 
-	return JuAFEM.Grid(cells, nodes)
+	return Ferrite.Grid(cells, nodes)
 
 end
 
-function WriteVTK.vtk_point_data(vtkfile, dh::JuAFEM.MixedDofHandler, u::Vector, beo::Vector{BezierExtractionOperator{T}}, suffix="") where {T}
+function WriteVTK.vtk_point_data(vtkfile, dh::Ferrite.MixedDofHandler, u::Vector, beo::Vector{BezierExtractionOperator{T}}, suffix="") where {T}
 
-    fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
+    fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
-        JuAFEM.@debug println("exporting field $(name)")
-        field_dim = JuAFEM.getfielddim(dh, name)
+        Ferrite.@debug println("exporting field $(name)")
+        field_dim = Ferrite.getfielddim(dh, name)
         space_dim = field_dim == 2 ? 3 : field_dim
-        data = fill(NaN, space_dim, JuAFEM.getnnodes(dh.grid))  # set default value
+        data = fill(NaN, space_dim, Ferrite.getnnodes(dh.grid))  # set default value
 
         for fh in dh.fieldhandlers
             # check if this fh contains this field, otherwise continue to the next
-            field_pos = findfirst(i->i == name, JuAFEM.getfieldnames(fh))
+            field_pos = findfirst(i->i == name, Ferrite.getfieldnames(fh))
             if field_pos == 0 && continue end
 
             cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
-            offset = JuAFEM.field_offset(fh, name)
+            offset = Ferrite.field_offset(fh, name)
 
             for cellnum in cellnumbers
                 cell = dh.grid.cells[cellnum]
-                n = JuAFEM.ndofs_per_cell(dh, cellnum)
+                n = Ferrite.ndofs_per_cell(dh, cellnum)
                 eldofs = zeros(Int, n)
-                _celldofs = JuAFEM.celldofs!(eldofs, dh, cellnum)
+                _celldofs = Ferrite.celldofs!(eldofs, dh, cellnum)
                 counter = 1
 
 				@assert(field_dim==1)
@@ -174,7 +174,7 @@ function WriteVTK.vtk_point_data(vtkfile, dh::JuAFEM.MixedDofHandler, u::Vector,
                 for node in cell.nodes
                     for d in 1:field_dim
                         data[d, node] = ue[counter]
-                        JuAFEM.@debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
+                        Ferrite.@debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
                         counter += 1
                     end
                     if field_dim == 2
@@ -190,29 +190,29 @@ function WriteVTK.vtk_point_data(vtkfile, dh::JuAFEM.MixedDofHandler, u::Vector,
     return vtkfile
 end
 
-function vtk_bezier_point_data(vtkfile, dh::JuAFEM.MixedDofHandler, u::Vector{T}, suffix="") where {T}
+function vtk_bezier_point_data(vtkfile, dh::Ferrite.MixedDofHandler, u::Vector{T}, suffix="") where {T}
 
-    fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
+    fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
-        JuAFEM.@debug println("exporting field $(name)")
-        field_dim = JuAFEM.getfielddim(dh, name)
+        Ferrite.@debug println("exporting field $(name)")
+        field_dim = Ferrite.getfielddim(dh, name)
         space_dim = field_dim == 2 ? 3 : field_dim
-        data = fill(NaN, space_dim, JuAFEM.getnnodes(dh.grid))  # set default value
+        data = fill(NaN, space_dim, Ferrite.getnnodes(dh.grid))  # set default value
 
         for fh in dh.fieldhandlers
             # check if this fh contains this field, otherwise continue to the next
-            field_pos = findfirst(i->i == name, JuAFEM.getfieldnames(fh))
+            field_pos = findfirst(i->i == name, Ferrite.getfieldnames(fh))
             if field_pos == 0 && continue end
 
             cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
-            offset = JuAFEM.field_offset(fh, name)
+            offset = Ferrite.field_offset(fh, name)
 
             for cellnum in cellnumbers
                 cell = dh.grid.cells[cellnum]
-                n = JuAFEM.ndofs_per_cell(dh, cellnum)
+                n = Ferrite.ndofs_per_cell(dh, cellnum)
                 eldofs = zeros(Int, n)
-                _celldofs = JuAFEM.celldofs!(eldofs, dh, cellnum)
+                _celldofs = Ferrite.celldofs!(eldofs, dh, cellnum)
                 counter = 1
 
 				#@assert(field_dim==1)
@@ -225,7 +225,7 @@ function vtk_bezier_point_data(vtkfile, dh::JuAFEM.MixedDofHandler, u::Vector{T}
                 for node in cell.nodes
                     for d in 1:field_dim
                         data[d, node] = ue[counter]
-                        JuAFEM.@debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
+                        Ferrite.@debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
                         counter += 1
                     end
                     if field_dim == 2

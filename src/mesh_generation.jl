@@ -648,7 +648,7 @@ function get_nurbs_griddata(orders::NTuple{pdim,Int}, knot_vectors::NTuple{pdim,
 
 	#Create cells and nodes
 	ncontrolpoints = length(IEN[:,1])
-	nodes = [JuAFEM.Node(x) for x in control_points]
+	nodes = [Ferrite.Node(x) for x in control_points]
 
 	_BezierCell = BezierCell{sdim,ncontrolpoints,orders}
 	cells = [_BezierCell(Tuple(reverse(IEN[:,ie]))) for ie in 1:nel]

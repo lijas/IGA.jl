@@ -1,5 +1,5 @@
 using IGA
-using JuAFEM
+using Ferrite
 
 function blabla()
 
@@ -58,7 +58,7 @@ function blabla()
 
     println(file, "<ElementDatabase name=\"C\">")
     #=println(file, "  <Column name = \"type\" type = \"int\">")
-    for cellid in 1:JuAFEM.getncells(grid)
+    for cellid in 1:Ferrite.getncells(grid)
         println(file,"    $(cellid-1) 62;")
     end
     println(file, "  </Column>")=#
@@ -69,7 +69,7 @@ function blabla()
     J = Dict{Int, Vector{Int}}()
     V = Dict{Int, Vector{Float64}}()
 
-    for cellid in 1:JuAFEM.getncells(grid)
+    for cellid in 1:Ferrite.getncells(grid)
         beo = grid.beo[cellid]
         I[cellid] = Int[]
         J[cellid] = Int[]
@@ -84,7 +84,7 @@ function blabla()
     end
 
     println(file,"  <Column name = \"i\" type = \"int\">")
-    for cellid in 1:JuAFEM.getncells(grid)
+    for cellid in 1:Ferrite.getncells(grid)
         s = "    $(cellid-1)  "
         for indx in I[cellid]
             s*= string(indx)*" "
@@ -97,7 +97,7 @@ function blabla()
     println(file, " ")
 
     println(file,"  <Column name = \"j\" type = \"int\">")
-    for cellid in 1:JuAFEM.getncells(grid)
+    for cellid in 1:Ferrite.getncells(grid)
         s = "    $(cellid-1)  "
         for indx in J[cellid]
             s*= string(indx)*" "
@@ -110,7 +110,7 @@ function blabla()
     println(file, " ")
 
     println(file,"  <Column name = \"v\" type = \"float\">")
-    for cellid in 1:JuAFEM.getncells(grid)
+    for cellid in 1:Ferrite.getncells(grid)
         s = "    $(cellid-1)  "
         for indx in V[cellid]
             s*= string(indx)*" "

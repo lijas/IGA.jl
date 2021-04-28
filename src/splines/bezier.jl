@@ -1,9 +1,9 @@
 export BernsteinBasis, value, reference_coordinates, set_current_cellid!
 export BezierValues, set_bezier_operator!
 """
-BernsteinBasis subtype of JuAFEM:s interpolation struct
+BernsteinBasis subtype of Ferrite:s interpolation struct
 """  
-struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order} 
+struct BernsteinBasis{dim,order} <: Ferrite.Interpolation{dim,Ferrite.RefCube,order} 
 
     function BernsteinBasis{dim,order}() where {dim,order} 
          @assert(length(order)<=dim)
@@ -13,7 +13,7 @@ struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,orde
 
 end
 
-#=function JuAFEM.value(b::BernsteinBasis{2,order}, i, xi) where {order}
+#=function Ferrite.value(b::BernsteinBasis{2,order}, i, xi) where {order}
     n = order+1
     ix,iy = Tuple(CartesianIndices((n,n))[i])
     x = _bernstein_basis_recursive(order, ix, xi[1])
@@ -21,7 +21,7 @@ end
     return x*y
 end=#
 
-function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi::Vec{dim}) where {dim,order}
+function Ferrite.value(b::BernsteinBasis{dim,order}, i, xi::Vec{dim}) where {dim,order}
 
     _n = order.+1
     _n = (_n...,) # make _n tuple in 1d
@@ -35,20 +35,20 @@ function JuAFEM.value(b::BernsteinBasis{dim,order}, i, xi::Vec{dim}) where {dim,
     return val
 end
 
-JuAFEM.vertices(ip::BernsteinBasis{dim,order}) where {dim,order} = ntuple(i->i, JuAFEM.getnbasefunctions(ip))
+Ferrite.vertices(ip::BernsteinBasis{dim,order}) where {dim,order} = ntuple(i->i, Ferrite.getnbasefunctions(ip))
 
-JuAFEM.faces(::BernsteinBasis{2,(2,2)}) = ((1,2,3),(3,6,9), (9,8,7), (7,4,1))
-JuAFEM.faces(::IGA.BernsteinBasis{1,order}) where order = ((1,), (order+1,))
+Ferrite.faces(::BernsteinBasis{2,(2,2)}) = ((1,2,3),(3,6,9), (9,8,7), (7,4,1))
+Ferrite.faces(::IGA.BernsteinBasis{1,order}) where order = ((1,), (order+1,))
 
 #Line in 2d
-JuAFEM.edges(::IGA.BernsteinBasis{2,(2,)}) = ((1,), (3,))
-JuAFEM.faces(::IGA.BernsteinBasis{2,(2,)}) = ((1,2,3), (3,2,1))
+Ferrite.edges(::IGA.BernsteinBasis{2,(2,)}) = ((1,), (3,))
+Ferrite.faces(::IGA.BernsteinBasis{2,(2,)}) = ((1,2,3), (3,2,1))
 
 #3d Shell
-JuAFEM.edges(::BernsteinBasis{3,(2,2)}) = ((1,2,3), (3,6,9), (9,8,7), (7,4,1))
+Ferrite.edges(::BernsteinBasis{3,(2,2)}) = ((1,2,3), (3,6,9), (9,8,7), (7,4,1))
 
 
-function JuAFEM.faces(c::BernsteinBasis{2,order}) where {order}
+function Ferrite.faces(c::BernsteinBasis{2,order}) where {order}
     length(order)==1 && return _faces_line(c)
     length(order)==2 && return _faces_quad(c)
 end
@@ -79,7 +79,7 @@ function _faces_quad(::BernsteinBasis{2,order}) where {order}
 
 end
 
-function JuAFEM.faces(c::BernsteinBasis{3,order}) where {order}
+function Ferrite.faces(c::BernsteinBasis{3,order}) where {order}
     length(order)==2 && return _faces_quad(c)
     length(order)==3 && return _faces_hexa(c)
 end
@@ -120,7 +120,7 @@ function _faces_hexa(::IGA.BernsteinBasis{3,order}) where {order}
 end
 #
 
-function JuAFEM.edges(c::BernsteinBasis{3,order}) where {order}
+function Ferrite.edges(c::BernsteinBasis{3,order}) where {order}
     length(order)==2 && return _edges_quad(c)
     length(order)==3 && return _edges_hexa(c)
 end
@@ -179,11 +179,11 @@ function _edges_quad(::IGA.BernsteinBasis{3,order}) where {order}
     return Tuple(edges)
 end
 
-JuAFEM.getnbasefunctions(::BernsteinBasis{dim,order}) where {dim,order} = prod(order.+1)#(order+1)^dim
-JuAFEM.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
-JuAFEM.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
-JuAFEM.nfacedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
-JuAFEM.ncelldofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
+Ferrite.getnbasefunctions(::BernsteinBasis{dim,order}) where {dim,order} = prod(order.+1)#(order+1)^dim
+Ferrite.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
+Ferrite.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
+Ferrite.nfacedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
+Ferrite.ncelldofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
 
 function _bernstein_basis_recursive(p::Int, i::Int, xi::T) where T
 	if i==1 && p==0
@@ -199,7 +199,7 @@ function _bernstein_basis_derivative_recursive(p::Int, i::Int, xi::T) where T
     return p*(_bernstein_basis_recursive(p-1, i-1, xi) - _bernstein_basis_recursive(p-1, i, xi))
 end
 
-function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_s,order}
+function Ferrite.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_s,order}
     dim_p = length(order)
     T = Float64
 
@@ -233,7 +233,7 @@ function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_
         end
         #In some cases we have for example a 1d-line (dim_p=1) in 2d (dim_s=1). 
         # Then this bernsteinbasis will only be used for, not for actualy calculating basefunction values
-        # Anyways, in those cases, we will still need to export a 2d-coord, because JuAFEM.BCValues will be super mad 
+        # Anyways, in those cases, we will still need to export a 2d-coord, because Ferrite.BCValues will be super mad 
         for _ in 1:(dim_s-dim_p)
             push!(_vec, zero(T))
         end
@@ -289,67 +289,67 @@ end
 Second try for bezier cellvalues
 """
 
-struct BezierValues{dim_s,T<:Real,CV<:JuAFEM.Values} <: JuAFEM.Values{dim_s,T,JuAFEM.RefCube}
-#struct BezierValues{dim_s,T<:Real,CV<:JuAFEM.CellValues} <: JuAFEM.CellValues{dim_s,T,JuAFEM.RefCube}
+struct BezierValues{dim_s,T<:Real,CV<:Ferrite.Values} <: Ferrite.Values{dim_s,T,Ferrite.RefCube}
+#struct BezierValues{dim_s,T<:Real,CV<:Ferrite.CellValues} <: Ferrite.CellValues{dim_s,T,Ferrite.RefCube}
     cv_bezier::CV
     cv_store::CV
 
     current_beo::Base.RefValue{BezierExtractionOperator{T}}
 end
 
-function BezierValues(cv::JuAFEM.Values{dim_s,T,JuAFEM.RefCube}) where {dim_s,T}
+function BezierValues(cv::Ferrite.Values{dim_s,T,Ferrite.RefCube}) where {dim_s,T}
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
     return BezierValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
 end
 
-#=function BezierValues(quad_rule::JuAFEM.QuadratureRule{dim_s,JuAFEM.RefCube,T}, 
-                            func_interpol::JuAFEM.Interpolation{dim_s}, 
-                            geom_interpol::JuAFEM.Interpolation{dim_s}=func_interpol; 
-                            cvtype::Type{CV}=JuAFEM.CellVectorValues) where {dim_s,T,CV}
+#=function BezierValues(quad_rule::Ferrite.QuadratureRule{dim_s,Ferrite.RefCube,T}, 
+                            func_interpol::Ferrite.Interpolation{dim_s}, 
+                            geom_interpol::Ferrite.Interpolation{dim_s}=func_interpol; 
+                            cvtype::Type{CV}=Ferrite.CellVectorValues) where {dim_s,T,CV}
 
     cv = CV(quad_rule, func_interpol, geom_interpol)
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
     return BezierValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
 end=#
 
-JuAFEM.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
-JuAFEM.getngeobasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.M, 1)
-JuAFEM.getnquadpoints(bcv::BezierValues) = JuAFEM.getnquadpoints(bcv.cv_bezier)
-JuAFEM.getdetJdV(bv::BezierValues, q_point::Int) = JuAFEM.getdetJdV(bv.cv_bezier, q_point)
-JuAFEM.shape_value(bcv::BezierValues, qp::Int, i::Int) = JuAFEM.shape_value(bcv.cv_store,qp,i)
-JuAFEM.getn_scalarbasefunctions(bcv::BezierValues) = JuAFEM.getn_scalarbasefunctions(bcv.cv_store)
-JuAFEM._gradienttype(::BezierValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
+Ferrite.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
+Ferrite.getngeobasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.M, 1)
+Ferrite.getnquadpoints(bcv::BezierValues) = Ferrite.getnquadpoints(bcv.cv_bezier)
+Ferrite.getdetJdV(bv::BezierValues, q_point::Int) = Ferrite.getdetJdV(bv.cv_bezier, q_point)
+Ferrite.shape_value(bcv::BezierValues, qp::Int, i::Int) = Ferrite.shape_value(bcv.cv_store,qp,i)
+Ferrite.getn_scalarbasefunctions(bcv::BezierValues) = Ferrite.getn_scalarbasefunctions(bcv.cv_store)
+Ferrite._gradienttype(::BezierValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
 
-function JuAFEM.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T} 
-    return JuAFEM.function_gradient(fe_v.cv_store, q_point, u)
+function Ferrite.function_gradient(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T} 
+    return Ferrite.function_gradient(fe_v.cv_store, q_point, u)
 end
-function JuAFEM.function_value(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::AbstractVector{Int} = collect(1:length(u))) where {dim,T} 
-    return JuAFEM.function_value(fe_v.cv_store, q_point, u, dof_range)
+function Ferrite.function_value(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::AbstractVector{Int} = collect(1:length(u))) where {dim,T} 
+    return Ferrite.function_value(fe_v.cv_store, q_point, u, dof_range)
 end
 
-JuAFEM.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} = JuAFEM.geometric_value(cv.cv_bezier, q_point, i);
+Ferrite.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} = Ferrite.geometric_value(cv.cv_bezier, q_point, i);
 
-JuAFEM.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = JuAFEM.shape_gradient(bcv.cv_store, q_point, base_func)#bcv.cv_store.dNdx[base_func, q_point]
+Ferrite.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = Ferrite.shape_gradient(bcv.cv_store, q_point, base_func)#bcv.cv_store.dNdx[base_func, q_point]
 set_bezier_operator!(bcv::BezierValues, beo::BezierExtractionOperator{T}) where T = bcv.current_beo[]=beo
 _cellvaluestype(::BezierValues{dim_s,T,CV}) where {dim_s,T,CV} = CV
 
-function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T,CV<:JuAFEM.FaceValues}
-    JuAFEM.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
+function Ferrite.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T,CV<:Ferrite.FaceValues}
+    Ferrite.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
     bcv.cv_store.current_face[] = faceid
 
     _reinit_bezier!(bcv, faceid)
 end
 
-function JuAFEM.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T,CV<:JuAFEM.CellValues}
-    JuAFEM.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
+function Ferrite.reinit!(bcv::BezierValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T,CV<:Ferrite.CellValues}
+    Ferrite.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
 
     _reinit_bezier!(bcv, 1)
 end
 
-JuAFEM.reinit!(bcv::BezierValues, coords::Tuple{AbstractVector{Vec{dim_s,T}}, AbstractArray{T}}) where {dim_s,T} = JuAFEM.reinit!(bcv, coords[1], coords[2])
+Ferrite.reinit!(bcv::BezierValues, coords::Tuple{AbstractVector{Vec{dim_s,T}}, AbstractArray{T}}) where {dim_s,T} = Ferrite.reinit!(bcv, coords[1], coords[2])
 
-function JuAFEM.reinit!(bcv::BezierValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractArray{T}) where {dim_s,T}
-    JuAFEM.reinit!(bcv.cv_bezier, x, w) #call the normal reinit function first
+function Ferrite.reinit!(bcv::BezierValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractArray{T}) where {dim_s,T}
+    Ferrite.reinit!(bcv.cv_bezier, x, w) #call the normal reinit function first
     _reinit_bezier!(bcv, 1)
 end
 
@@ -363,14 +363,14 @@ function _reinit_bezier!(bcv::BezierValues{dim_s}, faceid::Int) where {dim_s}
     dBdξ   = bcv.cv_bezier.dNdξ
     B      = bcv.cv_bezier.N
 
-    for iq in 1:JuAFEM.getnquadpoints(bcv)
-        for ib in 1:JuAFEM.getn_scalarbasefunctions(bcv.cv_bezier)
+    for iq in 1:Ferrite.getnquadpoints(bcv)
+        for ib in 1:Ferrite.getn_scalarbasefunctions(bcv.cv_bezier)
 
-            if _cellvaluestype(bcv) <: JuAFEM.ScalarValues
+            if _cellvaluestype(bcv) <: Ferrite.ScalarValues
                 cv_store.N[ib, iq, faceid] = zero(eltype(cv_store.N))
                 cv_store.dNdξ[ib, iq, faceid] = zero(eltype(cv_store.dNdξ))
                 cv_store.dNdx[ib, iq, faceid] = zero(eltype(cv_store.dNdx))
-            elseif _cellvaluestype(bcv) <: JuAFEM.VectorValues
+            elseif _cellvaluestype(bcv) <: Ferrite.VectorValues
                 for d in 1:dim_s
                     cv_store.N[(ib-1)*dim_s+d, iq, faceid] = zero(eltype(cv_store.N))
                     cv_store.dNdξ[(ib-1)*dim_s+d, iq, faceid] = zero(eltype(cv_store.dNdξ))
@@ -383,11 +383,11 @@ function _reinit_bezier!(bcv::BezierValues{dim_s}, faceid::Int) where {dim_s}
             for (i, nz_ind) in enumerate(Cbe_ib.nzind)                
                 val = Cbe_ib.nzval[i]
                 
-                if _cellvaluestype(bcv) <: JuAFEM.ScalarValues
+                if _cellvaluestype(bcv) <: Ferrite.ScalarValues
                     cv_store.N[ib, iq, faceid]    += val*   B[nz_ind, iq, faceid]
                     cv_store.dNdξ[ib, iq, faceid] += val*dBdξ[nz_ind, iq, faceid]
                     cv_store.dNdx[ib, iq, faceid] += val*dBdx[nz_ind, iq, faceid]
-                elseif _cellvaluestype(bcv) <: JuAFEM.VectorValues
+                elseif _cellvaluestype(bcv) <: Ferrite.VectorValues
                     for d in 1:dim_s
                            cv_store.N[(ib-1)*dim_s + d, iq, faceid] += val*   B[(nz_ind-1)*dim_s + d, iq, faceid]
                         cv_store.dNdξ[(ib-1)*dim_s + d, iq, faceid] += val*dBdξ[(nz_ind-1)*dim_s + d, iq, faceid]
@@ -401,9 +401,9 @@ function _reinit_bezier!(bcv::BezierValues{dim_s}, faceid::Int) where {dim_s}
 end
 
 """
-Bsplines sutyping JuAFEM interpolation
+Bsplines sutyping Ferrite interpolation
 """
-struct BSplineInterpolation{dim,T} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,1} 
+struct BSplineInterpolation{dim,T} <: Ferrite.Interpolation{dim,Ferrite.RefCube,1} 
     INN::Matrix{Int}
     IEN::Matrix{Int}
     knot_vectors::NTuple{dim,Vector{T}}
@@ -417,11 +417,11 @@ end
 function BSplineInterpolation(mesh::NURBSMesh{pdim,sdim,T}) where{pdim,sdim,T}
     return BSplineInterpolation{pdim,T}(mesh.INN, mesh.IEN, mesh.knot_vectors, mesh.orders, Ref(-1))
 end
-JuAFEM.getnbasefunctions(b::BSplineInterpolation) = prod(b.orders.+1)
+Ferrite.getnbasefunctions(b::BSplineInterpolation) = prod(b.orders.+1)
 
 set_current_cellid!(b::BSplineInterpolation, iel::Int) = (b.current_element[] = iel)
 
-function JuAFEM.value(b::BSplineInterpolation{3,T}, i, xi::Vec{3}) where {T}
+function Ferrite.value(b::BSplineInterpolation{3,T}, i, xi::Vec{3}) where {T}
 
     @assert _coord_in_range(xi)
 
@@ -444,7 +444,7 @@ function JuAFEM.value(b::BSplineInterpolation{3,T}, i, xi::Vec{3}) where {T}
     return x*y*z
 end
 
-function JuAFEM.value(b::BSplineInterpolation{2,T}, i, xi) where {T}
+function Ferrite.value(b::BSplineInterpolation{2,T}, i, xi) where {T}
 
     @assert _coord_in_range(xi)
 
@@ -471,7 +471,7 @@ function JuAFEM.value(b::BSplineInterpolation{2,T}, i, xi) where {T}
     return x*y
 end
 
-function JuAFEM.value(b::BSplineInterpolation{1,T}, i, xi::Vec{1}) where {T}
+function Ferrite.value(b::BSplineInterpolation{1,T}, i, xi::Vec{1}) where {T}
     
     @assert _coord_in_range(xi)
     

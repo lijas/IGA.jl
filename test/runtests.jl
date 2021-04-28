@@ -1,7 +1,7 @@
 using IGA
 using Tensors
 using Test
-using JuAFEM
+using Ferrite
 using SparseArrays
 
 include("test_bsplines.jl")

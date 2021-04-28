@@ -1,4 +1,4 @@
-using JuAFEM
+using Ferrite
 using IGA
 
 function generate_square_with_hole(nel::NTuple{2,Int}, L::T=4.0, R::T = 1.0) where T
@@ -47,7 +47,7 @@ function generate_square_with_hole(nel::NTuple{2,Int}, L::T=4.0, R::T = 1.0) whe
     end
 
 
-    JuAFEM.copy!!(grid.nodes, nodes)
+    Ferrite.copy!!(grid.nodes, nodes)
     return grid
 end
 

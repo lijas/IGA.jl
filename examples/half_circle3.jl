@@ -1,5 +1,5 @@
 using IGA
-using JuAFEM
+using Ferrite
 using Plots; pyplot()
 
 function create_nurbs_mesh1()
@@ -209,7 +209,7 @@ function solve_2d()
 		for j in 1:length(xi_eval_points)
 			_vec = Vec{dim,T}((xi_eval_points[j], eta_eval_points[j]))
 			for i in 1:length(globaldofs)
-				N = JuAFEM.value(ip, i, _vec)
+				N = Ferrite.value(ip, i, _vec)
 
 				edge[j] += N* becp[i]
 				
