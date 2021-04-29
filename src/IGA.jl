@@ -52,7 +52,7 @@ include("VTK.jl")
 #we can only distribute cells on the nodes/controlpoints
 Ferrite.vertices(c::BezierCell) = c.nodes
 
-_bernstein_ordering(::Type{<:BezierCell{dim,N,orders}}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{dim,orders}())                                        
+_bernstein_ordering(::Type{<:BezierCell{dim,N,orders}}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{length(orders),orders}())                                        
 
 #Dim 2
 function Ferrite.faces(c::BezierCell{2,N,order}) where {N,order}
@@ -77,7 +77,7 @@ function Ferrite.edges(c::BezierCell{3,N,order}) where {N,order}
     length(order)==3 && return _edges_hexa(c)
 end
 _edges_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(Ferrite.edges(BernsteinBasis{3,order}() )))
-_edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(Ferrite.edges(BernsteinBasis{3,order}() )))
+_edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(Ferrite.edges(BernsteinBasis{2,order}() )))
 
 
 Ferrite.default_interpolation(::Type{BezierCell{dim,N,order,M}}) where {dim,N,order,M} = BernsteinBasis{length(order),order}()
