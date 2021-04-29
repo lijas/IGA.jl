@@ -7,11 +7,11 @@ The Bertnstein polynominal spline basis. Usually used as the cell interpolation 
 IGA, together with bezier extraction + BezierValues.
 
 `dim` - The spacial dimentsion of the interpolation
-`order` - A tuple with the order in each parametric direction. Note, this can be lower than `dim`.
+`order` - A tuple with the order in each parametric direction. 
 """  
 struct BernsteinBasis{dim,order} <: Ferrite.Interpolation{dim,Ferrite.RefCube,order} 
     function BernsteinBasis{dim,order}() where {dim,order} 
-         @assert(length(order) <= dim)
+         @assert(length(order) == dim)
          # Make order into tuple for 1d case
          return new{dim,Tuple(order)}()
     end
@@ -48,35 +48,19 @@ end
 Ferrite.vertices(ip::BernsteinBasis{dim,orders}) where {dim,orders} = ntuple(i -> i, Ferrite.getnbasefunctions(ip))
 
 # 2D
-function Ferrite.faces(c::BernsteinBasis{2,orders}) where {orders}
-    length(orders) == 1 && return _faces_line(c)
-    length(orders) == 2 && return _faces_quad(c)
-end
-
-_faces_line(::BernsteinBasis{2,orders}) where {orders} = (ntuple(i -> i, orders),)
-
-function _faces_quad(ip::BernsteinBasis{2,orders}) where {orders}
-    dim = 2
+function Ferrite.faces(ip::BernsteinBasis{2,orders}) where {orders}
     faces = Tuple[]
-
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
     push!(faces, Tuple(ind[:,1])) #bot
-    push!(faces, Tuple(ind[end,:]))# left
+    push!(faces, Tuple(ind[end,:]))# right
     push!(faces, Tuple(ind[:,end]))# top
-    push!(faces, Tuple(ind[1,:]))# right
+    push!(faces, Tuple(ind[1,:]))# left
     
     return Tuple(faces) 
 end
 
-function Ferrite.faces(c::BernsteinBasis{3,orders}) where {orders}
-    length(orders) == 2 && return _faces_quad(c)
-    length(orders) == 3 && return _faces_hexa(c)
-end
-_faces_quad(::BernsteinBasis{3,orders}) where {orders} = ntuple(i -> i, prod(orders .+ 1))
-function _faces_hexa(ip::BernsteinBasis{3,orders}) where {orders}
-    @assert(length(orders) == 3)
-
+function Ferrite.faces(ip::BernsteinBasis{3,orders}) where {orders}
     faces = Tuple[]
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
@@ -89,17 +73,8 @@ function _faces_hexa(ip::BernsteinBasis{3,orders}) where {orders}
 
     return Tuple(faces)
 end
-# 
 
-function Ferrite.edges(c::BernsteinBasis{3,orders}) where {orders}
-    length(orders) == 2 && return _edges_quad(c)
-    length(orders) == 3 && return _edges_hexa(c)
-end
-
-
-function _edges_hexa(ip::IGA.BernsteinBasis{3,orders}) where {orders}
-    @assert(length(orders) == 3)
-    
+function Ferrite.edges(ip::BernsteinBasis{3,orders}) where {orders}
     edges = Tuple[]
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
 
@@ -120,19 +95,6 @@ function _edges_hexa(ip::IGA.BernsteinBasis{3,orders}) where {orders}
     push!(edges, Tuple(ind[end,1,:]))
     push!(edges, Tuple(ind[1,end,:]))
     push!(edges, Tuple(ind[end,end,:]))
-
-    return Tuple(edges)
-end
-
-function _edges_quad(ip::IGA.BernsteinBasis{3,orders}) where {orders}
-    @assert(length(orders) == 2)
-    edges = Tuple[]
-    ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
-
-    push!(edges, Tuple(ind[:,1][:]))# bottom
-    push!(edges, Tuple(ind[end,:][:]))# right
-    push!(edges, Tuple(reverse(ind[:,end])[:]))# top
-    push!(edges, Tuple(reverse(ind[1,:])[:]))# left
 
     return Tuple(edges)
 end
