@@ -1,4 +1,4 @@
-using JuAFEM, IGA, LinearAlgebra
+using Ferrite, IGA, LinearAlgebra
 
 function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
     n_basefuncs = getnbasefunctions(cv)
@@ -93,7 +93,7 @@ function get_material(; E, ν)
     return SymmetricTensor{4, 2}(g)
 end;
 
-function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
 
     celldofs = zeros(Int, ndofs_per_cell(dh))
 
@@ -161,15 +161,15 @@ function solve()
     apply!(K, f, ch)
     u = K\f
 
-    cellstresses = calculate_stress(dh, cv, stiffmat, u)
+    #cellstresses = calculate_stress(dh, cv, stiffmat, u)
 
-    csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
-    projector = L2Projector(csv, ip, grid)
-    σ_nodes = project(cellstresses, projector)
+    #csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
+    #projector = L2Projector(csv, ip, grid)
+    #σ_nodes = project(cellstresses, projector)
 
     vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
     vtk_point_data(vtkgrid, dh, u, :u)
-    vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
+    #vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
     vtk_save(vtkgrid)
 
 end;

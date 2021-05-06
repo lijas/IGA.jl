@@ -9,10 +9,10 @@
 
 #md # !!! note 
 #md #     It is expected that the reader already be familiar with IGA and the concept of "bezier extraction".
-#md #     It is also expected that the reader is familiar with the JuAFEM package. In particular JuAFEM.DofHandler and JuAFEM.CellValues.
+#md #     It is also expected that the reader is familiar with the Ferrite package. In particular Ferrite.DofHandler and Ferrite.CellValues.
 
 # Start by loading the necessary packages
-using JuAFEM, IGA, LinearAlgebra
+using Ferrite, IGA, LinearAlgebra
 
 # Next we define the functions for the integration of the element stiffness matrix and traction force.
 # These functions will be the same as for a normal finite elment problem, but
@@ -122,7 +122,7 @@ function get_material(; E, ν)
 end;
 
 # We also create a function that calculates the stress in each quadrature point, given the cell displacement and such...
-function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
     
     celldofs = zeros(Int, ndofs_per_cell(dh))
 
@@ -161,13 +161,13 @@ function solve()
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
 
     # Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this 
-    # we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `JuAFEM.Grid`, but includes the NURBS-weights and 
+    # we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `Ferrite.Grid`, but includes the NURBS-weights and 
     # bezier extraction operators.
     grid = BezierGrid(nurbsmesh)
 
-    # Next, create some facesets. This is done in the same way as in normal JuAFEM-code. One thing to note however, is that the nodes/controlpoints, 
+    # Next, create some facesets. This is done in the same way as in normal Ferrite-code. One thing to note however, is that the nodes/controlpoints, 
     # does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
-    # use the JuAFEM functions below.
+    # use the Ferrite functions below.
     addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
     addfaceset!(grid, "left", (x) -> x[1] ≈ -4.0)
     addfaceset!(grid, "bot", (x) -> x[2] ≈ 0.0)
@@ -206,19 +206,23 @@ function solve()
     u = K\f
     
     # Now we want to export the results to VTK. So we calculate the stresses in each gauss-point, and project them to 
-    # the nodes using the L2Projector from JuAFEM. Node that we need to create new CellValues of type CellScalarValues, since the 
+    # the nodes using the L2Projector from Ferrite. Node that we need to create new CellValues of type CellScalarValues, since the 
     # L2Projector only works with scalar fields.
 
-    cellstresses = calculate_stress(dh, cv, stiffmat, u)
+#md # !!! note 
+#md #     Termporarily disabeling L2-projections due to changes in Ferrite
+#md #     
 
-    csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
-    projector = L2Projector(csv, ip, grid)
-    σ_nodes = project(cellstresses, projector)
+    #cellstresses = calculate_stress(dh, cv, stiffmat, u)
+
+    #csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
+    #projector = L2Projector(csv, ip, grid)
+    #σ_nodes = project(cellstresses, projector)
 
     # Output results to VTK
     vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
     vtk_point_data(vtkgrid, dh, u, :u)
-    vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
+    #vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
     vtk_save(vtkgrid)
 
 end;
