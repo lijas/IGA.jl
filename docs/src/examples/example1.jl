@@ -1,4 +1,4 @@
-using JuAFEM, IGA, LinearAlgebra
+using Ferrite, IGA, LinearAlgebra
 
 function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
     n_basefuncs = getnbasefunctions(cv)
@@ -92,7 +92,7 @@ function get_material(; E, ν)
     return SymmetricTensor{4, 2}(g)
 end;
 
-function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
 
     celldofs = zeros(Int, ndofs_per_cell(dh))
 

@@ -1,6 +1,6 @@
 # IGA.jl
 
-Small toolbox for Isogeometric anlysis. Built on top of [JuAFEM](https://github.com/KristofferC/JuAFEM.jl)
+Small toolbox for Isogeometric anlysis. Built on top of [Ferrite](https://github.com/KristofferC/Ferrite.jl)
 
 ## Installation
 

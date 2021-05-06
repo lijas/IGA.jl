@@ -5,12 +5,12 @@ b1 = BernsteinBasis{2,(2,2)}()
 b2 = BernsteinBasis{1,2}()
 
 #1d basis function should equal to 2d basis function on the boundary (-1.0)
-@test JuAFEM.value(b1, 5, Vec((0.0,-1.0))) == JuAFEM.value(b2, 3, Vec((0.0)))
+@test Ferrite.value(b1, 5, Vec((0.0,-1.0))) == Ferrite.value(b2, 3, Vec((0.0)))
 
 for xi in [rand(Vec{2,Float64}), rand(Vec{2,Float64})]
     sum = 0.0
-    for i in  1:JuAFEM.getnbasefunctions(b1)
-        sum += JuAFEM.value(b1, i, xi)
+    for i in  1:Ferrite.getnbasefunctions(b1)
+        sum += Ferrite.value(b1, i, xi)
     end
     @test sum ≈ 1.0
 end
@@ -26,8 +26,8 @@ for p in (2,4)
     reorder = IGA._bernstein_ordering(ip2)
 
     ξ = Vec((rand(),rand()))
-    N1 = JuAFEM.value(ip1, ξ)[reorder]
-    N2 = JuAFEM.value(ip2, ξ)
+    N1 = Ferrite.value(ip1, ξ)[reorder]
+    N2 = Ferrite.value(ip2, ξ)
 
     @test N1 ≈ N2
 end

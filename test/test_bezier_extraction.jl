@@ -37,7 +37,7 @@ end
 
     grid = BezierGrid(mesh)
     
-    reorder = IGA._bernstein_ordering(JuAFEM.getcelltype(grid))
+    reorder = IGA._bernstein_ordering(Ferrite.getcelltype(grid))
     
     #Element 1
     x_paper = [Vec((0.0, 1.0)), Vec((0.2612, 1.0)), Vec((0.4890, 0.8723)), Vec((0.0, 1.25)), Vec((0.3265, 1.25)), Vec((0.6113, 1.0903)), Vec((0.0, 1.5)), Vec((0.3918, 1.5)), Vec((0.7336, 1.3084))][reorder]

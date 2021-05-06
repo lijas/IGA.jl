@@ -142,7 +142,7 @@ end
         set_bezier_operator!(fv, w.*C)
         reinit!(fv, Xb, wb, faceidx)
 
-        qr_face_side = JuAFEM.create_face_quad_rule(qr_face, ip)[faceidx]
+        qr_face_side = Ferrite.create_face_quad_rule(qr_face, ip)[faceidx]
         for (iqp, ξ) in enumerate(qr_face_side.points)
 
             #Calculate the value of the NURBS from the nurbs patch
@@ -158,7 +158,7 @@ end
             end
 
             J = sum(X .⊗ dRdξ_patch)
-            dV_patch = norm(JuAFEM.weighted_normal(J, fv, faceidx))*qr_face_side.weights[iqp]
+            dV_patch = norm(Ferrite.weighted_normal(J, fv, faceidx))*qr_face_side.weights[iqp]
 
             dRdX_patch = similar(dNdξ)
             for i in 1:nb_per_cell

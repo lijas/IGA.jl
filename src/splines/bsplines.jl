@@ -4,7 +4,7 @@ export BSplineBasis
 Interpolation for bsplines.
     Not really used, since bezier-interpolation + bezier-extraction is prefered. 
 """
-struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order}
+struct BSplineBasis{dim,T,order} <: Ferrite.Interpolation{dim,Ferrite.RefCube,order}
 	knot_vector::NTuple{dim,Vector{T}}
 
     function BSplineBasis(knots::NTuple{dim,Vector{T}}, order::NTuple{dim,Int}) where {dim,T} 
@@ -21,11 +21,11 @@ struct BSplineBasis{dim,T,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,orde
 end
 
 getnbasefunctions_dim(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = Tuple([length(basis.knot_vector[i]) - order[i] - 1 for i in 1:dim])
-JuAFEM.getnbasefunctions(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = prod(getnbasefunctions_dim(basis))::Int
+Ferrite.getnbasefunctions(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = prod(getnbasefunctions_dim(basis))::Int
 
-function JuAFEM.value(b::BSplineBasis{dim,T,order}, i, xi::Vec{dim}) where {dim,T,order}
+function Ferrite.value(b::BSplineBasis{dim,T,order}, i, xi::Vec{dim}) where {dim,T,order}
 
-    @assert( i <= JuAFEM.getnbasefunctions(b))
+    @assert( i <= Ferrite.getnbasefunctions(b))
 
     _n = getnbasefunctions_dim(b)
     
@@ -45,7 +45,7 @@ end
 const BSplineCurve{sdim,T} = BSplineGeometry{1,sdim,T}
 const BSplineSurface{sdim,T} = BSplineGeometry{2,sdim,T}
 
-function JuAFEM.value(curve::BSplineGeometry{pdim,sdim,T}, xi::Vec{sdim,T}) where {pdim,sdim,T}
+function Ferrite.value(curve::BSplineGeometry{pdim,sdim,T}, xi::Vec{sdim,T}) where {pdim,sdim,T}
 
 	S = zero(Vec{dim,T})
 	counter = 0

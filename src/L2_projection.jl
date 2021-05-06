@@ -1,10 +1,10 @@
 
-# The functions in JuAFEM calls getcoordinates(grid, cellid)
+# The functions in Ferrite calls getcoordinates(grid, cellid)
 # but in IGA we need to call get_bezier_coordinates(grid, cellid).
-# Therefore we have to copy the functions from JuAFEM, even though the code is almost the same
+# Therefore we have to copy the functions from Ferrite, even though the code is almost the same
 
-function JuAFEM._assemble_L2_matrix(fe_values::BezierCellValues, set, dh)
-    n = JuAFEM.getn_scalarbasefunctions(fe_values)
+function Ferrite._assemble_L2_matrix(fe_values::BezierCellValues, set, dh)
+    n = Ferrite.getn_scalarbasefunctions(fe_values)
     M = create_symmetric_sparsity_pattern(dh)
     assembler = start_assemble(M)
 
@@ -48,7 +48,7 @@ function JuAFEM._assemble_L2_matrix(fe_values::BezierCellValues, set, dh)
     return M
 end
 
-function JuAFEM._project(vars, proj::L2Projector{<:BezierCellValues}, M::Integer) 
+function Ferrite._project(vars, proj::L2Projector{<:BezierCellValues}, M::Integer) 
 
     # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.

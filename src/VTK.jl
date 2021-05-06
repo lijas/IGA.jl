@@ -8,9 +8,9 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid{dim,C,T}) 
 	cellorders = Int[]
 	offset = 0
     for (cellid, cell) in enumerate(grid.cells)
-		reorder = juafem_to_vtk_order(typeof(first(grid.cells)))
+		reorder = Ferrite_to_vtk_order(typeof(first(grid.cells)))
 		
-		vtktype = JuAFEM.cell_to_vtkcell(typeof(cell))
+		vtktype = Ferrite.cell_to_vtkcell(typeof(cell))
 		for p in getorders(cell)
 			push!(cellorders, p)
 		end
@@ -38,18 +38,18 @@ end
 function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler{dim,T,G}, u::Vector, suffix="") where {dim,T,G<:BezierGrid}
 	C = getcelltype(dh.grid)
 	@assert isconcretetype(C)
-	N = JuAFEM.nnodes(C)
+	N = Ferrite.nnodes(C)
 
-    fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
+    fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
         @debug println("exporting field $(name)")
-        field_dim = JuAFEM.getfielddim(dh, name)
+        field_dim = Ferrite.getfielddim(dh, name)
         space_dim = field_dim == 2 ? 3 : field_dim
         data = fill(NaN, space_dim, N*getncells(dh.grid))  # set default value
 
 		for fh in dh.fieldhandlers
-			field_pos = findfirst(i->i == name, JuAFEM.getfieldnames(fh))
+			field_pos = findfirst(i->i == name, Ferrite.getfieldnames(fh))
             field_pos === nothing && continue 
 
             cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
@@ -105,13 +105,13 @@ function WriteVTK.vtk_point_data(
 	grid::BezierGrid{dim,C}) where {order,dimv,dim,C,T,M}
 
 	@assert isconcretetype(C)
-	nnodes = JuAFEM.nnodes(C)
+	nnodes = Ferrite.nnodes(C)
 
 	data = fill(NaN, M, nnodes*getncells(grid))  # set default value
 
 	nodecount = 0
     for (cellid, cell) in enumerate(grid.cells)
-		reorder = juafem_to_vtk_order(typeof(first(grid.cells)))
+		reorder = Ferrite_to_vtk_order(typeof(first(grid.cells)))
 		nodevalues = cpvalues[collect(cell.nodes)]
 		_distribute_vtk_point_data!(grid.beo[cellid], data, nodevalues, nodecount)
 		nodecount += length(cell.nodes)

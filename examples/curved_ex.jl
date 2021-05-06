@@ -1,4 +1,4 @@
-using JuAFEM, IGA, SparseArrays
+using Ferrite, IGA, SparseArrays
 using Plots; pyplot()
 
 function generate_square_with_hole(nel::NTuple{2,Int}, L::T=4.0, R::T = 1.0) where T
@@ -47,12 +47,12 @@ function generate_square_with_hole(nel::NTuple{2,Int}, L::T=4.0, R::T = 1.0) whe
     end
 
 
-    JuAFEM.copy!!(grid.nodes, nodes)
+    Ferrite.copy!!(grid.nodes, nodes)
     empty!(grid.facesets)
     return grid
 end
 
-function doassemble(cellvalues::JuAFEM.Values{dim}, facevalues::JuAFEM.Values{dim}, K::AbstractMatrix, dh::MixedDofHandler, C::SymmetricTensor{4,2}) where {dim}
+function doassemble(cellvalues::Ferrite.Values{dim}, facevalues::Ferrite.Values{dim}, K::AbstractMatrix, dh::MixedDofHandler, C::SymmetricTensor{4,2}) where {dim}
 
     grid = dh.grid
     f = zeros(ndofs(dh))
@@ -122,7 +122,7 @@ function doassemble(cellvalues::JuAFEM.Values{dim}, facevalues::JuAFEM.Values{di
             end
         end
 
-        global_dofs = zeros(Int, JuAFEM.ndofs_per_cell(dh,cellid))
+        global_dofs = zeros(Int, Ferrite.ndofs_per_cell(dh,cellid))
         celldofs!(global_dofs, dh, cellid)
         assemble!(assembler, global_dofs, fe, Ke)
 
@@ -131,14 +131,14 @@ function doassemble(cellvalues::JuAFEM.Values{dim}, facevalues::JuAFEM.Values{di
     return K, f
 end;
 
-function calc_stresses(cellvalues::JuAFEM.Values{dim}, dh::MixedDofHandler, u::Vector{T}, C::SymmetricTensor{4,2}) where {dim,T}
+function calc_stresses(cellvalues::Ferrite.Values{dim}, dh::MixedDofHandler, u::Vector{T}, C::SymmetricTensor{4,2}) where {dim,T}
 
     grid = dh.grid
 
     cellstresses = zeros(SymmetricTensor{2,2}, getnnodes(grid))
     for cellid in 1:getncells(dh.grid)
 
-        global_dofs = zeros(Int, JuAFEM.ndofs_per_cell(dh,cellid))
+        global_dofs = zeros(Int, Ferrite.ndofs_per_cell(dh,cellid))
         celldofs!(global_dofs, dh, cellid)
 
         coords, w = IGA.get_bezier_coordinates(grid, cellid)
@@ -202,7 +202,7 @@ function go(grid, ip, cellvalues, facevalues)
     apply!(K, f, ch)
     u = K \ f;
 
-    #x = JuAFEM.reference_coordinates(ip)
+    #x = Ferrite.reference_coordinates(ip)
     #qr = QuadratureRule{2,RefCube,Float64}(zeros(Float64,length(x)), x)
     #cellvalues = BezierValues(CellVectorValues(qr,ip))
     

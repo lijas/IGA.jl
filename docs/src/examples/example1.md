@@ -13,12 +13,12 @@ By using so called bezier extraction, we will see that most of the structure of 
 
 !!! note
     It is expected that the reader already be familiar with IGA and the concept of "bezier extraction".
-    It is also expected that the reader is familiar with the JuAFEM package. In particular JuAFEM.DofHandler and JuAFEM.CellValues.
+    It is also expected that the reader is familiar with the Ferrite package. In particular Ferrite.DofHandler and Ferrite.CellValues.
 
 Start by loading the necessary packages
 
 ```@example example1
-using JuAFEM, IGA, LinearAlgebra
+using Ferrite, IGA, LinearAlgebra
 ```
 
 Next we define the functions for the integration of the element stiffness matrix and traction force.
@@ -147,7 +147,7 @@ nothing #hide
 We also create a function that calculates the stress in each quadrature point, given the cell displacement and such...
 
 ```@example example1
-function calculate_stress(dh, cv::JuAFEM.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
 
     celldofs = zeros(Int, ndofs_per_cell(dh))
 
@@ -190,16 +190,16 @@ function solve()
 ```
 
 Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this
-we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `JuAFEM.Grid`, but includes the NURBS-weights and
+we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `Ferrite.Grid`, but includes the NURBS-weights and
 bezier extraction operators.
 
 ```@example example1
     grid = BezierGrid(nurbsmesh)
 ```
 
-Next, create some facesets. This is done in the same way as in normal JuAFEM-code. One thing to note however, is that the nodes/controlpoints,
+Next, create some facesets. This is done in the same way as in normal Ferrite-code. One thing to note however, is that the nodes/controlpoints,
 does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to
-use the JuAFEM functions below.
+use the Ferrite functions below.
 
 ```@example example1
     addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
@@ -256,7 +256,7 @@ Solve
 ```
 
 Now we want to export the results to VTK. So we calculate the stresses in each gauss-point, and project them to
-the nodes using the L2Projector from JuAFEM. Node that we need to create new CellValues of type CellScalarValues, since the
+the nodes using the L2Projector from Ferrite. Node that we need to create new CellValues of type CellScalarValues, since the
 L2Projector only works with scalar fields.
 
 ```@example example1

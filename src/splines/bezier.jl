@@ -7,25 +7,25 @@ The Bertnstein polynominal spline basis. Usually used as the cell interpolation 
 IGA, together with bezier extraction + BezierValues.
 
 `dim` - The spacial dimentsion of the interpolation
-`order` - A tuple with the order in each parametric direction. Note, this can be lower than `dim`.
+`order` - A tuple with the order in each parametric direction. 
 """  
-struct BernsteinBasis{dim,order} <: JuAFEM.Interpolation{dim,JuAFEM.RefCube,order} 
+struct BernsteinBasis{dim,order} <: Ferrite.Interpolation{dim,Ferrite.RefCube,order} 
     function BernsteinBasis{dim,order}() where {dim,order} 
-         @assert(length(order) <= dim)
+         @assert(length(order) == dim)
          # Make order into tuple for 1d case
          return new{dim,Tuple(order)}()
     end
 end
 
-#= This is a bit of a hack to get JuAFEMs Dofhandler to distribute dofs correctly:
+#= This is a bit of a hack to get Ferrites Dofhandler to distribute dofs correctly:
 There are actually dofs on the faces/edges, but define all dofs on the verices instead =#
-JuAFEM.getnbasefunctions(::BernsteinBasis{dim,order}) where {dim,order} = prod(order .+ 1)::Int
-JuAFEM.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
-JuAFEM.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
-JuAFEM.nfacedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
-JuAFEM.ncelldofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
+Ferrite.getnbasefunctions(::BernsteinBasis{dim,order}) where {dim,order} = prod(order .+ 1)::Int
+Ferrite.nvertexdofs(::BernsteinBasis{dim,order}) where {dim,order} = 1
+Ferrite.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
+Ferrite.nfacedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
+Ferrite.ncelldofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
 
-function JuAFEM.value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) where {dim,order}
+function Ferrite.value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) where {dim,order}
 
     _n = order .+ 1
     
@@ -45,38 +45,22 @@ function JuAFEM.value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) where
     return val
 end
 
-JuAFEM.vertices(ip::BernsteinBasis{dim,orders}) where {dim,orders} = ntuple(i -> i, JuAFEM.getnbasefunctions(ip))
+Ferrite.vertices(ip::BernsteinBasis{dim,orders}) where {dim,orders} = ntuple(i -> i, Ferrite.getnbasefunctions(ip))
 
 # 2D
-function JuAFEM.faces(c::BernsteinBasis{2,orders}) where {orders}
-    length(orders) == 1 && return _faces_line(c)
-    length(orders) == 2 && return _faces_quad(c)
-end
-
-_faces_line(::BernsteinBasis{2,orders}) where {orders} = (ntuple(i -> i, orders),)
-
-function _faces_quad(ip::BernsteinBasis{2,orders}) where {orders}
-    dim = 2
+function Ferrite.faces(ip::BernsteinBasis{2,orders}) where {orders}
     faces = Tuple[]
-
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
     push!(faces, Tuple(ind[:,1])) #bot
-    push!(faces, Tuple(ind[end,:]))# left
+    push!(faces, Tuple(ind[end,:]))# right
     push!(faces, Tuple(ind[:,end]))# top
-    push!(faces, Tuple(ind[1,:]))# right
+    push!(faces, Tuple(ind[1,:]))# left
     
     return Tuple(faces) 
 end
 
-function JuAFEM.faces(c::BernsteinBasis{3,orders}) where {orders}
-    length(orders) == 2 && return _faces_quad(c)
-    length(orders) == 3 && return _faces_hexa(c)
-end
-_faces_quad(::BernsteinBasis{3,orders}) where {orders} = ntuple(i -> i, prod(orders .+ 1))
-function _faces_hexa(ip::BernsteinBasis{3,orders}) where {orders}
-    @assert(length(orders) == 3)
-
+function Ferrite.faces(ip::BernsteinBasis{3,orders}) where {orders}
     faces = Tuple[]
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
@@ -89,17 +73,8 @@ function _faces_hexa(ip::BernsteinBasis{3,orders}) where {orders}
 
     return Tuple(faces)
 end
-# 
 
-function JuAFEM.edges(c::BernsteinBasis{3,orders}) where {orders}
-    length(orders) == 2 && return _edges_quad(c)
-    length(orders) == 3 && return _edges_hexa(c)
-end
-
-
-function _edges_hexa(ip::IGA.BernsteinBasis{3,orders}) where {orders}
-    @assert(length(orders) == 3)
-    
+function Ferrite.edges(ip::BernsteinBasis{3,orders}) where {orders}
     edges = Tuple[]
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
 
@@ -124,19 +99,6 @@ function _edges_hexa(ip::IGA.BernsteinBasis{3,orders}) where {orders}
     return Tuple(edges)
 end
 
-function _edges_quad(ip::IGA.BernsteinBasis{3,orders}) where {orders}
-    @assert(length(orders) == 2)
-    edges = Tuple[]
-    ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
-
-    push!(edges, Tuple(ind[:,1][:]))# bottom
-    push!(edges, Tuple(ind[end,:][:]))# right
-    push!(edges, Tuple(reverse(ind[:,end])[:]))# top
-    push!(edges, Tuple(reverse(ind[1,:])[:]))# left
-
-    return Tuple(edges)
-end
-
 function _bernstein_basis_recursive(p::Int, i::Int, xi::T) where T
 	if i == 1 && p == 0
 		return 1
@@ -151,7 +113,7 @@ function _bernstein_basis_derivative_recursive(p::Int, i::Int, xi::T) where T
     return p * (_bernstein_basis_recursive(p - 1, i - 1, xi) - _bernstein_basis_recursive(p - 1, i, xi))
 end
 
-function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_s,order}
+function Ferrite.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_s,order}
     dim_p = length(order)
     T = Float64
 
@@ -170,7 +132,7 @@ function JuAFEM.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_
         end
         # In some cases we have for example a 1d-line (dim_p=1) in 2d (dim_s=1). 
         # Then this bernsteinbasis will only be used for, not for actualy calculating basefunction values
-        # Anyways, in those cases, we will still need to export a 2d-coord, because JuAFEM.BCValues will be super mad 
+        # Anyways, in those cases, we will still need to export a 2d-coord, because Ferrite.BCValues will be super mad 
         for _ in 1:(dim_s - dim_p)
             push!(_vec, zero(T))
         end
@@ -261,7 +223,7 @@ function _bernstein_ordering(::BernsteinBasis{3,orders}) where {orders}
     append!(ordering, ind[1, end, 2:end-1])
     append!(ordering, ind[end, end, 2:end-1])
 
-    # Faces (vtk orders left face first, but juafem orders bottom first)
+    # Faces (vtk orders left face first, but Ferrite orders bottom first)
     append!(ordering, ind[2:end-1, 2:end-1, 1][:])   # bottom
     append!(ordering, ind[2:end-1, 1, 2:end-1][:])   # front
     append!(ordering, ind[end, 2:end-1, 2:end-1][:]) # right
@@ -310,7 +272,7 @@ function _vtk_ordering(::BernsteinBasis{3,orders}) where {orders}
     append!(ordering, ind[1, end, 2:end-1])
     append!(ordering, ind[end, end, 2:end-1])
 
-    # Faces (vtk orders left face first, but juafem orders bottom first)
+    # Faces (vtk orders left face first, but Ferrite orders bottom first)
     append!(ordering, ind[1, 2:end-1, 2:end-1][:])   # left
     append!(ordering, ind[end, 2:end-1, 2:end-1][:]) # right
     append!(ordering, ind[2:end-1, 1, 2:end-1][:])   # front
