@@ -223,6 +223,52 @@ function generate_nurbs_patch(::Val{:nasa_specimen}, nel_bend::NTuple{2,Int}, or
 	return IGA.NURBSMesh(Tuple([kv_x,kv_y]), orders, control_points)
 end
 
+function generate_nurbs_patch(::Val{:nasa_specimen}, nel_bend::NTuple{1,Int}, orders::NTuple{1,Int}; L1::T, R::T, multiplicity::NTuple{1,Int}=(1,)) where {T}
+
+	pdim = 1
+	sdim = 2
+
+	kv_bend = _create_knotvector(T, nel_bend[1], orders[1], multiplicity[1])
+	nbasefuncs_bend = [(length(kv_bend[i])-1-orders[i]) for i in 1:pdim]
+
+	elbow = collect(_generate_equidistant_parametrization(kv_bend, orders[1], 0.0, π/2))
+	reverse!(elbow)
+
+	cp_inplane = Vec{sdim,T}[]
+	
+	#First create the points inplane, and then extrude it
+	for θ in elbow
+		x = -R*cos(θ) + R
+		z = -R*sin(θ) + R
+		push!(cp_inplane, Vec((x,z)))
+	end
+	
+	cp_dist = abs(elbow[end÷2] - elbow[(end÷2) - 1]) * R
+	straght = collect((R+cp_dist):cp_dist:(R+L1))
+	
+	for x in (straght)
+		pushfirst!(cp_inplane, Vec((x, 0.0)))
+	end
+
+	for z in (straght)
+		push!(cp_inplane, Vec((0.0, z)))
+	end
+
+	#Since it is not clear how many elements exist in x-direction, recreate the knotvector along specimen
+	nbasefuncs = length(cp_inplane)
+	nelx = nbasefuncs - orders[1]
+	kv_x = _create_knotvector(T, nelx, orders[1], multiplicity[1])
+	
+	#Rotate everything 45 degrees
+	θ = deg2rad(45.0 + 90.0)
+	Rotmat = [cos(θ) sin(θ);-sin(θ) cos(θ)] |> Tuple |> Tensor{2,2}
+	for i in eachindex(cp_inplane)
+		cp_inplane[i] = Rotmat ⋅ cp_inplane[i]
+	end
+
+	return IGA.NURBSMesh((kv_x,), orders, cp_inplane)
+end
+
 function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; α::T, R::T, width::T, thickness::T, multiplicity::NTuple{3,Int}=(1,1,1)) where T
 
 	pdim = 3
