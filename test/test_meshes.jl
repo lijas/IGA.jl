@@ -6,7 +6,8 @@ function _calculate_volume(cv, grid, cellset, bezier_operators)
 
         set_bezier_operator!(cv, Ce)
         X = getcoordinates(grid, cellid)
-        Xᴮ = compute_bezier_points(Ce, X)
+        Xᴮ = similar(X)
+        compute_bezier_points!(Xᴮ, Ce, X)
 
         reinit!(cv, Xᴮ)
 
@@ -24,7 +25,8 @@ function _calculate_area(fv, grid, faceset, bezier_operators)
 
         set_bezier_operator!(fv, Ce)
         X = getcoordinates(grid, cellid)
-        Xᴮ = compute_bezier_points(Ce, X)
+        Xᴮ = similar(X)
+        compute_bezier_points!(Xᴮ, Ce, X)
 
         reinit!(fv, Xᴮ, faceidx)
 
