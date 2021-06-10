@@ -1,5 +1,33 @@
 
-export compute_bezier_extraction_operators, compute_bezier_points
+export compute_bezier_extraction_operators, compute_bezier_points, compute_bezier_points!
+
+"""
+	compute_bezier_points(bezier_points::AbstractVector{T2}, Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1)
+
+Given a BezierExtractionOperator and control points for a cell, compute the bezier controlpoints.
+"""
+Base.@propagate_inbounds function compute_bezier_points!(bezier_points::AbstractVector{T2}, Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1) where {T2,T}
+
+	n_points = length(first(Ce))
+	@boundscheck (length(control_points) == length(Ce)*dim)
+	@boundscheck (length(bezier_points) == n_points*dim)
+
+	Base.@inbounds for i in 1:length(bezier_points)
+		bezier_points[i] = zero(T2)
+	end
+
+	for ic in 1:length(control_points)÷dim
+		ce = Ce[ic]
+
+		for i in 1:n_points
+			for d in 1:dim
+				bezier_points[(i-1)*dim + d] += ce[i] * control_points[(ic-1)*dim + d]
+			end
+		end
+	end
+
+	return nothing
+end
 
 """
 	compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1)
@@ -8,19 +36,8 @@ Given a BezierExtractionOperator and control points for a cell, compute the bezi
 """
 function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1) where {T2,T}
 
-	@assert(length(control_points) == length(Ce)*dim)
-	n_points = length(first(Ce))#length(control_points)#length(first(Ce))
-	bezierpoints = zeros(T2, n_points*dim)
-
-	for ic in 1:length(control_points)÷dim
-		ce = Ce[ic]
-
-		for i in 1:n_points
-			for d in 1:dim
-				bezierpoints[(i-1)*dim + d] += ce[i] * control_points[(ic-1)*dim + d]
-			end
-		end
-	end
+	bezierpoints = zeros(T2, length(first(Ce))*dim)
+	compute_bezier_points!(bezierpoints, Ce, control_points, dim=dim)
 
 	return bezierpoints
 
