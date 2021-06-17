@@ -113,28 +113,25 @@ function _bernstein_basis_derivative_recursive(p::Int, i::Int, xi::T) where T
     return p * (_bernstein_basis_recursive(p - 1, i - 1, xi) - _bernstein_basis_recursive(p - 1, i, xi))
 end
 
-function Ferrite.reference_coordinates(::BernsteinBasis{dim_s,order}) where {dim_s,order}
-    dim_p = length(order)
-    T = Float64
+function Ferrite.reference_coordinates(ip::BernsteinBasis{dim_s,order}) where {dim_s,order}
 
-    _n = order .+ 1
+    T = Float64
+    nbasefunks_dim = order .+ 1
+    nbasefuncs = prod(nbasefunks_dim)
     
     coords = Vec{dim_s,T}[]
 
-    ranges = [range(-1.0, stop=1.0, length=_n[i]) for i in 1:dim_p]
+    ordering = _bernstein_ordering(ip)
+    ranges = [range(-1.0, stop=1.0, length=nbasefunks_dim[i]) for i in 1:dim_s]
 
-    # algo independent of dim
-    inds = CartesianIndices(_n)[:]
-    for ind in inds
+    inds = CartesianIndices(nbasefunks_dim)
+    for i in 1:nbasefuncs
+        ind = inds[ordering[i]]
+
         _vec = T[]
-        for d in 1:dim_p
-            push!(_vec, ranges[d][ind[d]])
-        end
-        # In some cases we have for example a 1d-line (dim_p=1) in 2d (dim_s=1). 
-        # Then this bernsteinbasis will only be used for, not for actualy calculating basefunction values
-        # Anyways, in those cases, we will still need to export a 2d-coord, because Ferrite.BCValues will be super mad 
-        for _ in 1:(dim_s - dim_p)
-            push!(_vec, zero(T))
+        for d in 1:dim_s
+            j = ranges[d][ind[d]]
+            push!(_vec, j)
         end
 
         push!(coords, Vec(Tuple(_vec)))
