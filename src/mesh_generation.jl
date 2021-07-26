@@ -43,14 +43,14 @@ function generate_nurbs_patch(s::Symbol, args...; kwargs...)
 	generate_nurbs_patch(Val{s}(), args...; kwargs...)
 end
 
-function generate_nurbs_patch(::Val{:cube}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; size::NTuple{3,T}, multiplicity::NTuple{3,Int}=(1,1,1)) where T
+function generate_nurbs_patch(::Val{:cube}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; cornerpos::NTuple{3,T} = (0.0,0.0,0.0), size::NTuple{3,T}, multiplicity::NTuple{3,Int}=(1,1,1)) where T
 
 	pdim = 3
 	sdim = 3
 
 	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 	nbf = length.(knot_vectors) .- orders .- 1
-	coords = [_generate_linear_parametrization(knot_vectors[d], orders[d], 0.0, size[d]) for d in 1:pdim]
+	coords = [_generate_linear_parametrization(knot_vectors[d], orders[d], cornerpos[d], cornerpos[d] + size[d]) for d in 1:pdim]
 	
 	control_points = Vec{sdim,T}[]
 	for iz in 1:nbf[3]
@@ -70,10 +70,10 @@ function generate_nurbs_patch(::Val{:cube}, nel::NTuple{3,Int}, orders::NTuple{3
 	return IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
 end
 
-function generate_nurbs_patch(::Val{:rectangle}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; size::NTuple{2,T}, multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
-	generate_nurbs_patch(:cube, nel, orders; size=size, multiplicity=multiplicity, sdim=sdim)
+function generate_nurbs_patch(::Val{:rectangle}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; cornerpos::NTuple{2,T} = (0.0,0.0), size::NTuple{2,T}, multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
+	generate_nurbs_patch(:cube, nel, orders; cornerpos=cornerpos, size=size, multiplicity=multiplicity, sdim=sdim)
 end
-function generate_nurbs_patch(::Val{:cube}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; size::NTuple{2,T}, multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
+function generate_nurbs_patch(::Val{:cube}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; cornerpos::NTuple{2,T} = (0.0,0.0), size::NTuple{2,T}, multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
 
 	@assert( all(orders .>= multiplicity) )
 
@@ -81,7 +81,7 @@ function generate_nurbs_patch(::Val{:cube}, nel::NTuple{2,Int}, orders::NTuple{2
 
 	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 	nbf = length.(knot_vectors) .- orders .- 1
-	coords = [_generate_linear_parametrization(knot_vectors[d], orders[d], 0.0, size[d]) for d in 1:pdim]
+	coords = [_generate_linear_parametrization(knot_vectors[d], orders[d], cornerpos[d], cornerpos[d] + size[d]) for d in 1:pdim]
 	
 	control_points = Vec{sdim,T}[]
 
@@ -105,10 +105,10 @@ function generate_nurbs_patch(::Val{:cube}, nel::NTuple{2,Int}, orders::NTuple{2
 
 end
 
-function generate_nurbs_patch(::Val{:line}, nel::NTuple{1,Int}, orders::NTuple{1,Int}, size::NTuple{1,T}; multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
-	generate_nurbs_patch(:cube, nel, orders; size=size, multiplicity=multiplicity, sdim=sdim)
+function generate_nurbs_patch(::Val{:line}, nel::NTuple{1,Int}, orders::NTuple{1,Int}, size::NTuple{1,T};  cornerpos::NTuple{1,T} = (0.0,), multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
+	generate_nurbs_patch(:cube, nel, orders; cornerpos=cornerpos, size=size, multiplicity=multiplicity, sdim=sdim)
 end
-function generate_nurbs_patch(::Val{:cube}, nel::NTuple{1,Int}, orders::NTuple{1,Int}; size::NTuple{1,T}, multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
+function generate_nurbs_patch(::Val{:cube}, nel::NTuple{1,Int}, orders::NTuple{1,Int}; cornerpos::NTuple{1,T} = (0.0,), size::NTuple{1,T}, multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
 
 	@assert( all(orders .>= multiplicity) )
 
@@ -116,7 +116,7 @@ function generate_nurbs_patch(::Val{:cube}, nel::NTuple{1,Int}, orders::NTuple{1
 
 	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
 	nbf = length.(knot_vectors) .- orders .- 1
-	coords = [_generate_linear_parametrization(knot_vectors[d], orders[d], 0.0, size[d]) for d in 1:pdim]
+	coords = [_generate_linear_parametrization(knot_vectors[d], orders[d], cornerpos[d], cornerpos[d] + size[d]) for d in 1:pdim]
 	
 	control_points = Vec{sdim,T}[]
 

@@ -61,10 +61,10 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
 end
 
 function test_cube()
-    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (2,2,2), (2,2,2), size=(2.0,3.0,4.0))
+    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (2,2,2), (2,2,2), cornerpos=(-1.0,-2.0,0.0), size=(2.0,3.0,4.0))
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "left", (x)->x[1]≈0.0)
-    addfaceset!(grid, "right", (x)->x[1]≈2.0)
+    addfaceset!(grid, "left", (x)->x[1]≈-1.0)
+    addfaceset!(grid, "right", (x)->x[1]≈1.0)
     addfaceset!(grid, "top", (x)->x[3]≈4.0)
 
     #Volume
@@ -84,11 +84,11 @@ function test_cube()
 end
 
 function test_square()
-    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (1,1,), (2,2,), size=(2.0,3.0,))
+    grid, cv, fv, bezier_operators = _get_problem_data(:cube, (1,1,), (2,2,), cornerpos=(-1.0,-1.0), size=(2.0,3.0,))
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "left", (x)->x[1]≈0.0)
-    addfaceset!(grid, "right", (x)->x[1]≈2.0)
-    addfaceset!(grid, "top", (x)->x[2]≈3.0)
+    addfaceset!(grid, "left", (x)->x[1]≈-1.0)
+    addfaceset!(grid, "right", (x)->x[1]≈1.0)
+    addfaceset!(grid, "top", (x)->x[2]≈2.0)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"), bezier_operators)
