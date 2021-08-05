@@ -102,13 +102,27 @@ function plot_bezier_basis(p)
 
 end
 
+function _genometry_value(x, knot1, p1, control_points::Vector{Vec{dim,T}}) where {dim,T}
+
+	S = zero(Vec{dim,T})
+	counter = 0
+	for i in 1:(length(knot1)-p1-1)
+		counter +=1
+		Nx = IGA._bspline_basis_value_alg2(p1, knot1, i, x)
+		#@show Nx*Ny
+		S += (Nx)*control_points[counter]
+	end
+
+	return S
+
+end
 
 function _genometry_value(x,y,knot1,knot2,p1,p2, control_points::Vector{Vec{dim,T}}) where {dim,T}
 
 	S = zero(Vec{dim,T})
 	counter = 0
 	for j in 1:(length(knot2)-p2-1)
-		for i in 1:(length(knot1)-p2-1)
+		for i in 1:(length(knot1)-p1-1)
 			counter +=1
 			Nx = IGA._bspline_basis_value_alg2(p1, knot1, i, x)
 			Ny = IGA._bspline_basis_value_alg2(p2, knot2, j, y)
@@ -145,7 +159,7 @@ end
 function _get_edges(pdim)
 	all(x) = x #pass through methodsd
 	if pdim == 1
-		edges = [all,]
+		edges = [[all,],]
 	elseif pdim == 2
 		edges = [[all,first], [all,last], [first,all], [last,all]]; 
 	elseif pdim == 3
@@ -191,7 +205,7 @@ function plot_bspline_mesh!(fig, mesh::NURBSMesh{pdim,sdim,T}, u::AbstractVector
 		for d in 1:pdim
 			_first = knot_vectors[d][nijk[d]]
 			_last =  knot_vectors[d][nijk[d]+1]
-			knot_plot_ranges[d] = range(_first, stop=_last, length=4)
+			knot_plot_ranges[d] = range(_first, stop=_last, length=10)
 		end
 
 		#Plot cell edges
