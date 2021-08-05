@@ -52,10 +52,13 @@ function Ferrite.faces(ip::BernsteinBasis{2,orders}) where {orders}
     faces = Tuple[]
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
-    push!(faces, Tuple(ind[:,1])) #bot
-    push!(faces, Tuple(ind[end,:]))# right
-    push!(faces, Tuple(ind[:,end]))# top
-    push!(faces, Tuple(ind[1,:]))# left
+    #Order for 1d interpolation.
+    order_1d = _bernstein_ordering(BernsteinBasis{1,orders[1:1]}())
+
+    push!(faces, Tuple(ind[:,1][order_1d])) #bot
+    push!(faces, Tuple(ind[end,:][order_1d]))# right
+    push!(faces, Tuple(ind[:,end][order_1d]))# top
+    push!(faces, Tuple(ind[1,:][order_1d]))# left
     
     return Tuple(faces) 
 end
@@ -64,12 +67,15 @@ function Ferrite.faces(ip::BernsteinBasis{3,orders}) where {orders}
     faces = Tuple[]
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
-    push!(faces, Tuple(ind[1,:,:][:]))   # left
-    push!(faces, Tuple(ind[end,:,:][:])) # right
-    push!(faces, Tuple(ind[:,1,:][:]))   # front
-    push!(faces, Tuple(ind[:,end,:][:])) # back
-    push!(faces, Tuple(ind[a][:]))       # bottom
-    push!(faces, Tuple(ind[:,:,1][:]))   # top
+    #Order for 2d interpolation.
+    order_2d = _bernstein_ordering(BernsteinBasis{2,orders[1:2]}())
+
+    push!(faces, Tuple(ind[1,:,:][order_2d]))   # left
+    push!(faces, Tuple(ind[end,:,:][order_2d])) # right
+    push!(faces, Tuple(ind[:,1,:][order_2d]))   # front
+    push!(faces, Tuple(ind[:,end,:][order_2d])) # back
+    push!(faces, Tuple(ind[:,:,end][order_2d])) # bottom
+    push!(faces, Tuple(ind[:,:,1][order_2d]))   # top
 
     return Tuple(faces)
 end
@@ -78,23 +84,26 @@ function Ferrite.edges(ip::BernsteinBasis{3,orders}) where {orders}
     edges = Tuple[]
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
 
+    #Order for 1d interpolation.
+    order_1d = _bernstein_ordering(BernsteinBasis{1,orders[1:1]}())
+
     # bottom
-    push!(edges, Tuple(ind[:,1,1]))
-    push!(edges, Tuple(ind[end,:,1]))
-    push!(edges, Tuple(ind[:,end,1]))
-    push!(edges, Tuple(ind[1,:,1]))
+    push!(edges, Tuple(ind[:,1,1][order_1d]))
+    push!(edges, Tuple(ind[end,:,1][order_1d]))
+    push!(edges, Tuple(ind[:,end,1][order_1d]))
+    push!(edges, Tuple(ind[1,:,1][order_1d]))
 
     # top
-    push!(edges, Tuple(ind[:,1,end]))
-    push!(edges, Tuple(ind[end,:,end]))
-    push!(edges, Tuple(ind[:,end,end]))
-    push!(edges, Tuple(ind[1,:,end]))
+    push!(edges, Tuple(ind[:,1,end][order_1d]))
+    push!(edges, Tuple(ind[end,:,end][order_1d]))
+    push!(edges, Tuple(ind[:,end,end][order_1d]))
+    push!(edges, Tuple(ind[1,:,end][order_1d]))
 
     # verticals
-    push!(edges, Tuple(ind[1,1,:]))
-    push!(edges, Tuple(ind[end,1,:]))
-    push!(edges, Tuple(ind[1,end,:]))
-    push!(edges, Tuple(ind[end,end,:]))
+    push!(edges, Tuple(ind[1,1,:][order_1d]))
+    push!(edges, Tuple(ind[end,1,:][order_1d]))
+    push!(edges, Tuple(ind[1,end,:][order_1d]))
+    push!(edges, Tuple(ind[end,end,:][order_1d]))
 
     return Tuple(edges)
 end
