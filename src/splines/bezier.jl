@@ -69,13 +69,13 @@ function Ferrite.faces(ip::BernsteinBasis{3,orders}) where {orders}
     
     #Order for 2d interpolation.
     order_2d = _bernstein_ordering(BernsteinBasis{2,orders[1:2]}())
-
-    push!(faces, Tuple(ind[1,:,:][order_2d]))   # left
-    push!(faces, Tuple(ind[end,:,:][order_2d])) # right
+    
+    push!(faces, Tuple(ind[:,:,1][order_2d])) # bottom
     push!(faces, Tuple(ind[:,1,:][order_2d]))   # front
+    push!(faces, Tuple(ind[end,:,:][order_2d])) # right
     push!(faces, Tuple(ind[:,end,:][order_2d])) # back
-    push!(faces, Tuple(ind[:,:,end][order_2d])) # bottom
-    push!(faces, Tuple(ind[:,:,1][order_2d]))   # top
+    push!(faces, Tuple(ind[1,:,:][order_2d]))   # left
+    push!(faces, Tuple(ind[:,:,end][order_2d]))   # top
 
     return Tuple(faces)
 end
