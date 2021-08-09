@@ -11,10 +11,18 @@ getT(g::BezierGrid) = eltype(first(g.nodes).x)
 function BezierGrid(cells::Vector{C},
 		nodes::Vector{Ferrite.Node{dim,T}},
 		weights::AbstractVector{T},
-		extraction_operator::AbstractVector{BezierExtractionOperator{T}}) where {dim,C,T}
+		extraction_operator::AbstractVector{BezierExtractionOperator{T}}; 
+		cellsets::Dict{String,Set{Int}}             =Dict{String,Set{Int}}(),
+		nodesets::Dict{String,Set{Int}}             =Dict{String,Set{Int}}(),
+		facesets::Dict{String,Set{FaceIndex}}       =Dict{String,Set{FaceIndex}}(),
+		edgesets::Dict{String,Set{EdgeIndex}}       =Dict{String,Set{EdgeIndex}}(),
+		vertexsets::Dict{String,Set{VertexIndex}}   =Dict{String,Set{VertexIndex}}(),
+		boundary_matrix::SparseArrays.SparseMatrixCSC{Bool,Int}  = SparseArrays.spzeros(Bool, 0, 0)) where {dim,C,T}
 
 	
-	grid = Ferrite.Grid(cells, nodes)
+	grid = Ferrite.Grid(cells, nodes; 
+							cellsets=cellsets, nodesets=nodesets, facesets=facesets,
+							edgesets, vertexsets, boundary_matrix=boundary_matrix)
 
 	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
 end
@@ -123,11 +131,15 @@ Ferrite_to_vtk_order(::Type{<:Ferrite.AbstractCell{dim,N,M}}) where {dim,N,M} = 
 # Store the Ferrite to vtk order in a cache for specific cell type
 let cache = Dict{Type{<:BezierCell}, Vector{Int}}()
 	global function Ferrite_to_vtk_order(celltype::Type{BezierCell{3,N,order,M}}) where {N,order,M}
-		get!(cache, x) do 
-			igaorder = _bernstein_ordering(celltype)
-			vtkorder = _vtk_ordering(celltype)
+		get!(cache, celltype) do 
+			if length(order) == 3
+				igaorder = _bernstein_ordering(celltype)
+				vtkorder = _vtk_ordering(celltype)
 
-			return [findfirst(ivtk-> ivtk == iiga, vtkorder) for iiga in igaorder]
+				return [findfirst(ivtk-> ivtk == iiga, vtkorder) for iiga in igaorder]
+			else
+				return 1:N
+			end
 		end
 	end
 end

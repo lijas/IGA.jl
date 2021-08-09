@@ -25,13 +25,15 @@ const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 """
 struct BezierCell{dim,N,order,M} <: Ferrite.AbstractCell{dim,N,M}
     nodes::NTuple{N,Int}
-    function BezierCell{dim,N,order}(nodes::NTuple{N,Int}) where {dim,N,order} 
+    function BezierCell{dim,N,order,M}(nodes::NTuple{N,Int}) where {dim,N,order,M} 
         @assert(order isa Tuple)
         @assert(prod(order.+1)==N)
-        M = (2,4,6)[dim]
 		return new{dim,N,order,M}(nodes)
     end
 end
+
+BezierCell{dim,N,order}(nodes::NTuple{N,Int}) where {dim,N,order} = 
+    BezierCell{dim,N,order,(2,4,6)[dim]}(nodes)
 
 getorders(::BezierCell{dim,N,orders}) where {dim,N,orders} = orders
 
@@ -55,30 +57,13 @@ Ferrite.vertices(c::BezierCell) = c.nodes
 _bernstein_ordering(::Type{<:BezierCell{dim,N,orders}}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{length(orders),orders}())                                        
 
 #Dim 2
-function Ferrite.faces(c::BezierCell{2,N,order}) where {N,order}
-    length(order)==1 && return ((c.nodes[1],c.nodes[2]), ) # return _faces_line(c)
-    length(order)==2 && return ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[4],c.nodes[3]), (c.nodes[1],c.nodes[4])) #return _faces_quad(c)
+function Ferrite.faces(c::BezierCell{dim,N,order}) where {dim,N,order}
+    return getindex.(Ref(c.nodes), collect.(Ferrite.faces(BernsteinBasis{length(order),order}() )))
 end
-_faces_line(c::BezierCell{2,N,order}) where {N,order} = (c.nodes,) #Only one face
-_faces_quad(c::BezierCell{2,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(Ferrite.faces(BernsteinBasis{2,order}() )))
 
-#Dim 3                                        
-function Ferrite.faces(c::BezierCell{3,N,order}) where {N,order}
-    length(order)==2 && return _faces_quad(c)
-    length(order)==3 && return  ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
-    #length(order)==3 && return ((c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))#return _faces_hexa(c)
+function Ferrite.edges(c::BezierCell{dim,N,order}) where {dim,N,order}
+    return getindex.(Ref(c.nodes), collect.(Ferrite.edges(BernsteinBasis{length(order),order}() )))
 end
-_faces_quad(c::BezierCell{3,N,order}) where {N,order} = (c.nodes,) #Only on face
-_faces_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(Ferrite.faces(BernsteinBasis{3,order}() )))
-
-function Ferrite.edges(c::BezierCell{3,N,order}) where {N,order}
-    #own dispatch
-    length(order)==2 && return _edges_quad(c)
-    length(order)==3 && return _edges_hexa(c)
-end
-_edges_hexa(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(Ferrite.edges(BernsteinBasis{3,order}() )))
-_edges_quad(c::BezierCell{3,N,order}) where {N,order} = getindex.(Ref(c.nodes), collect.(Ferrite.edges(BernsteinBasis{2,order}() )))
-
 
 Ferrite.default_interpolation(::Type{BezierCell{dim,N,order,M}}) where {dim,N,order,M} = BernsteinBasis{length(order),order}()
 
@@ -95,7 +80,7 @@ function Ferrite.cell_to_vtkcell(::Type{BezierCell{3,N,order,M}}) where {N,order
     if length(order) == 3
         return Ferrite.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
     else
-        error("adsf")
+        return Ferrite.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
     end
 end
 
