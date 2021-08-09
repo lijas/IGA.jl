@@ -220,7 +220,7 @@ function plot_bspline_mesh!(fig, mesh::NURBSMesh{pdim,sdim,T}, u::AbstractVector
 		#scatter!(fig, [getindex.(mesh.control_points[basefuncs],i) for i in 1:sdim]..., marker=:circle, color=:green)
 
 	end
-
+	return fig
 end
 
 function plot_mesh_edge!(fig, mesh::NURBSMesh{pdim,sdim,T}; edge::Int, kwargs...) where {pdim,sdim,T}
