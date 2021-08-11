@@ -435,6 +435,57 @@ function generate_nurbs_patch(::Val{:doubly_curved}, nel::NTuple{2,Int}, orders:
 end
 
 
+function generate_nurbs_patch(::Val{:doubly_curved_nurbs}, nel::NTuple{2,Int}; r1::T, r2::T, α2::T) where T
+
+	@assert(nel[1]>=1 && nel[2]>=1)
+
+	pdim = 2
+	sdim = 3
+
+	x1 = -r2*sin(α2/2)
+	re = r1 + (r2*cos(α2/2) - r2)
+	rs = r2*csc((pi-α2)/2) - r2*sin((pi-α2)/2) 
+
+	control_points = Vec{sdim,T}[
+		Vec(x1, 0.0, re),
+        Vec(x1, -re, re),
+        Vec(x1, -re, 0.0),
+
+		Vec(0.0, 0.0, re + rs),
+        Vec(0.0, -re - rs, re + rs),
+        Vec(0.0, -re  - rs, 0.0),
+
+		Vec(-x1, 0.0, re),
+        Vec(-x1, -re, re),
+        Vec(-x1, -re, 0.0),
+	]
+
+	w = 1/sqrt(2)
+	w2 = cos(α2/2)
+	weigts = T[1.0, w, 1.0,
+				w2, w*w2, w2,
+			   1.0, w, 1.0]
+
+
+    knot_vectors = ([-1.0, -1.0, -1.0, 1.0, 1.0, 1.0], [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0], )
+    orders = (2,2,)
+
+	rangeξ = range(-1.0, stop = 1.0, length=nel[1]+1)
+	for ξ in rangeξ[2:end-1]
+		knotinsertion!(knot_vectors, orders, control_points, weigts, ξ, dir=1)
+	end
+	
+	rangeη = range(-1.0, stop = 1.0, length=nel[2]+1)
+	for η in rangeη[2:end-1]
+		knotinsertion!(knot_vectors, orders, control_points, weigts, η, dir=2)
+	end
+
+	mesh = IGA.NURBSMesh(knot_vectors, orders, control_points, weigts)
+	
+    return mesh
+
+end
+
 #=function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; width::T, radius::T, multiplicity::NTuple{2,Int}=(1,1)) where T
 
 	@assert( orders[1] >=2 && orders[2] >=2 ) 
