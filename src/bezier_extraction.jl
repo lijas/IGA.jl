@@ -151,12 +151,13 @@ function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdi
 
 		w_row = weights[indx]
 		for i in 1:size(C,1)
-			new_cp = sum(C[i,:] .* cp_row)
+			new_cp = sum(C[i,:] .* (cp_row.*w_row))
 			new_w = sum(C[i,:] .* w_row)
 			
 			indx2 = (dir==1) ? (i + (r-1)*(n+1)) : (r + (i-1)*m)
 		
-			new_cps[indx2] = new_cp
+					
+			new_cps[indx2] = new_cp/new_w
 			new_ws[indx2] = new_w
 		end
 	end
