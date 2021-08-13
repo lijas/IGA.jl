@@ -53,12 +53,13 @@ function Ferrite.faces(ip::BernsteinBasis{2,orders}) where {orders}
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
     #Order for 1d interpolation.
-    order_1d = _bernstein_ordering(BernsteinBasis{1,orders[1:1]}())
+    order_1d1 = _bernstein_ordering(BernsteinBasis{1,orders[1:1]}())
+    order_1d2 = _bernstein_ordering(BernsteinBasis{1,orders[2:2]}())
 
-    push!(faces, Tuple(ind[:,1][order_1d])) #bot
-    push!(faces, Tuple(ind[end,:][order_1d]))# right
-    push!(faces, Tuple(ind[:,end][order_1d]))# top
-    push!(faces, Tuple(ind[1,:][order_1d]))# left
+    push!(faces, Tuple(ind[:,1][order_1d1])) #bot
+    push!(faces, Tuple(ind[end,:][order_1d2]))# right
+    push!(faces, Tuple(ind[:,end][order_1d1]))# top
+    push!(faces, Tuple(ind[1,:][order_1d2]))# left
     
     return Tuple(faces) 
 end
