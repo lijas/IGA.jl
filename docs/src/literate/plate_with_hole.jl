@@ -7,6 +7,10 @@
 # or in other words, solving a FE-problem with splines as the basis/shape functions.
 # By using so called bezier extraction, we will see that most of the structure of the code will be the same as in standard FE-codes (however many differences are happening "under the hood").
 
+#md # !!! warning 
+#md #     Please validate your code. I can't guarantee that everything is 100% correct
+#md #  
+
 #md # !!! note 
 #md #     It is expected that the reader already be familiar with IGA and the concept of "bezier extraction".
 #md #     It is also expected that the reader is familiar with the Ferrite package. In particular Ferrite.DofHandler and Ferrite.CellValues.
