@@ -90,33 +90,33 @@ function Ferrite.getweights(grid::BezierGrid, ic::Int)
 	return grid.weights[nodeids]
 end
 
-function get_bezier_coordinates!(bcoords::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}, grid::BezierGrid, ic::Int) where {dim,T}
+function Ferrite.getcoordinates!(xb::AbstractVector{Vec{dim,T}}, wb::AbstractVector{T}, w::AbstractVector{T}, grid::BezierGrid, ic::Int) where {dim,T}
 
 	C = grid.beo[ic]
 
-	Ferrite.getcoordinates!(bcoords, grid.grid, ic)
+	Ferrite.getcoordinates!(xb, grid.grid, ic)
 	getweights!(w, grid, ic)
 
-	bcoords .*= w
-	w .= compute_bezier_points(C, w)
-	bcoords .= inv.(w) .* compute_bezier_points(C, bcoords)
+	xb .*= w
+	wb .= compute_bezier_points(C, w)
+	xb .= inv.(wb) .* compute_bezier_points(C, xb)
 
-	return nothing
+	return (xb, wb, w, C)
 end
 
-function get_bezier_coordinates(grid::BezierGrid, ic::Int)
+function Ferrite.getcoordinates(grid::BezierGrid, ic::Int)
 
 	dim = Ferrite.getdim(grid); T = getT(grid)
 
 	n = Ferrite.nnodes_per_cell(grid, ic)
 	w = zeros(T, n)
-	x = zeros(Vec{dim,T}, n)
+	wb = zeros(T, n)
+	xb = zeros(Vec{dim,T}, n)
 	
-	get_bezier_coordinates!(x,w,grid,ic)
-	return x,w
+	return getcoordinates!(xb,wb,w,grid,ic)
 end
 
-function Ferrite.getcoordinates(grid::BezierGrid, cell::Int)
+function get_nurbs_coordinates(grid::BezierGrid, cell::Int)
     dim = Ferrite.getdim(grid); T = getT(grid)
     nodeidx = grid.cells[cell].nodes
     return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim,T}}

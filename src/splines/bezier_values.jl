@@ -112,9 +112,17 @@ end
 #
 # NURBS Function values needs to be treated differently than other basis values, since they have weights-factors aswell
 #
-const BezierCoords{dim_s,T} = Tuple{AbstractVector{Vec{dim_s,T}}, AbstractVector{T}}
 Ferrite.reinit!(bcv::BezierValues, x_w::BezierCoords{dim_s,T}) where {dim_s,T} = Ferrite.reinit!(bcv, x_w...)
 Ferrite.reinit!(bcv::BezierValues, x_w::BezierCoords{dim_s,T}, faceid::Int) where {dim_s,T} = Ferrite.reinit!(bcv, x_w..., faceid)
+
+function Ferrite.reinit!(bcv::BezierValues, (xb, wb, w, C)::BezierGroup{dim_s,T}) where {dim_s,T} 
+    set_bezier_operator!(bcv, w.*C)
+    Ferrite.reinit!(bcv, (xb, wb))
+end
+function Ferrite.reinit!(bcv::BezierValues, (xb, wb, w, C)::BezierGroup{dim_s,T}, faceid::Int) where {dim_s,T} 
+    set_bezier_operator!(bcv, w.*C)
+    Ferrite.reinit!(bcv, (xb, wb), faceid)
+end
 
 function Ferrite.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractVector{T}) where {dim_s,T}
     _reinit_nurbs!(bcv.cv_store, bcv.cv_bezier, x, w) 

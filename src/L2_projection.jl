@@ -3,49 +3,34 @@
 # but in IGA we need to call get_bezier_coordinates(grid, cellid).
 # Therefore we have to copy the functions from Ferrite, even though the code is almost the same
 
-function Ferrite._assemble_L2_matrix(fe_values::BezierCellValues, set, dh)
-    n = Ferrite.getn_scalarbasefunctions(fe_values)
-    M = create_symmetric_sparsity_pattern(dh)
-    assembler = start_assemble(M)
+function L2ProjectorIGA(
+    func_ip::Interpolation,
+    grid::AbstractGrid;
+    qr_lhs::QuadratureRule = _mass_qr(func_ip),
+    set = 1:getncells(grid),
+    geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])),
+    qr_rhs::Union{QuadratureRule,Nothing}=nothing, # deprecated
+)
 
-    Me = zeros(n, n)
-    cell_dofs = zeros(Int, n)
+    _check_same_celltype(grid, collect(set)) # TODO this does the right thing, but gives the wrong error message if it fails
 
-    function symmetrize_to_lower!(K)
-       for i in 1:size(K, 1)
-           for j in i+1:size(K, 1)
-               K[j, i] = K[i, j]
-           end
-       end
-    end
+    fe_values_mass = BezierCellValues( CellScalarValues(qr_lhs, func_ip, geom_ip) )
 
-    ## Assemble contributions from each cell
-    for cellnum in set
-        celldofs!(cell_dofs, dh, cellnum)
+    # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
+    dh = MixedDofHandler(grid)
+    field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
+    fh = FieldHandler([field], Set(set))
+    push!(dh, fh)
+    _, vertex_dict, _, _ = __close!(dh)
 
-        fill!(Me, 0)
-        extr = dh.grid.beo[cellnum]
-        Xᴮ, wᴮ = get_bezier_coordinates(dh.grid, cellnum)
-        w = getweights(dh.grid, cellnum)
-        
-        set_bezier_operator!(fe_values, w.*extr)
-        reinit!(fe_values, (Xᴮ, wᴮ))
+    M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
+    M_cholesky = cholesky(M)
 
-        ## ∭( v ⋅ u )dΩ
-        for q_point = 1:getnquadpoints(fe_values)
-            dΩ = getdetJdV(fe_values, q_point)
-            for j = 1:n
-                v = shape_value(fe_values, q_point, j)
-                for i = 1:j
-                    u = shape_value(fe_values, q_point, i)
-                    Me[i, j] += v ⋅ u * dΩ
-                end
-            end
-        end
-        symmetrize_to_lower!(Me)
-        assemble!(assembler, cell_dofs, Me)
-    end
-    return M
+    # For deprecated API
+    fe_values = qr_rhs === nothing ? nothing :
+                CellScalarValues(qr_rhs, func_ip, geom_ip)
+
+    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set), vertex_dict[1], fe_values, qr_rhs)
 end
 
 function Ferrite._project(vars, proj::L2Projector{<:BezierCellValues}, M::Integer) 
