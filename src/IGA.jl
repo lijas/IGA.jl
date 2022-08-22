@@ -4,9 +4,9 @@ using Reexport
 
 @reexport using Tensors
 @reexport using Ferrite
+@reexport using WriteVTK
 
 using LinearAlgebra
-using WriteVTK
 using StaticArrays
 import SparseArrays
 
