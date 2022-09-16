@@ -12,11 +12,19 @@ import SparseArrays
 
 export BezierExtractionOperator
 export BezierCell
+export BezierCoords
 
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 
-const BezierCoords{dim_s,T} = Tuple{AbstractVector{Vec{dim_s,T}}, AbstractVector{T}}
-const BezierGroup{dim_s,T} = Tuple{AbstractVector{Vec{dim_s,T}}, AbstractVector{T}, AbstractVector{T}, BezierExtractionOperator{T}}
+struct BezierCoords{dim_s,T} 
+    xb   ::Vector{Vec{dim_s,T}}
+    wb   ::Vector{T}
+    w    ::Vector{T}
+    beow ::BezierExtractionOperator{T} #BezierextractionOpeator multiplied with weights
+    #Perhaps add these later:
+end
+
+#Base.zero(Type{BezierCoords{dim,T}}) where {dim,T} = BezierCoords
 
 """
     BezierCell{dim,N,order,M} <: Ferrite.AbstractCell{dim,N,M}
@@ -40,18 +48,17 @@ BezierCell{dim,N,order}(nodes::NTuple{N,Int}) where {dim,N,order} =
 
 getorders(::BezierCell{dim,N,orders}) where {dim,N,orders} = orders
 
-include("utils.jl")
+include("bezier_extraction.jl")
 include("nurbsmesh.jl")
 include("mesh_generation.jl")
 include("bezier_grid.jl")
-include("bezier_extraction.jl")
 include("splines/bezier.jl")
 include("splines/bezier_values.jl")
 include("splines/bsplines.jl")
-include("nurbs_cell_values.jl")
-#include("L2_projection.jl") Disable L2 projection due to update in JUAFEM
-Ferrite._mass_qr(::BernsteinBasis{2, (2, 2)}) = QuadratureRule{2,RefCube}(2+1)
 include("VTK.jl")
+include("L2_projection.jl")
+
+Ferrite._mass_qr(::BernsteinBasis{2, (2, 2)}) = QuadratureRule{2,RefCube}(2+1)
 
 #Normaly the verices function should only return the 8 corner nodes of the hexa (or 4 in 2d),
 #but since the cell connectivity in IGA is different compared to normal FE elements,

@@ -66,14 +66,14 @@ end
     for cellnum in [1,4,5]
         Xb, wb = get_bezier_coordinates(grid, cellnum)
         C = get_extraction_operator(grid, cellnum)
-        X = getcoordinates(grid, cellnum)
+        X = get_nurbs_coordinates(grid, cellnum)
         w = getweights(grid, cellnum)
+        #set_bezier_operator!(cv, w.*C)
+        bc = BezierCoords(Xb, wb, w, C.*w)#getcoordinates(grid, cellnum)
+        reinit!(cv, bc)
 
-        set_bezier_operator!(cv, w.*C)
-        reinit!(cv, Xb, wb)
-
-        set_bezier_operator!(cv_vector, w.*C)
-        reinit!(cv_vector, Xb, wb)
+        #set_bezier_operator!(cv_vector, w.*C)
+        reinit!(cv_vector, bc)
 
         for (iqp, ξ) in enumerate(qr.points)
 
@@ -136,11 +136,11 @@ end
 
         Xb, wb = get_bezier_coordinates(grid, cellnum)
         C = get_extraction_operator(grid, cellnum)
-        X = getcoordinates(grid, cellnum)
+        X = get_nurbs_coordinates(grid, cellnum)
         w = getweights(grid, cellnum)
 
-        set_bezier_operator!(fv, w.*C)
-        reinit!(fv, Xb, wb, faceidx)
+        bc = BezierCoords(Xb, wb, w, C.*w) # getcoordinates(grid, cellnum)
+        reinit!(fv, bc, faceidx)
 
         qr_face_side = Ferrite.create_face_quad_rule(qr_face, ip)[faceidx]
         for (iqp, ξ) in enumerate(qr_face_side.points)

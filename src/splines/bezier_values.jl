@@ -96,45 +96,53 @@ function _cellvalues_bezier_extraction!(cv_store::Ferrite.Values{dim_s}, cv_bezi
 
 end
 
-function Ferrite.reinit!(bcv::BezierFaceValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T,CV<:Ferrite.FaceValues}
-    Ferrite.reinit!(bcv.cv_bezier, x, faceid) #call the normal reinit function first
+function Ferrite.reinit!(bcv::BezierCellValues{dim_s,T,CV}, xb::AbstractVector{Vec{dim_s,T}}) where {dim_s,T,CV<:Ferrite.CellValues}
+    Ferrite.reinit!(bcv.cv_bezier, xb) #call the normal reinit function first
+
+    _cellvalues_bezier_extraction!(bcv.cv_store, bcv.cv_bezier, bcv.current_beo[], 1)
+end
+
+function Ferrite.reinit!(bcv::BezierFaceValues{dim_s,T,CV}, xb::AbstractVector{Vec{dim_s,T}}, faceid::Int) where {dim_s,T,CV<:Ferrite.FaceValues}
+    Ferrite.reinit!(bcv.cv_bezier, xb, faceid) #call the normal reinit function first
     bcv.cv_store.current_face[] = faceid
 
     _cellvalues_bezier_extraction!(bcv.cv_store, bcv.cv_bezier, bcv.current_beo[], faceid)
 end
 
-function Ferrite.reinit!(bcv::BezierCellValues{dim_s,T,CV}, x::AbstractVector{Vec{dim_s,T}}) where {dim_s,T,CV<:Ferrite.CellValues}
-    Ferrite.reinit!(bcv.cv_bezier, x) #call the normal reinit function first
+
+#
+function Ferrite.reinit!(bcv::BezierCellValues{dim_s,T,CV}, (xb, wb)::Tuple{<:AbstractVector{Vec{dim_s,T}}, <:AbstractVector{T}}) where {dim_s,T,CV<:Ferrite.CellValues}
+    Ferrite.reinit!(bcv.cv_bezier, xb) #call the normal reinit function first
 
     _cellvalues_bezier_extraction!(bcv.cv_store, bcv.cv_bezier, bcv.current_beo[], 1)
+end
+
+function Ferrite.reinit!(bcv::BezierFaceValues{dim_s,T,CV},  (xb, wb)::Tuple{<:AbstractVector{Vec{dim_s,T}}, <:AbstractVector{T}}, faceid::Int) where {dim_s,T,CV<:Ferrite.FaceValues}
+    Ferrite.reinit!(bcv.cv_bezier, xb, faceid) #call the normal reinit function first
+    bcv.cv_store.current_face[] = faceid
+
+    _cellvalues_bezier_extraction!(bcv.cv_store, bcv.cv_bezier, bcv.current_beo[], faceid)
 end
 
 #
 # NURBS Function values needs to be treated differently than other basis values, since they have weights-factors aswell
 #
-Ferrite.reinit!(bcv::BezierValues, x_w::BezierCoords{dim_s,T}) where {dim_s,T} = Ferrite.reinit!(bcv, x_w...)
-Ferrite.reinit!(bcv::BezierValues, x_w::BezierCoords{dim_s,T}, faceid::Int) where {dim_s,T} = Ferrite.reinit!(bcv, x_w..., faceid)
+function Ferrite.reinit!(bcv::BezierValues, bc::BezierCoords{dim_s,T}) where {dim_s,T} 
+    set_bezier_operator!(bcv, bc.beow)
 
-function Ferrite.reinit!(bcv::BezierValues, (xb, wb, w, C)::BezierGroup{dim_s,T}) where {dim_s,T} 
-    set_bezier_operator!(bcv, w.*C)
-    Ferrite.reinit!(bcv, (xb, wb))
-end
-function Ferrite.reinit!(bcv::BezierValues, (xb, wb, w, C)::BezierGroup{dim_s,T}, faceid::Int) where {dim_s,T} 
-    set_bezier_operator!(bcv, w.*C)
-    Ferrite.reinit!(bcv, (xb, wb), faceid)
+    _reinit_nurbs!(bcv.cv_store, bcv.cv_bezier, bc.xb, bc.wb) 
+    _cellvalues_bezier_extraction!(bcv.cv_store, copy(bcv.cv_store), bc.beow, 1)
 end
 
-function Ferrite.reinit!(bcv::BezierCellValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractVector{T}) where {dim_s,T}
-    _reinit_nurbs!(bcv.cv_store, bcv.cv_bezier, x, w) 
-    _cellvalues_bezier_extraction!(bcv.cv_store, copy(bcv.cv_store), bcv.current_beo[], 1)
-end
-
-function Ferrite.reinit!(bcv::BezierFaceValues, x::AbstractVector{Vec{dim_s,T}}, w::AbstractVector{T}, faceid::Int) where {dim_s,T}
+function Ferrite.reinit!(bcv::BezierFaceValues, bc::BezierCoords{dim_s,T}, faceid::Int) where {dim_s,T}
+    set_bezier_operator!(bcv, bc.beow)
     bcv.cv_bezier.current_face[] = faceid
     bcv.cv_store.current_face[] = faceid
-    _reinit_nurbs!(bcv.cv_store, bcv.cv_bezier, x, w, faceid) 
-    _cellvalues_bezier_extraction!(bcv.cv_store, copy(bcv.cv_store), bcv.current_beo[], faceid)
+
+    _reinit_nurbs!(bcv.cv_store, bcv.cv_bezier, bc.xb, bc.wb, faceid) 
+    _cellvalues_bezier_extraction!(bcv.cv_store, copy(bcv.cv_store), bc.beow, faceid)
 end
+
 
 """
 Ferrite.reinit!(cv::Ferrite.CellVectorValues{dim}, xᴮ::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}) where {dim,T}
@@ -250,10 +258,3 @@ function Ferrite.reinit!(fv::FaceValues{dim}, xᴮ::AbstractVector{Vec{dim,T}}, 
     end
 end
 =#
-function Ferrite.reinit!(cv::Ferrite.CellValues{dim}, xw::BezierCoords{dim,T}) where {dim,T}
-    Ferrite.reinit!(cv, xw...)
-end
-
-function Ferrite.reinit!(cv::Ferrite.FaceValues{dim}, xw::BezierCoords{dim,T}, faceid::Int) where {dim,T}
-    Ferrite.reinit!(cv, xw..., faceid)
-end

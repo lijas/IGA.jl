@@ -581,38 +581,3 @@ function get_nurbs_griddata(orders::NTuple{pdim,Int}, knot_vectors::NTuple{pdim,
 
 	return cells, nodes
 end
-
-function generate_nurbs_meshdata(orders::NTuple{dim,Int}, nbf::NTuple{dim,Int}) where dim
-
-	nel = prod(nbf .- orders) #(n-p)*(m-q)*(l-r)
-	nnp = prod(nbf) #n*m*l
-	nen = prod(orders.+1) #(p+1)*(q+1)*(r+1)
-
-	INN = zeros(Int, nnp, dim)
-	IEN = zeros(Int, nen, nel)
-
-	A = 0; e = 0
-    dims = 1:dim
-
-    for i in Tuple.(CartesianIndices(nbf))
-        A += 1
-        INN[A, dims] .= i
-        if all(i .>= (orders.+1))
-            e+=1
-			for loc in Tuple.(CartesianIndices(orders.+1))
-				loc = loc .- 1
-				B = A
-				b = 1
-                for d in dim:-1:1
-                    _d = dims[1:d-1]
-					B -= loc[d] * prod(nbf[_d])
-                    b += loc[d] * prod(orders[_d] .+ 1)
-				end
-                IEN[b,e] = B
-            end
-        end
-	end
-	IEN .= reverse(IEN, dims=1)
-
-	return nel, nnp, nen, INN, IEN
-end

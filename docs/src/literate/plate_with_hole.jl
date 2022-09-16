@@ -22,7 +22,7 @@ using Ferrite, IGA, LinearAlgebra
 # These functions will be the same as for a normal finite elment problem, but
 # with the difference that we need the cell coorinates AND cell weights (the weights from the NURBS shape functions), to reinitilize the shape values, dNdx.
 # Read this [`page`](../bezier_values.md), to see how the shape values are reinitilized. 
-function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, C::SymmetricTensor{4,2}, cv)
+function integrate_element!(ke::AbstractMatrix, C::SymmetricTensor{4,2}, cv)
     n_basefuncs = getnbasefunctions(cv)
 
     δɛ = [zero(SymmetricTensor{2,2,Float64}) for i in 1:n_basefuncs]
@@ -41,7 +41,7 @@ function integrate_element!(ke::AbstractMatrix, Xᴮ::Vector{Vec{2,Float64}}, w�
     end
 end;
 
-function integrate_traction_force!(fe::AbstractVector, Xᴮ::Vector{Vec{2,Float64}}, wᴮ::Vector{Float64}, t::Vec{2}, fv, faceid::Int)
+function integrate_traction_force!(fe::AbstractVector, t::Vec{2}, fv)
     n_basefuncs = getnbasefunctions(fv)
 
     for q_point in 1:getnquadpoints(fv)
@@ -80,14 +80,14 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)
 
 #md # !!! tip 
-#md #     Since the operations above are quite common in IGA, there is a helper-function called `get_bezier_coordinates(grid, cellid)`, 
-#md #     which return the bezier coorinates and weights directly.
+#md #     Since the operations above are quite common in IGA, there is a helper-function called `bc = getcoordinates(grid, cellid)::BezierCoords `, 
+#md #     which return the bezier coorinates and weights directly. 
 
         # Furthermore, we pass the bezier extraction operator to the CellValues/Beziervalues.
         set_bezier_operator!(cv, w.*extr)
         reinit!(cv, (Xᴮ, wᴮ)) ## Reinit cellvalues by passsing both bezier coords and weights
 
-        integrate_element!(ke, Xᴮ, wᴮ, stiffmat, cv)
+        integrate_element!(ke, stiffmat, cv)
         assemble!(assembler, celldofs, ke, fe)
     end
 
@@ -97,13 +97,12 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 
         celldofs!(celldofs, dh, cellid)
 
-        extr = get_extraction_operator(grid, cellid) 
-        Xᴮ, wᴮ, w, C = getcoordinates(grid, cellid)
+        beziercoords = getcoordinates(grid, cellid)
 
         #set_bezier_operator!(fv, )
-        reinit!(fv, (Xᴮ, wᴮ, w, C), faceid)
+        reinit!(fv, beziercoords, faceid)
 
-        integrate_traction_force!(fe, Xᴮ, wᴮ, traction, fv, faceid)
+        integrate_traction_force!(fe, traction, fv)
         f[celldofs] += fe
     end
 
@@ -132,9 +131,9 @@ function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Ve
 
     for cellid in 1:getncells(dh.grid)
         
-        Xᴮ, wᴮ, w, extr = getcoordinates(dh.grid, cellid)
+        bc = getcoordinates(dh.grid, cellid)
 
-        reinit!(cv, (Xᴮ, wᴮ, w, extr))
+        reinit!(cv, bc)
         celldofs!(celldofs, dh, cellid)
 
         ue = u[celldofs]
@@ -215,12 +214,12 @@ function solve()
 
     #csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
     projector = L2Projector(ip, grid)
-    σ_nodes = project(cellstresses, projector)
+    σ_nodes = project(projector, cellstresses, qr_cell; project_to_nodes=true)
     
     # Output results to VTK
     vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
     vtk_point_data(vtkgrid, dh, u, :u)
-    #vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
+    vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
     vtk_save(vtkgrid)
 
 end;
