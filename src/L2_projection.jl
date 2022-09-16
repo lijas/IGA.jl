@@ -29,7 +29,8 @@ function Ferrite.L2Projector(
     return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set), vertex_dict[1], nothing, nothing)
 end
 
-function project(proj::L2Projector,
+#TODO: use Ferrite.project instead of igaproject
+function igaproject(proj::L2Projector,
     vars::AbstractVector{<:AbstractVector{T}},
     qr_rhs::Union{QuadratureRule,Nothing}=nothing;
     project_to_nodes::Bool=true) where T <: Union{Number, AbstractTensor}
