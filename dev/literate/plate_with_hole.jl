@@ -206,7 +206,7 @@ function solve()
 
     #csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
     projector = L2Projector(ip, grid)
-    σ_nodes = project(projector, cellstresses, qr_cell; project_to_nodes=true)
+    σ_nodes = IGA.igaproject(projector, cellstresses, qr_cell; project_to_nodes=true)
     
     # Output results to VTK
     vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
