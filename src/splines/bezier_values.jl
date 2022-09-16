@@ -34,6 +34,10 @@ function BezierFaceValues(cv::Ferrite.FaceValues{dim_s,T,Ferrite.RefCube}) where
     return BezierFaceValues{dim_s,T,typeof(cv)}(cv, deepcopy(cv), undef_beo)
 end
 
+function BezierCellValues{dim_s,T,CV}(qr::QuadratureRule, ip::Interpolation, ip_geo::Interpolation=ip) where {dim_s,T<:Real,CV<:CellValues}
+    return BezierCellValues(CV(qr,ip,ip_geo))
+end
+
 Ferrite.getnbasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.N, 1)
 Ferrite.getngeobasefunctions(bcv::BezierValues) = size(bcv.cv_bezier.M, 1)
 Ferrite.getnquadpoints(bcv::BezierValues) = Ferrite.getnquadpoints(bcv.cv_bezier)
