@@ -7,10 +7,6 @@
 # or in other words, solving a FE-problem with splines as the basis/shape functions.
 # By using so called bezier extraction, we will see that most of the structure of the code will be the same as in standard FE-codes (however many differences are happening "under the hood").
 
-#md # !!! warning 
-#md #     Please validate your code. I can't guarantee that everything is 100% correct
-#md #  
-
 #md # !!! note 
 #md #     It is expected that the reader already be familiar with IGA and the concept of "bezier extraction".
 #md #     It is also expected that the reader is familiar with the Ferrite package. In particular Ferrite.DofHandler and Ferrite.CellValues.
@@ -204,11 +200,7 @@ function solve()
     
     # Now we want to export the results to VTK. So we calculate the stresses in each gauss-point, and project them to 
     # the nodes using the L2Projector from Ferrite. Node that we need to create new CellValues of type CellScalarValues, since the 
-    # L2Projector only works with scalar fields.
-
-#md # !!! note 
-#md #     Termporarily disabeling L2-projections due to changes in Ferrite
-#md #     
+    # L2Projector only works with scalar fields.  
 
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
 
