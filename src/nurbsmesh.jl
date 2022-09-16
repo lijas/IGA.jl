@@ -134,9 +134,9 @@ function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdi
 		end
 	end
 	
-	Ferrite.copy!!(knot_vectors[dir], new_knot_vector)
-	Ferrite.copy!!(control_points, new_cps)
-	Ferrite.copy!!(weights, new_ws)
+	copy!(knot_vectors[dir], new_knot_vector)
+	copy!(control_points, new_cps)
+	copy!(weights, new_ws)
 
 end
 

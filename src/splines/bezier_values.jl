@@ -160,8 +160,8 @@ function _reinit_nurbs!(cv_nurbs::Ferrite.Values{dim}, cv_bezier::Ferrite.Values
     B =  cv_bezier.M
     dBdξ = cv_bezier.dMdξ
 
-    @inbounds for i in 1:length(cv_bezier.qr_weights)
-        weight = cv_bezier.qr_weights[i]
+    @inbounds for i in 1:length(cv_bezier.qr.weights)
+        weight = cv_bezier.qr.weights[i]
 
         W = zero(T)
         dWdξ = zero(Vec{dim,T})
