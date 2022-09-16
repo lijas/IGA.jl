@@ -1,5 +1,41 @@
 
 export compute_bezier_extraction_operators, compute_bezier_points, compute_bezier_points!
+export bezier_extraction_to_vectors
+
+function bezier_extraction_to_vectors(Ce::AbstractVector{<:AbstractMatrix})
+    T = Float64
+    nbe = length(Ce)
+
+    Cvecs = [Vector{SparseArrays.SparseVector{T,Int}}() for _ in 1:nbe]
+    for ie in 1:nbe
+        cv = bezier_extraction_to_vector(Ce[ie])
+        Cvecs[ie] = cv
+    end
+    return Cvecs
+end
+
+function bezier_extraction_to_vector(Ce::AbstractMatrix{T}) where T
+
+    Cvecs = Vector{SparseArrays.SparseVector{T,Int}}()
+    for r in 1:size(Ce,1)
+        ce = Ce[r,:]
+        push!(Cvecs, SparseArrays.sparsevec(ce))
+    end
+
+    return Cvecs
+end
+
+function beo2matrix(m::BezierExtractionOperator{T}) where T
+
+    m2 = zeros(T, length(m), length(first(m)))
+    for r in 1:length(m)
+        for c in 1:length(m[r])
+            m2[r,c] = m[r][c]
+        end
+    end
+    return m2
+end
+
 
 """
 	compute_bezier_points(bezier_points::AbstractVector{T2}, Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1)
@@ -42,6 +78,7 @@ function compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::
 	return bezierpoints
 
 end
+
 
 """
 	compute_bezier_extraction_operators2(orders::NTuple{pdim,Int}, knots::NTuple{pdim,Vector{T}})
@@ -132,68 +169,4 @@ function _compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
 	#pop!(C)
 	C = SparseArrays.sparse.(C[1:nb])
 	return C, nb
-end
-
-#Worlds slowest knot insertion algo.
-function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdim,Int}, control_points::Vector{Vec{sdim,T}}, weights::Vector{T}, ξᴺ::T; dir::Int) where {pdim,sdim,T}
-
-	C, new_knot_vector = knotinsertion(knot_vectors[dir], orders[dir], ξᴺ)
-	
-	n = length(knot_vectors[dir]) - 1 - orders[dir] #number of basefunctions
-	m = length(control_points) ÷ n
-
-	
-	new_cps = zeros(Vec{sdim,T}, (n+1)*m)
-	new_ws = zeros(T, (n+1)*m)
-	for r in 1:m
-		indx = (dir==1) ? ((1:n) .+ (r-1)*n) : (r:m:(length(control_points)))
-		cp_row = control_points[indx]
-
-		w_row = weights[indx]
-		for i in 1:size(C,1)
-			new_cp = sum(C[i,:] .* (cp_row.*w_row))
-			new_w = sum(C[i,:] .* w_row)
-			
-			indx2 = (dir==1) ? (i + (r-1)*(n+1)) : (r + (i-1)*m)
-		
-					
-			new_cps[indx2] = new_cp/new_w
-			new_ws[indx2] = new_w
-		end
-	end
-	
-	copy!(knot_vectors[dir], new_knot_vector)
-	copy!(control_points, new_cps)
-	copy!(weights, new_ws)
-
-end
-
-function knotinsertion(Ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
-
-    n = length(Ξ) - p - 1
-    m = n+1
-
-    k = findfirst(ξᵢ -> ξᵢ>ξᴺ, Ξ)-1
-
-    @assert((k>p))
-    C = zeros(T,m,n)
-    C[1,1] = 1
-    for i in 2:m-1
-        
-        local α
-        if i<=k-p
-            α = 1.0
-        elseif k-p+1<=i<=k
-            α = (ξᴺ - Ξ[i])/(Ξ[i+p] - Ξ[i])
-        elseif i>=k+1
-             α = 0.0
-        end
-        C[i,i] = α
-        C[i,i-1] = (1-α)
-    end
-    C[m,n] = 1
-    
-    new_knot_vector = copy(Ξ)
-    insert!(new_knot_vector,k+1,ξᴺ)
-    return C, new_knot_vector
 end

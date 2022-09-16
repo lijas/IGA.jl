@@ -42,8 +42,9 @@ struct NURBSMesh{pdim,sdim,T} #<: Ferrite.AbstractGrid
 end
 
 Ferrite.getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
-getnbasefuncs_per_cell(mesh::NURBSMesh) = length(mesh.IEN[:,1])
-Ferrite.getnbasefunctions(mesh::NURBSMesh) = maximum(mesh.IEN)
+
+Ferrite.getnnodes(mesh::NURBSMesh) = maximum(mesh.IEN) 
+const getncontrolponits = Ferrite.getnnodes
 
 function Ferrite.getcoordinates(mesh::NURBSMesh, ie::Int)
 	return mesh.control_points[mesh.IEN[:,ie]]
@@ -64,12 +65,107 @@ function parent_to_parametric_map(nurbsmesh::NURBSMesh{pdim}, cellid::Int, xi::V
 	ξηζ = [0.5*((Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]])*xi[d] + (Ξ[d][_ni[d]+1] + Ξ[d][_ni[d]])) for d in 1:pdim]
 end
 
-#=function Ferrite.Grid(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
-	ncontrolpoints = length(mesh.IEN[:,1])
-	nodes = [Ferrite.Node(x) for x in mesh.control_points]
+"""
+	generate_nurbs_meshdata(orders, nbf)
 
-	_BezierCell = BezierCell{sdim,ncontrolpoints,mesh.orders}
-	cells = [_BezierCell(Tuple(reverse(mesh.IEN[:,ie]))) for ie in 1:getncells(mesh)]
+Computes connectivity arrays for a nurbs patch, based on the order and number of basefunctions of the patch.
+"""
+function generate_nurbs_meshdata(orders::NTuple{dim,Int}, nbf::NTuple{dim,Int}) where dim
 
-	return Ferrite.Grid(cells, nodes)
-end=#
+	nel = prod(nbf .- orders) #(n-p)*(m-q)*(l-r)
+	nnp = prod(nbf) #n*m*l
+	nen = prod(orders.+1) #(p+1)*(q+1)*(r+1)
+
+	INN = zeros(Int, nnp, dim)
+	IEN = zeros(Int, nen, nel)
+
+	A = 0; e = 0
+    dims = 1:dim
+
+    for i in Tuple.(CartesianIndices(nbf))
+        A += 1
+        INN[A, dims] .= i
+        if all(i .>= (orders.+1))
+            e+=1
+			for loc in Tuple.(CartesianIndices(orders.+1))
+				loc = loc .- 1
+				B = A
+				b = 1
+                for d in dim:-1:1
+                    _d = dims[1:d-1]
+					B -= loc[d] * prod(nbf[_d])
+                    b += loc[d] * prod(orders[_d] .+ 1)
+				end
+                IEN[b,e] = B
+            end
+        end
+	end
+	IEN .= reverse(IEN, dims=1)
+
+	return nel, nnp, nen, INN, IEN
+end
+
+
+#Worlds slowest knot insertion algo.
+function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdim,Int}, control_points::Vector{Vec{sdim,T}}, weights::Vector{T}, ξᴺ::T; dir::Int) where {pdim,sdim,T}
+
+	C, new_knot_vector = knotinsertion(knot_vectors[dir], orders[dir], ξᴺ)
+	
+	n = length(knot_vectors[dir]) - 1 - orders[dir] #number of basefunctions
+	m = length(control_points) ÷ n
+
+	
+	new_cps = zeros(Vec{sdim,T}, (n+1)*m)
+	new_ws = zeros(T, (n+1)*m)
+	for r in 1:m
+		indx = (dir==1) ? ((1:n) .+ (r-1)*n) : (r:m:(length(control_points)))
+		cp_row = control_points[indx]
+
+		w_row = weights[indx]
+		for i in 1:size(C,1)
+			new_cp = sum(C[i,:] .* (cp_row.*w_row))
+			new_w = sum(C[i,:] .* w_row)
+			
+			indx2 = (dir==1) ? (i + (r-1)*(n+1)) : (r + (i-1)*m)
+		
+					
+			new_cps[indx2] = new_cp/new_w
+			new_ws[indx2] = new_w
+		end
+	end
+	
+	copy!(knot_vectors[dir], new_knot_vector)
+	copy!(control_points, new_cps)
+	copy!(weights, new_ws)
+
+end
+
+function knotinsertion(Ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
+
+    n = length(Ξ) - p - 1
+    m = n+1
+
+    k = findfirst(ξᵢ -> ξᵢ>ξᴺ, Ξ)-1
+
+    @assert((k>p))
+    C = zeros(T,m,n)
+    C[1,1] = 1
+    for i in 2:m-1
+        
+        local α
+        if i<=k-p
+            α = 1.0
+        elseif k-p+1<=i<=k
+            α = (ξᴺ - Ξ[i])/(Ξ[i+p] - Ξ[i])
+        elseif i>=k+1
+             α = 0.0
+        end
+        C[i,i] = α
+        C[i,i-1] = (1-α)
+    end
+    C[m,n] = 1
+    
+    new_knot_vector = copy(Ξ)
+    insert!(new_knot_vector,k+1,ξᴺ)
+    return C, new_knot_vector
+end

@@ -1,9 +1,9 @@
-export BezierGrid, getweights, getweights!, get_bezier_coordinates, get_bezier_coordinates!, get_extraction_operator
+export BezierGrid, getweights, getweights!, get_extraction_operator, get_bezier_coordinates, get_bezier_coordinates!, get_nurbs_coordinates
 
 struct BezierGrid{dim,C<:Ferrite.AbstractCell,T<:Real} <: Ferrite.AbstractGrid{dim}
-	grid::Ferrite.Grid{dim,C,T}
-	weights::Vector{Float64} #Ferrite.CellVector{Float64}
-	beo::Vector{BezierExtractionOperator{Float64}}
+	grid    ::Ferrite.Grid{dim,C,T}
+	weights ::Vector{Float64}
+	beo     ::Vector{BezierExtractionOperator{Float64}}
 end
 Ferrite.getdim(g::BezierGrid{dim}) where {dim} = dim
 getT(g::BezierGrid) = eltype(first(g.nodes).x)
@@ -47,7 +47,10 @@ function BezierGrid(mesh::NURBSMesh{pdim,sdim}) where {pdim,sdim}
 end
 
 function Ferrite.Grid(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
-	any(mesh.weights .!= 1.0) && @warn("Some of the weigts are non-unity, so you might want to use BezierGrid instead of a Grid.")
+	if any(mesh.weights .!= 1.0)
+		@warn("You are transforming the NURBSMesh to a Ferrite.Grid. It is better to use a IGA.BezierGrid to also get bezier extraction operators and weights.") 
+		@warn("Some of the weigts are non-unity, so you might want to use BezierGrid instead of a Grid.")
+	end
 
 	N = length(mesh.IEN[:,1])
 	
@@ -90,6 +93,35 @@ function Ferrite.getweights(grid::BezierGrid, ic::Int)
 	return grid.weights[nodeids]
 end
 
+function Ferrite.getcoordinates!(bc::BezierCoords{dim,T}, grid::BezierGrid, ic::Int) where {dim,T}
+
+	C = grid.beo[ic]
+
+	Ferrite.getcoordinates!(bc.xb, grid.grid, ic)
+	getweights!(bc.w, grid, ic)
+
+	bc.wb .= compute_bezier_points(C, bc.w)
+	bc.xb .*= bc.w
+	bc.xb .= inv.(bc.wb) .* compute_bezier_points(C, bc.xb)
+	bc.beow .= C.*bc.w
+
+	return bc
+end
+
+function Ferrite.getcoordinates(grid::BezierGrid, ic::Int)
+
+	dim = Ferrite.getdim(grid); T = getT(grid)
+
+	n = Ferrite.nnodes_per_cell(grid, ic)
+	w = zeros(T, n)
+	wb = zeros(T, n)
+	xb = zeros(Vec{dim,T}, n)
+	
+	bc = BezierCoords(xb,wb,w,grid.beo[ic])
+
+	return getcoordinates!(bc,grid,ic)
+end
+
 function get_bezier_coordinates!(bcoords::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}, grid::BezierGrid, ic::Int) where {dim,T}
 
 	C = grid.beo[ic]
@@ -116,7 +148,7 @@ function get_bezier_coordinates(grid::BezierGrid, ic::Int)
 	return x,w
 end
 
-function Ferrite.getcoordinates(grid::BezierGrid, cell::Int)
+function get_nurbs_coordinates(grid::BezierGrid, cell::Int)
     dim = Ferrite.getdim(grid); T = getT(grid)
     nodeidx = grid.cells[cell].nodes
     return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim,T}}

@@ -1,95 +1,59 @@
 
-# The functions in Ferrite calls getcoordinates(grid, cellid)
-# but in IGA we need to call get_bezier_coordinates(grid, cellid).
-# Therefore we have to copy the functions from Ferrite, even though the code is almost the same
 
-function Ferrite._assemble_L2_matrix(fe_values::BezierCellValues, set, dh)
-    n = Ferrite.getn_scalarbasefunctions(fe_values)
-    M = create_symmetric_sparsity_pattern(dh)
-    assembler = start_assemble(M)
+function Ferrite.L2Projector(
+    func_ip::Interpolation,
+    grid::BezierGrid;
+    qr_lhs::QuadratureRule = Ferrite._mass_qr(func_ip),
+    set = 1:getncells(grid),
+    geom_ip::Interpolation = Ferrite.default_interpolation(typeof(grid.cells[first(set)])),
+    #qr_rhs::Union{QuadratureRule,Nothing}=nothing, # deprecated
+)
 
-    Me = zeros(n, n)
-    cell_dofs = zeros(Int, n)
+    Ferrite._check_same_celltype(grid, collect(set)) # TODO this does the right thing, but gives the wrong error message if it fails
 
-    function symmetrize_to_lower!(K)
-       for i in 1:size(K, 1)
-           for j in i+1:size(K, 1)
-               K[j, i] = K[i, j]
-           end
-       end
-    end
+    fe_values_mass = BezierCellValues( CellScalarValues(qr_lhs, func_ip, geom_ip) )
 
-    ## Assemble contributions from each cell
-    for cellnum in set
-        celldofs!(cell_dofs, dh, cellnum)
+    # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
+    dh = MixedDofHandler(grid)
+    field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
+    fh = FieldHandler([field], Set(set))
+    push!(dh, fh)
+    _, vertex_dict, _, _ = Ferrite.__close!(dh)
 
-        fill!(Me, 0)
-        extr = dh.grid.beo[cellnum]
-        Xᴮ, wᴮ = get_bezier_coordinates(dh.grid, cellnum)
-        w = getweights(dh.grid, cellnum)
-        
-        set_bezier_operator!(fe_values, w.*extr)
-        reinit!(fe_values, (Xᴮ, wᴮ))
+    M = Ferrite._assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
+    M_cholesky = LinearAlgebra.cholesky(M)
 
-        ## ∭( v ⋅ u )dΩ
-        for q_point = 1:getnquadpoints(fe_values)
-            dΩ = getdetJdV(fe_values, q_point)
-            for j = 1:n
-                v = shape_value(fe_values, q_point, j)
-                for i = 1:j
-                    u = shape_value(fe_values, q_point, i)
-                    Me[i, j] += v ⋅ u * dΩ
-                end
-            end
-        end
-        symmetrize_to_lower!(Me)
-        assemble!(assembler, cell_dofs, Me)
-    end
-    return M
+    # For deprecated API
+    # fe_values = qr_rhs === nothing ? nothing : CellScalarValues(qr_rhs, func_ip, geom_ip)
+
+    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set), vertex_dict[1], nothing, nothing)
 end
 
-function Ferrite._project(vars, proj::L2Projector{<:BezierCellValues}, M::Integer) 
+function project(proj::L2Projector,
+    vars::AbstractVector{<:AbstractVector{T}},
+    qr_rhs::Union{QuadratureRule,Nothing}=nothing;
+    project_to_nodes::Bool=true) where T <: Union{Number, AbstractTensor}
 
-    # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
-    # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
-    f = zeros(ndofs(proj.dh), M)
-    fe_values = proj.fe_values
-    n = getnbasefunctions(proj.fe_values)
-    fe = zeros(n, M)
+    # For using the deprecated API
+    fe_values = qr_rhs === nothing ?
+    proj.fe_values :
+    BezierCellValues(CellScalarValues(qr_rhs, proj.func_ip, proj.geom_ip))
 
-    cell_dofs = zeros(Int, n)
-    nqp = getnquadpoints(fe_values)
+    M = T <: AbstractTensor ? length(vars[1][1].data) : 1
 
-    ## Assemble contributions from each cell
-    for cellnum in proj.set
-        celldofs!(cell_dofs, proj.dh, cellnum)
-        fill!(fe, 0)
-        
-        extr = proj.dh.grid.beo[cellnum]
-        Xᴮ, wᴮ = get_bezier_coordinates(proj.dh.grid, cellnum)
-        w = getweights(proj.dh.grid, cellnum)
-        
-        set_bezier_operator!(fe_values, w.*extr)
-        reinit!(fe_values, (Xᴮ, wᴮ))
-
-        cell_vars = vars[cellnum]
-
-        for q_point = 1:nqp
-            dΩ = getdetJdV(fe_values, q_point)
-            qp_vars = cell_vars[q_point]
-            for i = 1:n
-                v = shape_value(fe_values, q_point, i)
-                fe[i, :] += v * [qp_vars.data[i] for i=1:M] * dΩ
-            end
+    projected_vals = Ferrite._project(vars, proj, fe_values, M, T)::Vector{T}
+    if project_to_nodes
+        # NOTE we may have more projected values than verticies in the mesh => not all values are returned
+        nnodes = getnnodes(proj.dh.grid)
+        reordered_vals = fill(convert(T, NaN * zero(T)), nnodes)
+        for node = 1:nnodes
+            if (k = get(proj.node2dof_map, node, nothing); k !== nothing)
+                @assert length(k) == 1
+                reordered_vals[node] = projected_vals[k[1]]
+                end
         end
-
-        # Assemble cell contribution
-        for (num, dof) in enumerate(cell_dofs)
-            f[dof, :] += fe[num, :]
-        end
+        return reordered_vals
+    else
+        return projected_vals
     end
-
-    # solve for the projected nodal values
-    return proj.M_cholesky\f
-
 end

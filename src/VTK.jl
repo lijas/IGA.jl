@@ -15,10 +15,10 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid{dim,C,T}) 
 			push!(cellorders, p)
 		end
 
-		x,w = get_bezier_coordinates(grid, cellid)
+		xb, wb = get_bezier_coordinates(grid, cellid)
 
-	    append!(beziercoords,  x)
-		append!(weights,  w)
+	    append!(beziercoords, xb)
+		append!(weights, wb)
 
 		cellnodes = (1:length(cell.nodes)) .+ offset
 

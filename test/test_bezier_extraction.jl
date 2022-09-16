@@ -42,24 +42,49 @@ end
     #Element 1
     x_paper = [Vec((0.0, 1.0)), Vec((0.2612, 1.0)), Vec((0.4890, 0.8723)), Vec((0.0, 1.25)), Vec((0.3265, 1.25)), Vec((0.6113, 1.0903)), Vec((0.0, 1.5)), Vec((0.3918, 1.5)), Vec((0.7336, 1.3084))][reorder]
     w_paper = [1.0, 0.9025, 0.8698,1.0, 0.9025, 0.8698,1.0, 0.9025, 0.8698][reorder]
-    x,w = get_bezier_coordinates(grid, 1)
-    @test all(isapprox.(x_paper, x, atol = 1e-4))
-    @test all(isapprox.(w_paper, w, atol = 1e-4))
+    bc = getcoordinates(grid, 1)
+    @test all(isapprox.(x_paper, bc.xb, atol = 1e-4))
+    @test all(isapprox.(w_paper, bc.wb, atol = 1e-4))
 
     #Element 2
     x_paper = [Vec((0.4890, 0.8723)), Vec((0.7346, 0.7346)), Vec((0.8723, 0.4890)), Vec((0.6113, 1.0903)), Vec((0.9182, 0.9182)), Vec((1.0903, 0.6113)), Vec((0.7336, 1.3084)), Vec((1.1019, 1.1019)), Vec((1.3084, 0.7336))][reorder]
     w_paper = [0.8698,0.8373,0.8698,0.8698,0.8373,0.8698,0.8698,0.8373,0.8698][reorder]
-    x,w = get_bezier_coordinates(grid, 2)
-    @test all(isapprox.(x_paper, x, atol = 1e-4))
-    @test all(isapprox.(w_paper, w, atol = 1e-4))
+    bc = getcoordinates(grid, 2)
+    @test all(isapprox.(x_paper, bc.xb, atol = 1e-4))
+    @test all(isapprox.(w_paper, bc.wb, atol = 1e-4))
 
     #Element 5
     x_paper = [Vec((0.7336, 1.3084)), Vec((1.1019, 1.1019)), Vec((1.3084, 0.7336)), Vec((0.8558, 1.5265)), Vec((1.2855, 1.2855)), Vec((1.5265, 0.8558)), Vec((0.9781, 1.7445)), Vec((1.4692, 1.4692)), Vec((1.7445, 0.9781))][reorder]
     w_paper = [0.8698,0.8373,0.8698,0.8698,0.8373,0.8698,0.8698,0.8373,0.8698][reorder]
-    x,w = get_bezier_coordinates(grid, 5)
-    @test all(isapprox.(x_paper, x, atol = 1e-3)) 
-    @test all(isapprox.(w_paper, w, atol = 1e-4))
+    bc = getcoordinates(grid, 5)
+    @test all(isapprox.(x_paper, bc.xb, atol = 1e-3))
+    @test all(isapprox.(w_paper, bc.wb, atol = 1e-4))
 end
+
+#=
+bc = getcoordinates(grid, 1)
+@show x_paper, bc.xb
+@test all(isapprox.(x_paper, bc.xb, atol = 1e-4))
+@test all(isapprox.(w_paper, bc.wb, atol = 1e-4))
+#Test again to see that nothing mutates:
+bc = getcoordinates(grid, 1)
+@test all(isapprox.(x_paper, bc.xb, atol = 1e-4))
+@test all(isapprox.(w_paper, bc.wb, atol = 1e-4))
+
+#Element 2
+x_paper = [Vec((0.4890, 0.8723)), Vec((0.7346, 0.7346)), Vec((0.8723, 0.4890)), Vec((0.6113, 1.0903)), Vec((0.9182, 0.9182)), Vec((1.0903, 0.6113)), Vec((0.7336, 1.3084)), Vec((1.1019, 1.1019)), Vec((1.3084, 0.7336))][reorder]
+w_paper = [0.8698,0.8373,0.8698,0.8698,0.8373,0.8698,0.8698,0.8373,0.8698][reorder]
+bc = getcoordinates(grid, 2)
+@test all(isapprox.(x_paper, bc.xb, atol = 1e-4))
+@test all(isapprox.(w_paper, bc.wb, atol = 1e-4))
+
+#Element 5
+x_paper = [Vec((0.7336, 1.3084)), Vec((1.1019, 1.1019)), Vec((1.3084, 0.7336)), Vec((0.8558, 1.5265)), Vec((1.2855, 1.2855)), Vec((1.5265, 0.8558)), Vec((0.9781, 1.7445)), Vec((1.4692, 1.4692)), Vec((1.7445, 0.9781))][reorder]
+w_paper = [0.8698,0.8373,0.8698,0.8698,0.8373,0.8698,0.8698,0.8373,0.8698][reorder]
+bc = getcoordinates(grid, 3)
+@test all(isapprox.(x_paper, bc.xb, atol = 1e-3))
+@test all(isapprox.(w_paper, bc.wb, atol = 1e-4))=#
+
 
 @testset "Bezier transformation" begin
 
