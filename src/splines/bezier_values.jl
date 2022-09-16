@@ -20,7 +20,12 @@ end
 Ferrite.FieldTrait(a::Type{<:BezierFaceValues}) = Ferrite.FieldTrait(a.cv_bezier)
 Ferrite.FieldTrait(a::Type{<:BezierCellValues}) = Ferrite.FieldTrait(a.cv_bezier)
 
+Ferrite.FieldTrait(a::Type{<:BezierFaceValues}) = Ferrite.FieldTrait(a.cv_bezier)
+Ferrite.FieldTrait(a::Type{<:BezierCellValues}) = Ferrite.FieldTrait(a.cv_bezier)
+
 BezierValues{dim_s,T,CV} = Union{BezierCellValues{dim_s,T,CV}, BezierFaceValues{dim_s,T,CV}}
+
+Ferrite.nfaces(fv::BezierFaceValues) = size(fv.cv_store.N, 3)
 
 function BezierCellValues(cv::Ferrite.CellValues{dim_s,T,Ferrite.RefCube}) where {dim_s,T}
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))

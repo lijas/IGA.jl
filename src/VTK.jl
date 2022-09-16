@@ -71,6 +71,7 @@ function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler{dim,T,G}, u::Vecto
         vtk_point_data(vtkfile, data, string(name, suffix))
     end
 
+
     return vtkfile
 end
 
@@ -96,17 +97,15 @@ function _distribute_vtk_point_data!(bezier_extraction,
 
 end
 
-function WriteVTK.vtk_point_data(
+function vtk_point_data_elias(
 	vtkfile::WriteVTK.DatasetFile, 
-	cpvalues::Vector{<:Union{SymmetricTensor{order,dim,T,M}, 
-                             Tensor{order,dimv,T,M}, 
-                             SVector{M,T}}}, 
-	name::AbstractString, 
-	grid::BezierGrid{dim,C}) where {order,dimv,dim,C,T,M}
+	cpvalues::Vector{<: Tensors.AbstractTensor}, 
+	name::String, 
+	grid::BezierGrid{dim,C}) where {dim,C}
 
 	@assert isconcretetype(C)
 	nnodes = Ferrite.nnodes(C)
-
+	M = length(first(cpvalues).data)
 	data = fill(NaN, M, nnodes*getncells(grid))  # set default value
 
 	nodecount = 0
