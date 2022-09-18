@@ -118,14 +118,14 @@ end
 
 #
 function Ferrite.reinit!(bcv::BezierCellValues{dim_s,T,CV}, (xb, wb)::Tuple{<:AbstractVector{Vec{dim_s,T}}, <:AbstractVector{T}}) where {dim_s,T,CV<:Ferrite.CellValues}
-    Ferrite.reinit!(bcv.cv_bezier, xb) #call the normal reinit function first
-
+    _reinit_nurbs!(bcv.cv_store, bcv.cv_bezier, xb, wb) 
     _cellvalues_bezier_extraction!(bcv.cv_store, bcv.cv_bezier, bcv.current_beo[], 1)
 end
 
-function Ferrite.reinit!(bcv::BezierFaceValues{dim_s,T,CV},  (xb, wb)::Tuple{<:AbstractVector{Vec{dim_s,T}}, <:AbstractVector{T}}, faceid::Int) where {dim_s,T,CV<:Ferrite.FaceValues}
-    Ferrite.reinit!(bcv.cv_bezier, xb, faceid) #call the normal reinit function first
-    bcv.cv_store.current_face[] = faceid
+function Ferrite.reinit!(bcv::BezierFaceValues{dim_s,T,CV}, (xb, wb)::Tuple{<:AbstractVector{Vec{dim_s,T}}, <:AbstractVector{T}}, faceid::Int) where {dim_s,T,CV<:Ferrite.FaceValues}
+    _reinit_nurbs!(bcv.cv_store, bcv.cv_bezier, xb, wb, faceid) 
+    bcv.cv_store.current_face[]  = faceid
+    bcv.cv_bezier.current_face[] = faceid
 
     _cellvalues_bezier_extraction!(bcv.cv_store, bcv.cv_bezier, bcv.current_beo[], faceid)
 end
