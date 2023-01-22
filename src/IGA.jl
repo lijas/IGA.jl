@@ -14,11 +14,13 @@ export BezierExtractionOperator
 export BezierCell
 export BezierCoords
 
+const Optional{T} = Union{T, Nothing}
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
 
 struct BezierCoords{dim_s,T} 
     xb   ::Vector{Vec{dim_s,T}}
     wb   ::Vector{T}
+    x    ::Vector{Vec{dim_s,T}}
     w    ::Vector{T}
     beow ::BezierExtractionOperator{T} #BezierextractionOpeator multiplied with weights
     #Perhaps add these later:
@@ -83,15 +85,17 @@ function Ferrite.cell_to_vtkcell(::Type{BezierCell{2,N,order,M}}) where {N,order
     if length(order) == 2
         return Ferrite.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
     else
-        error("adsf")
+        return Ferrite.VTKCellTypes.VTK_BEZIER_CURVE
     end
 end
 
 function Ferrite.cell_to_vtkcell(::Type{BezierCell{3,N,order,M}}) where {N,order,M}
     if length(order) == 3
         return Ferrite.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
-    else
+    elseif length(order) == 2
         return Ferrite.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
+    else 
+        return Ferrite.VTKCellTypes.VTK_BEZIER_CURVE
     end
 end
 

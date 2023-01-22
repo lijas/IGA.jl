@@ -37,7 +37,7 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
     return B[reorder], dBdξ[reorder]
 end
 
-@testset "Nurbs 1" begin
+@testset "bezier values nurbs" begin
 
     dim = 2
     orders = (2,2)
@@ -69,7 +69,7 @@ end
         X = get_nurbs_coordinates(grid, cellnum)
         w = getweights(grid, cellnum)
         #set_bezier_operator!(cv, w.*C)
-        bc = BezierCoords(Xb, wb, w, C.*w)#getcoordinates(grid, cellnum)
+        bc = BezierCoords(Xb, wb, X, w, C)#getcoordinates(grid, cellnum)
         reinit!(cv, bc)
 
         #set_bezier_operator!(cv_vector, w.*C)
@@ -139,7 +139,7 @@ end
         X = get_nurbs_coordinates(grid, cellnum)
         w = getweights(grid, cellnum)
 
-        bc = BezierCoords(Xb, wb, w, C.*w) # getcoordinates(grid, cellnum)
+        bc = BezierCoords(Xb, wb, X, w, C.*w) # getcoordinates(grid, cellnum)
         reinit!(fv, bc, faceidx)
 
         qr_face_side = Ferrite.create_face_quad_rule(qr_face, ip)[faceidx]
@@ -175,3 +175,37 @@ end
 end
 
 
+@testset "bezier values give NaN" begin
+
+    dim = 2
+    orders = (2,2)
+    nels = (4,3)
+    nb_per_cell = prod(orders.+1)
+
+    ##
+    # Build the problem
+    ##
+    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
+
+    grid = BezierGrid(nurbsmesh)
+    ip = BernsteinBasis{dim, orders}()
+    qr = QuadratureRule{dim, RefCube}(3)
+    cv  = BezierCellValues( CellScalarValues(qr, ip) )
+
+    Xb, wb = get_bezier_coordinates(grid, 1)
+    w = getweights(grid, 1)
+    C = get_extraction_operator(grid, 1)
+
+    set_bezier_operator!(cv, C)
+    reinit!(cv, (Xb, wb))
+
+    #NOTE: If do not give weights to the set_bezier_operator! function (above)
+    # the shape values should be NaN (fail safe)
+    @test shape_value(cv, 1, 1) === NaN
+
+    set_bezier_operator!(cv, C, w)
+    reinit!(cv, (Xb, wb))
+
+    @test shape_value(cv, 1, 1) != NaN
+
+end
