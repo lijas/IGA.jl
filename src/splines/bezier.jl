@@ -25,10 +25,13 @@ Ferrite.nedgedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
 Ferrite.nfacedofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
 Ferrite.ncelldofs(::BernsteinBasis{dim,order}) where {dim,order} = 0
 
+#Fallback method for any order and dim of  BernsteinBasis
 function Ferrite.value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) where {dim,order}
+    _berstein_value(ip, i, xi) 
+end
 
+function _berstein_value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) where {dim,order}
     _n = order .+ 1
-    
     #=
     Get the order of the bernstein basis (NOTE: not the same as VTK)
     The order gets recalculated each time the function is called, so 
@@ -44,6 +47,97 @@ function Ferrite.value(ip::BernsteinBasis{dim,order}, i::Int, xi::Vec{dim}) wher
     end
     return val
 end
+
+function Ferrite.value(ip::BernsteinBasis{1,(2,)}, i::Int, _ξ::Vec{1})
+    ξ = 0.5*(_ξ[1] + 1.0)
+    i == 1 && return (1-ξ)^2
+    i == 2 && return ξ^2
+    i == 3 && return 2ξ*(1 - ξ)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+function Ferrite.value(ip::BernsteinBasis{2,(2,2)}, i::Int, _ξ::Vec{2})
+    ξ, η = _ξ
+    i == 1 && return 0.0625((1 - η)^2)*((1 - ξ)^2)
+    i == 2 && return 0.0625((1 + ξ)^2)*((1 - η)^2)
+    i == 3 && return 0.0625((1 + η)^2)*((1 + ξ)^2)
+    i == 4 && return 0.0625((1 + η)^2)*((1 - ξ)^2)
+    i == 5 && return 0.125(1 + ξ)*((1 - η)^2)*(1 - ξ)
+    i == 6 && return 0.125(1 + η)*((1 + ξ)^2)*(1 - η)
+    i == 7 && return 0.125(1 + ξ)*((1 + η)^2)*(1 - ξ)
+    i == 8 && return 0.125(1 + η)*((1 - ξ)^2)*(1 - η)
+    i == 9 && return 0.25(1 + η)*(1 + ξ)*(1 - η)*(1 - ξ)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+function Ferrite.value(ip::BernsteinBasis{3,(2,2,2)}, i::Int, _ξ::Vec{3})
+    ξ, η, ζ = _ξ
+    i == 1 && return 0.015625((1 - ζ)^2)*((1 - η)^2)*((1 - ξ)^2)
+    i == 2 && return 0.015625((1 + ξ)^2)*((1 - ζ)^2)*((1 - η)^2)
+    i == 3 && return 0.015625((1 + η)^2)*((1 + ξ)^2)*((1 - ζ)^2)
+    i == 4 && return 0.015625((1 + η)^2)*((1 - ζ)^2)*((1 - ξ)^2)
+    i == 5 && return 0.015625((1 + ζ)^2)*((1 - η)^2)*((1 - ξ)^2)
+    i == 6 && return 0.015625((1 + ζ)^2)*((1 + ξ)^2)*((1 - η)^2)
+    i == 7 && return 0.015625((1 + ζ)^2)*((1 + η)^2)*((1 + ξ)^2)
+    i == 8 && return 0.015625((1 + ζ)^2)*((1 + η)^2)*((1 - ξ)^2)
+    i == 9 && return 0.03125(1 + ξ)*((1 - ζ)^2)*((1 - η)^2)*(1 - ξ)
+    i == 10 && return 0.03125(1 + η)*((1 + ξ)^2)*((1 - ζ)^2)*(1 - η)
+    i == 11 && return 0.03125(1 + ξ)*((1 + η)^2)*((1 - ζ)^2)*(1 - ξ)
+    i == 12 && return 0.03125(1 + η)*((1 - ζ)^2)*((1 - ξ)^2)*(1 - η)
+    i == 13 && return 0.03125(1 + ξ)*((1 + ζ)^2)*((1 - η)^2)*(1 - ξ)
+    i == 14 && return 0.03125(1 + η)*((1 + ζ)^2)*((1 + ξ)^2)*(1 - η)
+    i == 15 && return 0.03125(1 + ξ)*((1 + ζ)^2)*((1 + η)^2)*(1 - ξ)
+    i == 16 && return 0.03125(1 + η)*((1 + ζ)^2)*((1 - ξ)^2)*(1 - η)
+    i == 17 && return 0.03125(1 + ζ)*((1 - η)^2)*((1 - ξ)^2)*(1 - ζ)
+    i == 18 && return 0.03125(1 + ζ)*((1 + ξ)^2)*((1 - η)^2)*(1 - ζ)
+    i == 19 && return 0.03125(1 + ζ)*((1 + η)^2)*((1 - ξ)^2)*(1 - ζ)
+    i == 20 && return 0.03125(1 + ζ)*((1 + η)^2)*((1 + ξ)^2)*(1 - ζ)
+    i == 21 && return 0.0625(1 + η)*(1 + ξ)*((1 - ζ)^2)*(1 - η)*(1 - ξ)
+    i == 22 && return 0.0625(1 + ζ)*(1 + ξ)*((1 - η)^2)*(1 - ζ)*(1 - ξ)
+    i == 23 && return 0.0625(1 + ζ)*(1 + η)*((1 + ξ)^2)*(1 - ζ)*(1 - η)
+    i == 24 && return 0.0625(1 + ζ)*(1 + ξ)*((1 + η)^2)*(1 - ζ)*(1 - ξ)
+    i == 25 && return 0.0625(1 + ζ)*(1 + η)*((1 - ξ)^2)*(1 - ζ)*(1 - η)
+    i == 26 && return 0.0625(1 + η)*(1 + ξ)*((1 + ζ)^2)*(1 - η)*(1 - ξ)
+    i == 27 && return 0.125(1 + ζ)*(1 + η)*(1 + ξ)*(1 - ζ)*(1 - η)*(1 - ξ)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+#=
+# Code for computing higher dim and order Bernstein 
+  polynomials, e.g see function value(::Bernstein{2,(2,2)}, ::Int, ξ)
+
+using Symbolics
+
+@variables ξ η ζ
+
+ip1d = BernsteinBasis{1,(2,)}()
+
+dim = 3
+order = (2,2,2)#,2)
+ip = BernsteinBasis{dim,order}()
+ordering = IGA._bernstein_ordering(ip)
+
+cindex = CartesianIndices(order.+1)
+N = []
+c = 0
+for lindex in ordering
+    i = cindex[lindex][1]
+    j = cindex[lindex][2]
+    k = cindex[lindex][3]
+    
+    Ni = IGA._bernstein_basis_recursive(order[1], i, ξ)
+    Nj = IGA._bernstein_basis_recursive(order[2], j, η)
+    Nk = IGA._bernstein_basis_recursive(order[3], k, ζ)
+
+    _N = simplify(Ni*Nj*Nk)
+
+    c +=1 
+    println("i == $c && return $(_N)")
+    push!(N, _N)
+end
+
+=#
+
 
 Ferrite.vertices(ip::BernsteinBasis{dim,orders}) where {dim,orders} = ntuple(i -> i, Ferrite.getnbasefunctions(ip))
 
