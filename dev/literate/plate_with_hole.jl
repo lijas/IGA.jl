@@ -79,8 +79,8 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 #md #     Since the operations above are quite common in IGA, there is a helper-function called `bc = getcoordinates(grid, cellid)::BezierCoords `, 
 #md #     which return the bezier coorinates and weights directly. 
 
-        # Furthermore, we pass the bezier extraction operator to the CellValues/Beziervalues.
-        set_bezier_operator!(cv, w.*extr)
+        # Furthermore, we pass the bezier extraction operator and weigts to the CellValues/Beziervalues.
+        set_bezier_operator!(cv, extr, w)
         reinit!(cv, (Xᴮ, wᴮ)) ## Reinit cellvalues by passsing both bezier coords and weights
 
         integrate_element!(ke, stiffmat, cv)

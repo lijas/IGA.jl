@@ -54,7 +54,7 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         wᴮ = compute_bezier_points(extr, w)
         Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)
 
-        set_bezier_operator!(cv, w.*extr)
+        set_bezier_operator!(cv, extr, w)
         reinit!(cv, (Xᴮ, wᴮ)) ## Reinit cellvalues by passsing both bezier coords and weights
 
         integrate_element!(ke, stiffmat, cv)
