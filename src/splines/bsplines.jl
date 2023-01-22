@@ -156,6 +156,20 @@ end
 Algorithm that finds non zero basis function for u (xi)
 NURBS book alg2.2.    
 """    
-function _bspline_basis_values()
-    #TODO
+function _eval_nonzero_bspline_values!(N, i, u, p, U)
+    error("TODO")
+    N[begin] = 1.0
+    left = similar(N)
+    right = similar(N)
+    for j = 1:p
+        left[begin+j] = u-U[begin+i+1-j]
+        right[begin+j] = U[begin+i+j] - u
+        saved = 0.0
+        for r = 0:(j-1)
+            tmp = N[begin+r]/(right[begin+r+1]+left[begin+j-r])
+            N[begin+r] = saved+right[begin+r+1]*tmp
+            saved = left[begin+j-r]*tmp
+        end
+        N[end] = saved
+    end
 end

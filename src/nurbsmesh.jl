@@ -1,4 +1,4 @@
-export NURBSMesh, parent_to_parametric_map
+export NURBSMesh, parent_to_parametric_map, eval_parametric_coordinate
 
 """
 Defines a NURBS patch, containing knot vectors, orders, controlpoints, weights and connectivity arrays.
@@ -42,7 +42,6 @@ struct NURBSMesh{pdim,sdim,T} #<: Ferrite.AbstractGrid
 end
 
 Ferrite.getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
-
 Ferrite.getnnodes(mesh::NURBSMesh) = maximum(mesh.IEN) 
 const getncontrolponits = Ferrite.getnnodes
 
@@ -51,10 +50,58 @@ function Ferrite.getcoordinates(mesh::NURBSMesh, ie::Int)
 end
 
 """
-parent_to_parametric_map(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pdim})
+	eval_parametric_coordinate(mesh::NURBSMesh{pdim,sdim}, ξ::Vec{pdim}) where {pdim,sdim}
 
-	Given a coordinate for a cell in the parent domain, ξ, η, ζ, this functions returns the coordinate in 
-	the parametric domain, ξ', η', ζ' coordinate system.
+Given a coordinate `ξ` in the parametric domain in the parametric, this function 
+returns the corresponding coordinate in the global domain.
+
+TODO: This function is currently very in-effecient for large domain.
+"""
+
+function eval_parametric_coordinate(mesh::NURBSMesh{pdim,sdim}, ξ::Vec{pdim}) where {pdim,sdim}
+
+	bspline = BSplineBasis(mesh.knot_vectors, mesh.orders)
+	@assert getnbasefunctions(bspline) == length(mesh.control_points)
+
+	x = zero(Vec{sdim,Float64})
+	for i in 1:getnbasefunctions(bspline)
+		N = Ferrite.value(bspline, i, ξ)
+		x += N*mesh.control_points[i]
+	end
+
+	return x
+
+	#Possible faster algorithm:
+	#=
+	knot_spans = ntuple(pdim) do i
+		_find_span(n[i], p[i], ξ[i], Ξ[i])
+	end
+
+	shape_values = ntuple(pdim) do i
+		_eval_nonzero_bspline_values!(N[i], first(knot_span[i]), orders[i], ξ[i], knot_vectors[i] )
+	end
+
+	x = zero(Vec{sdim,Float64})
+	for k in knot_spans[3]
+		Nk = N[k]
+		for j in knot_spans[2]
+			Nj = N[k]
+			N = Nj*Nk
+			for i in knot_spans[1]
+				N *= N[i]
+				index = CartesianIndex(i,j,k)
+				x += N * control_points[index]
+			end
+		end
+	end =#
+	
+end
+
+"""
+	parent_to_parametric_map(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pdim})
+
+Given a coordinate for a cell in the parent domain `xi`, this functions returns the coordinate in 
+the parametric domain.
 """
 function parent_to_parametric_map(nurbsmesh::NURBSMesh{pdim}, cellid::Int, xi::Vec{pdim}) where {pdim}
 
