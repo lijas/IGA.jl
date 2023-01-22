@@ -122,19 +122,11 @@ function generate_nurbs_patch(::Val{:cube}, nel::NTuple{1,Int}, orders::NTuple{1
 
 	for ix in 1:nbf[1]
 		x = coords[1][ix]
-
-		if sdim == 2
-			v = (x, 0.0)
-		elseif sdim == 1
-			v = (x,)
-		end
-
+		v = ntuple(i->i==1 ? x : 0.0, sdim)
 		push!(control_points, Vec{sdim,T}(v))
 	end
-	
 
 	return IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
-
 end
 
 function generate_nurbs_patch(::Val{:hemisphere}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; α1::NTuple{2,T}, α2::NTuple{2,T}, R::T, multiplicity::NTuple{2,Int}=(1,1)) where T
@@ -529,7 +521,7 @@ function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int})
 	cp = [Vec((-1.0,   0.0)), Vec((-1.0, sqrt(2)-1)), Vec((1-sqrt(2),1.0)), Vec((0.0,1.0)), Vec((-2.5,   0.0)), Vec((-2.5,   0.75)), Vec((-0.75,   2.5)), Vec((0.0,   2.5)), Vec((-4.0,   0.0)), Vec((-4.0,   4.0)), Vec((-4.0,   4.0)),   Vec((0.0,   4.0))]
 	w = Float64[1, 0.5(1 + 1/sqrt(2)), 0.5(1 + 1/sqrt(2)), 1,1,1,1, 1,1,1,1,1]
 
-    knot_vectors = (Float64[0, 0, 0, 1/2, 1, 1, 1], Float64[0, 0, 0, 1, 1, 1])
+    knot_vectors = (Float64[-1, -1, -1, 0, 1, 1, 1], Float64[-1, -1, -1, 1, 1, 1])
     orders = (2,2)
 
 	#Add elements via knot insertion

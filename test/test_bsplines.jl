@@ -16,18 +16,58 @@ end=#
 
 @testset "bsplines" begin
     order = 2
-    knots = Float64[0,0,0, 0.5, 1,1,1]
+    knots = Float64[-1, -1, -1, 0, 1, 1, 1]
 
     basis = IGA.BSplineBasis(knots,order)
     n = IGA.Ferrite.getnbasefunctions(basis)
+    @test n == 4
+    @test IGA.getnbasefunctions_dim(basis) == (4,)
+
     for xi in [0.0, 0.25, 0.5, 1.0]
-        sum = 0.0
+        sum1 = 0.0
+        sum2 = 0.0
         for i in 1:n
-            sum += IGA._bspline_basis_value_alg2(order, knots, i, xi)
+            sum1 += IGA._bspline_basis_value_alg1(order, knots, i, xi)
+            sum2 += IGA._bspline_basis_value_alg2(order, knots, i, xi)
         end
-        @test sum==1.0
+        @test sum1==1.0
+        @test sum2==1.0
     end
 
     span = IGA._find_span(n, order, 0.3, knots)
-    @test span == 3
+    @test span == 4
+    
+    order = 3
+    knots = (Float64[-1,-1,-1,-1, -0.3, 0.0, 0.3, 1,1,1,1],
+             Float64[-1,-1,-1,-1, -0.3, -0.2, 0.2, 0.3, 1,1,1,1])
+    
+    basis = IGA.BSplineBasis(knots, (order, order))
+    @test IGA.getnbasefunctions_dim(basis) == (7,8)
+    @test IGA.getnbasefunctions(basis) == 7*8
+
+    #Knot vector needs to be in range [-1 ... 1]
+    order = 2
+    knots = Float64[-1, -1, -1, 0, 1, 1, 1]
+    @test_throws AssertionError IGA.BSplineBasis( [0.0, 1.0], 2)
+    @test_throws AssertionError IGA.BSplineBasis( ([-1.0, 0.0],), (2,))
+    @test_throws AssertionError IGA.BSplineBasis( ([-1.0, 0.0],[0.0, 1.0]), (2,2))
+end
+
+@testset "bsplines vs. bernstein" begin
+    #BsplineBasis is the same as BernsteinBasis in interval -1 to 1 
+    T = Float64
+    for p in (2,4)
+        knot_vector = [(ones(T, p+1)*-1)..., ones(T, p+1)...]
+    
+        ip1 = BSplineBasis((knot_vector,knot_vector), (p,p))
+        ip2 = BernsteinBasis{2,(p,p)}()
+
+        reorder = IGA._bernstein_ordering(ip2)
+
+        ξ = Vec((rand(),rand()))
+        N1 = Ferrite.value(ip1, ξ)[reorder]
+        N2 = Ferrite.value(ip2, ξ)
+
+        @test N1 ≈ N2
+    end
 end

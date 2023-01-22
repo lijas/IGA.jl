@@ -9,18 +9,18 @@ struct BSplineBasis{dim,T,order} <: Ferrite.Interpolation{dim,Ferrite.RefCube,or
 
     function BSplineBasis(knots::NTuple{dim,Vector{T}}, order::NTuple{dim,Int}) where {dim,T} 
         @assert(length(order)==dim)
-        @assert(last(first(knots))==T(1))
-        @assert(first(first(knots))==T(-1))
+        @assert( all( first.(knots) .== T(-1.0)) )
+        @assert( all( last.(knots) .== T(1.0)) )
 		return new{dim,T,Tuple(order)}(knots)
     end
 
     function BSplineBasis(knots::Vector{T}, order::Int) where {T} 
-		return new{1,T,Tuple(order)}((knots,))
+		return BSplineBasis((knots,), (order,))
     end
     
 end
 
-getnbasefunctions_dim(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = Tuple([length(basis.knot_vector[i]) - order[i] - 1 for i in 1:dim])
+getnbasefunctions_dim(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = ntuple(i -> length(basis.knot_vector[i]) - order[i] - 1, dim)
 Ferrite.getnbasefunctions(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = prod(getnbasefunctions_dim(basis))::Int
 
 function Ferrite.value(b::BSplineBasis{dim,T,order}, i, xi::Vec{dim}) where {dim,T,order}
@@ -29,10 +29,10 @@ function Ferrite.value(b::BSplineBasis{dim,T,order}, i, xi::Vec{dim}) where {dim
 
     _n = getnbasefunctions_dim(b)
     
-    coord = Tuple(CartesianIndices(_n)[i])
+    indecies = CartesianIndices(_n)[i]
     val = 1.0
     for i in 1:dim
-        val *= IGA._bspline_basis_value_alg1(order[i], b.knot_vector[i], coord[i], xi[i])
+        val *= IGA._bspline_basis_value_alg1(order[i], b.knot_vector[i], indecies[i], xi[i])
     end
     return val
 end
