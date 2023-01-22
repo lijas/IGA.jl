@@ -37,32 +37,6 @@ function Ferrite.value(b::BSplineBasis{dim,T,order}, i, xi::Vec{dim}) where {dim
     return val
 end
 
-struct BSplineGeometry{pdim,sdim,T}
-	basis::NTuple{pdim,BSplineBasis{T}}
-	control_points::Vector{Vec{sdim,T}}
-end
-
-const BSplineCurve{sdim,T} = BSplineGeometry{1,sdim,T}
-const BSplineSurface{sdim,T} = BSplineGeometry{2,sdim,T}
-
-function Ferrite.value(curve::BSplineGeometry{pdim,sdim,T}, xi::Vec{sdim,T}) where {pdim,sdim,T}
-
-	S = zero(Vec{dim,T})
-	counter = 0
-	for i in 1:nbasefunctions(curve.basis1)
-		for j in 1:nbasefunctions(curve.basis2)
-			counter +=1
-			Nx = value(curve.basis1, i, xi[1])
-			Ny = value(curve.basis2, j, xi[2])
-			#@show Nx*Ny
-			S += (Nx*Ny)*curve.control_points[counter]
-		end
-	end
-
-	return S
-
-end
-
 """
 Algorithm for calculating one basis functions value, using Cox-debor recursion formula
     From NURBS-book, alg2.?
