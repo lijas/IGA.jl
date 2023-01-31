@@ -525,12 +525,12 @@ function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int})
     orders = (2,2)
 
 	#Add elements via knot insertion
-	rangeξ = range(0.0, stop = 1.0, length=nel[1])
+	rangeξ = range(-1.0, stop = 1.0, length=nel[1])
 	for ξ in rangeξ[2:end-1]
 		knotinsertion!(knot_vectors, orders, cp, w, ξ, dir=1)
 	end
 	
-	rangeη = range(0.0, stop = 1.0, length=nel[2]+1)
+	rangeη = range(-1.0, stop = 1.0, length=nel[2]+1)
 	for η in rangeη[2:end-1]
 		knotinsertion!(knot_vectors, orders, cp, w, η, dir=2)
 	end
