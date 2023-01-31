@@ -39,18 +39,21 @@ end;</code></pre><p>The assembly loop is also written in almost the same way as 
     fe = zeros(n)     # element force vector
     ke = zeros(n, n)  # element stiffness matrix
 
+    n = Ferrite.nnodes_per_cell(grid)
+	w = zeros(Float64, n)
+	x = zeros(Vec{2}, n)
+	wb = zeros(Float64, n)
+	xb = zeros(Vec{2}, n)
+
     # Assemble internal forces
     for cellid in 1:getncells(grid)
         fill!(fe, 0.0)
         fill!(ke, 0.0)
         celldofs!(celldofs, dh, cellid)</code></pre><p>In a normal finite elment code, this is the point where we usually get the coordinates of the element <code>X = getcoordinates(grid, cellid)</code>. In this case, however, we also require the cell weights, and we need to transform them to the bezier mesh.</p><pre><code class="language-">        extr = get_extraction_operator(grid, cellid) # Extraction operator
-        X = IGA.get_nurbs_coordinates(grid, cellid) #Nurbs coords
-        w = getweights(grid, cellid)       #Nurbs weights
-        wᴮ = compute_bezier_points(extr, w)
-        Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)</code></pre><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>Since the operations above are quite common in IGA, there is a helper-function called <code>bc = getcoordinates(grid, cellid)::BezierCoords</code>, which return the bezier coorinates and weights directly.</p></div></div><p>Furthermore, we pass the bezier extraction operator and weigts to the CellValues/Beziervalues.</p><pre><code class="language-">        set_bezier_operator!(cv, extr, w)
-        reinit!(cv, (Xᴮ, wᴮ)) ## Reinit cellvalues by passsing both bezier coords and weights
-
+        get_bezier_coordinates!(xb,wb,x,w,grid,cellid) #Nurbs coords</code></pre><p>Furthermore, we pass the bezier extraction operator and weigts to the CellValues/Beziervalues.</p><pre><code class="language-">        set_bezier_operator!(cv, extr, w)
+        reinit!(cv, (xb,wb)) ## Reinit cellvalues by passsing both bezier coords and weights
         integrate_element!(ke, stiffmat, cv)
+
         assemble!(assembler, celldofs, ke, fe)
     end
 
@@ -136,4 +139,4 @@ end;</code></pre><p>Now we have all the parts needed to solve the problem. We be
     vtk_save(vtkgrid)
 
 end;
-nothing #hide</code></pre><p>Call the function</p><pre><code class="language-">solve()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../bezier_extraction/">« Bezier extraction</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 24 January 2023 08:53">Tuesday 24 January 2023</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+nothing #hide</code></pre><p>Call the function</p><pre><code class="language-">solve()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../bezier_extraction/">« Bezier extraction</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 31 January 2023 12:20">Tuesday 31 January 2023</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

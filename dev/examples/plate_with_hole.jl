@@ -42,6 +42,12 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
     fe = zeros(n)     # element force vector
     ke = zeros(n, n)  # element stiffness matrix
 
+    n = Ferrite.nnodes_per_cell(grid)
+	w = zeros(Float64, n)
+	x = zeros(Vec{2}, n)
+	wb = zeros(Float64, n)
+	xb = zeros(Vec{2}, n)
+
     # Assemble internal forces
     for cellid in 1:getncells(grid)
         fill!(fe, 0.0)
@@ -49,15 +55,12 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         celldofs!(celldofs, dh, cellid)
 
         extr = get_extraction_operator(grid, cellid) # Extraction operator
-        X = IGA.get_nurbs_coordinates(grid, cellid) #Nurbs coords
-        w = getweights(grid, cellid)       #Nurbs weights
-        wᴮ = compute_bezier_points(extr, w)
-        Xᴮ = inv.(wᴮ) .* compute_bezier_points(extr, w.*X)
+        get_bezier_coordinates!(xb,wb,x,w,grid,cellid) #Nurbs coords
 
         set_bezier_operator!(cv, extr, w)
-        reinit!(cv, (Xᴮ, wᴮ)) ## Reinit cellvalues by passsing both bezier coords and weights
-
+        reinit!(cv, (xb,wb)) ## Reinit cellvalues by passsing both bezier coords and weights
         integrate_element!(ke, stiffmat, cv)
+
         assemble!(assembler, celldofs, ke, fe)
     end
 
