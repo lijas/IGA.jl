@@ -198,5 +198,7 @@ let cache = Dict{Type{<:BezierCell}, Vector{Int}}()
 end
 
 function Ferrite.MixedDofHandler(grid::BezierGrid{dim,C,T}) where {dim,C,T}
-    Ferrite.MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Ferrite.CellVector(Int[],Int[],Int[]), Ferrite.CellVector(Int[],Int[],Int[]), Ferrite.CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+	#TODO: Remove this function and add method Ferrite.MixedDofHandler(::AbstractGrid) in Ferrite
+	ncells = getncells(grid)
+    Ferrite.MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Ferrite.CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), Ferrite.CellVector(Int[],Int[],Int[]), Ferrite.CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end

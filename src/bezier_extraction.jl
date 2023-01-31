@@ -42,7 +42,7 @@ end
 
 Given a BezierExtractionOperator and control points for a cell, compute the bezier controlpoints.
 """
-function compute_bezier_points!(bezier_points::Vector{T2}, Ce::BezierExtractionOperator, control_points::Vector{T2}; dim::Int=1) where {T2}
+function compute_bezier_points!(bezier_points::Vector{T2}, Ce::BezierExtractionOperator, control_points::AbstractVector{T2}; dim::Int=1) where {T2}
 
 	n_points = length(first(Ce))
 	@boundscheck (length(control_points) == length(Ce)*dim)
