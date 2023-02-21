@@ -72,6 +72,22 @@ end
 
 _cellvaluestype(::BezierValues{dim_s,T,CV}) where {dim_s,T,CV} = CV
 
+function Ferrite.spatial_coordinate(cv::BezierValues, iqp::Int, (xb, wb)::Tuple{<:AbstractVector{Vec{sdim,T}}, <:AbstractVector{T}}) where {sdim,T}
+    nbasefunks = Ferrite.getn_scalarbasefunctions(cv)
+    faceid::Int = hasfield(typeof(cv.cv_bezier), :current_face) ? cv.cv_bezier.current_face[] : 1
+    @assert nbasefunks == length(xb)
+
+    W = 0.0
+    x = zero(Vec{sdim,T})
+    for i in 1:nbasefunks
+        N = cv.cv_bezier.M[i, iqp, faceid]
+        x += N * wb[i] * xb[i]
+        W += N * wb[i]
+    end
+    x /= W
+    return x
+end
+
 #Function that computs basefunction values from bezier function values and the extraction operator, N = C*B
 function _cellvalues_bezier_extraction!(cv_store::Ferrite.Values{dim_s}, cv_bezier::Ferrite.Values{dim_s}, Cbe::BezierExtractionOperator{T}, w::Optional{Vector{T}}, faceid::Int) where {dim_s,T}
 

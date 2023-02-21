@@ -209,3 +209,44 @@ end
     @test shape_value(cv, 1, 1) != NaN
 
 end
+
+@testset "bezier spatial position" begin
+    ri = 1.0
+    ro = 4.0
+    grid, cv, fv = _get_problem_data(:ring, (4,1), (2,2); ri=ri, ro=ro)
+
+    inner = FaceIndex[]
+    outer = FaceIndex[]
+    for cellid in 1:getncells(grid), fid in 1:4
+        beziercoords = getcoordinates(grid, cellid)
+        reinit!(fv, beziercoords, fid)
+        (; xb, wb) = beziercoords
+        x = spatial_coordinate(fv, 1, (xb, wb))
+        
+        if norm(x) ≈ ri
+            push!(inner, FaceIndex(cellid, fid))
+        elseif norm(x) ≈ ro
+            push!(outer, FaceIndex(cellid, fid))
+        end
+    end
+
+    for (cellid, fid) in inner
+        beziercoords = getcoordinates(grid, cellid)
+        reinit!(fv, beziercoords, fid)
+        (; xb, wb) = beziercoords
+        for i in 1:getnquadpoints(fv)
+            x = spatial_coordinate(fv, i, (xb, wb))
+            @test norm(x) ≈ ri
+        end
+    end
+
+    for (cellid, fid) in outer
+        beziercoords = getcoordinates(grid, cellid)
+        reinit!(fv, beziercoords, fid)
+        (; xb, wb) = beziercoords
+        for i in 1:getnquadpoints(fv)
+            x = spatial_coordinate(fv, i, (xb, wb))
+            @test norm(x) ≈ ro
+        end
+    end
+end

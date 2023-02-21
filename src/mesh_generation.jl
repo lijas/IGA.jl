@@ -541,6 +541,59 @@ function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int})
 
 end
 
+function generate_nurbs_patch(::Val{:ring}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; ri::T, ro::T) where T
+
+	@assert nel == (4,1)
+	@assert orders == (2,2)
+
+	Li = ri
+	Lm = 0.5ri + 0.5ro
+	Lo = ro
+	cp = [#outer 
+		  Vec((Lo,0.0)), 
+		  Vec((Lo, Lo)), 
+		  Vec((0.0, Lo)),
+		  Vec((-Lo, Lo)),
+	  	  Vec((-Lo, 0.0)),
+		  Vec((-Lo, -Lo)),
+		  Vec((0.0, -Lo)),
+		  Vec((Lo, -Lo)),
+		  Vec((Lo, 0.0)),
+		  #mid 
+		  Vec((Lm,0.0)), 
+	      Vec((Lm, Lm)), 
+		  Vec((0.0, Lm)),
+		  Vec((-Lm, Lm)),
+		  Vec((-Lm, 0.0)),
+		  Vec((-Lm, -Lm)),
+		  Vec((0.0, -Lm)),
+		  Vec((Lm, -Lm)),
+		  Vec((Lo, 0.0)), 
+		  #inner
+		  Vec((Li,0.0)), 
+	      Vec((Li, Li)), 
+		  Vec((0.0, Li)),
+		  Vec((-Li, Li)),
+		  Vec((-Li, 0.0)),
+		  Vec((-Li, -Li)),
+		  Vec((0.0, -Li)),
+		  Vec((Li, -Li)),
+		  Vec((Li, 0.0)), 
+		  ]
+
+	w = Float64[1, 1/sqrt(2), 1, 1/sqrt(2), 1, 1/sqrt(2), 1, 1/sqrt(2), 1,
+	            1, 1/sqrt(2), 1, 1/sqrt(2), 1, 1/sqrt(2), 1, 1/sqrt(2), 1,
+				1, 1/sqrt(2), 1, 1/sqrt(2), 1, 1/sqrt(2), 1, 1/sqrt(2), 1]
+
+    knot_vectors = (Float64[-1, -1, -1, -0.5, -0.5, 0, 0, 0.5, 0.5, 1, 1, 1], 
+	                Float64[-1, -1, -1, 1, 1, 1])
+	
+
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, cp, w)
+	
+    return mesh
+end
+
 function get_nurbs_griddata(orders::NTuple{pdim,Int}, knot_vectors::NTuple{pdim,Vector{T}}, control_points::Vector{Vec{sdim,T}}) where {sdim,pdim,T}
 	
 	#get mesh data in CALFEM/Matrix format

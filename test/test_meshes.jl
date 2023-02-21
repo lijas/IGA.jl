@@ -33,11 +33,11 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
     bern_ip = BernsteinBasis{sdim, mesh.orders}()
 
     #Cell values
-    qr = Ferrite.QuadratureRule{sdim,Ferrite.RefCube}(3)
+    qr = Ferrite.QuadratureRule{sdim,Ferrite.RefCube}(5)
     cv = IGA.BezierCellValues(Ferrite.CellVectorValues(qr, bern_ip)) 
 
     #Face values
-    qr = Ferrite.QuadratureRule{sdim-1,Ferrite.RefCube}(3)
+    qr = Ferrite.QuadratureRule{sdim-1,Ferrite.RefCube}(5)
     fv = IGA.BezierFaceValues(Ferrite.FaceVectorValues(qr, bern_ip)) 
 
 
@@ -136,9 +136,53 @@ function test_singly_curved_2d()
     
 end
 
+
+function test_ring()
+    ri = 0.001
+    ro = 4.0
+    grid, cv, fv = _get_problem_data(:ring, (4,1), (2,2); ri=ri, ro=ro)
+    addcellset!(grid, "all", (x)->true)
+
+    inner = FaceIndex[]
+    outer = FaceIndex[]
+    for cellid in 1:getncells(grid), fid in 1:4
+        beziercoords = getcoordinates(grid, cellid)
+        reinit!(fv, beziercoords, fid)
+        (; xb, wb) = beziercoords
+        x = spatial_coordinate(fv, 1, (xb, wb))
+        
+        if norm(x) ≈ ri
+            push!(inner, FaceIndex(cellid, fid))
+        elseif norm(x) ≈ ro
+            push!(outer, FaceIndex(cellid, fid))
+        end
+        
+    end
+        
+    grid.facesets["inner"] = Set(inner)#addfaceset!(grid, "inner", Set(inner))
+    grid.facesets["outer"] = Set(outer)#addfaceset!(grid, "outer", Set(outer))
+
+    #Volume
+    V = _calculate_volume(cv, grid, getcellset(grid, "all"))
+    @test isapprox(V, pi*(ro^2 - ri^2), atol = 0.01)
+
+    #Area
+    A = _calculate_area(fv, grid, getfaceset(grid, "inner"))
+    @test isapprox(A, 2pi*ri, atol = 0.01)
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "outer"))
+    @test isapprox(A, 2pi*ro, atol = 0.01)
+
+    vtk_grid("test_ring.vtu", grid) do vtk
+        #
+    end
+    
+end
+
 @testset "Geometries, vtk-outputing and integration" begin
     test_cube()
     test_square()
     test_singly_curved_2d()
     test_singly_curved_3d()
+    test_ring()
 end
