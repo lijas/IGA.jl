@@ -1,6 +1,7 @@
 
 export compute_bezier_extraction_operators, compute_bezier_points, compute_bezier_points!
 export bezier_extraction_to_vectors
+export combine_beo, diagonal_beo
 
 function bezier_extraction_to_vectors(Ce::AbstractVector{<:AbstractMatrix})
     T = Float64
@@ -169,4 +170,29 @@ function _compute_bezier_extraction_operators(p::Int, knot::Vector{T}) where T
 	#pop!(C)
 	C = SparseArrays.sparse.(C[1:nb])
 	return C, nb
+end
+
+function diagonal_beo(N::Int)
+    beo = BezierExtractionOperator{Float64}(undef, N)
+    for i in 1:N
+        V = IGA.SparseArrays.sparsevec([i], [1.0], N)
+        beo[i] = V
+    end
+    return beo
+end
+
+function combine_beo(a::IGA.BezierExtractionOperator{Float64}, b::IGA.BezierExtractionOperator{Float64})
+    la = length(a)
+    lb = length(b)
+    ntotal = la+lb
+    beo = IGA.BezierExtractionOperator{Float64}()
+    for i in 1:la
+        newrow = SparseArrays.sparsevec(a[i].nzind, a[i].nzval, ntotal)
+        push!(beo, newrow)
+    end
+    for i in 1:lb
+        newrow = SparseArrays.sparsevec(b[i].nzind .+ la, b[i].nzval, ntotal)
+        push!(beo, newrow)
+    end
+    return beo
 end
