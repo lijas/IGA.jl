@@ -173,10 +173,30 @@ function test_ring()
     A = _calculate_area(fv, grid, getfaceset(grid, "outer"))
     @test isapprox(A, 2pi*ro, atol = 0.01)
 
-    vtk_grid("test_ring.vtu", grid) do vtk
-        #
-    end
     
+end
+
+
+function test_cylinder_sector_3d()
+    r = 2.0
+    L = 3.0
+    e1 = basevec(Vec{3}, 1)
+    grid, cv, fv = _get_problem_data(:cylinder_sector, (8,10,3), (2,2,2); r, L)
+    addcellset!(grid, "all", (x)->true)
+    addfaceset!(grid, "left", (x)->x[1]≈-L/2)
+    addfaceset!(grid, "topsurface", (x) -> (0.95r) <= norm(x - (e1⋅x)*e1) <= (1.05r), all=true)
+
+    #Volume
+    V = _calculate_volume(cv, grid, getcellset(grid, "all"))
+    @test isapprox(V, pi * r^2 * L / 2.0, atol = 0.0001)
+
+    #Area
+    A = _calculate_area(fv, grid, getfaceset(grid, "left"))
+    @test isapprox(A, pi * r^2 / 2, atol = 0.0001)
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "topsurface"))
+    @test isapprox(A, pi*2r/2 * L, atol = 0.0001)
+
 end
 
 @testset "Geometries, vtk-outputing and integration" begin
@@ -185,4 +205,5 @@ end
     test_singly_curved_2d()
     test_singly_curved_3d()
     test_ring()
+    test_cylinder_sector_3d()
 end

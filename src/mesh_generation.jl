@@ -568,7 +568,7 @@ function generate_nurbs_patch(::Val{:ring}, nel::NTuple{2,Int}, orders::NTuple{2
 		  Vec((-Lm, -Lm)),
 		  Vec((0.0, -Lm)),
 		  Vec((Lm, -Lm)),
-		  Vec((Lo, 0.0)), 
+		  Vec((Lm, 0.0)), 
 		  #inner
 		  Vec((Li,0.0)), 
 	      Vec((Li, Li)), 
@@ -590,6 +590,85 @@ function generate_nurbs_patch(::Val{:ring}, nel::NTuple{2,Int}, orders::NTuple{2
 	
 
 	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, cp, w)
+	
+    return mesh
+end
+
+
+function generate_nurbs_patch(::Val{:cylinder_sector}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; L::T, r::T, x0::T = -L/2) where T
+
+	@assert nel[2] > 2
+	@assert nel[3] > 1
+	@assert nel[2] |> iseven
+	@assert orders == (2,2,2)
+
+	Li = 0.0
+	Lm = 0.5r 
+	Lo = r
+	cp_circle = [#outer 
+		  Vec((Lo,0.0)), 
+		  Vec((Lo, Lo)), 
+		  Vec((0.0, Lo)),
+		  Vec((-Lo, Lo)),
+	  	  Vec((-Lo, 0.0)),
+		  #mid 
+		  Vec((Lm,0.0)), 
+	      Vec((Lm, Lm)), 
+		  Vec((0.0, Lm)),
+		  Vec((-Lm, Lm)),
+		  Vec((-Lm, 0.0)),
+		  #inner
+		  Vec((Li,0.0)), 
+	      Vec((Li, Li)), 
+		  Vec((0.0, Li)),
+		  Vec((-Li, Li)),
+		  Vec((-Li, 0.0)),
+		  ]
+
+	weights_circle = Float64[1, 1/sqrt(2), 1, 1/sqrt(2), 1,
+	                         1, 1/sqrt(2), 1, 1/sqrt(2), 1,
+				             1, 1/sqrt(2), 1, 1/sqrt(2), 1,]
+	
+    knot_vectors_circle = (Float64[-1, -1, -1, 0.0, 0.0, 1, 1, 1], 
+	                       Float64[-1, -1, -1, 1, 1, 1])
+
+	#Add elements via knot insertion
+	#Add to left range
+	rangeξ = range(-1.0, stop = 0.0, length = (nel[2]-2)÷2 + 2)
+	for ξ in rangeξ[2:end-1]
+		knotinsertion!(knot_vectors_circle, orders[[1,2]], cp_circle, weights_circle, ξ, dir=1)
+	end
+	#Add to riggt range
+	rangeξ = range(0.0, stop = 1.0, length = (nel[2]-2)÷2 + 2)
+	for ξ in rangeξ[2:end-1]
+		knotinsertion!(knot_vectors_circle, orders[[1,2]], cp_circle, weights_circle, ξ, dir=1)
+	end
+	
+	rangeη = range(-1.0, stop = 1.0, length=nel[3]+1)
+	for η in rangeη[2:end-1]
+		knotinsertion!(knot_vectors_circle, orders[[1,2]], cp_circle, weights_circle, η, dir=2)
+	end
+	
+	#Centerline of cylinder
+	knot_vectors_ζ = _create_knotvector(T, nel[1], orders[1], 1)
+	nbf = length(knot_vectors_ζ) - orders[1] - 1
+	cp_ζ = _generate_linear_parametrization(knot_vectors_ζ, orders[1], x0, x0+L)
+	
+	knot_vectors = (knot_vectors_ζ, knot_vectors_circle[1], knot_vectors_circle[2])
+
+	control_points = Vec{3,Float64}[]
+	weights = T[]
+	#Extrude to cylinder
+	for j in eachindex(cp_circle)
+		for i in 1:nbf
+			_v = (cp_ζ[i], cp_circle[j]...)
+			w = weights_circle[j]
+			push!(control_points, Vec{3,Float64}(s->_v[s]))
+			push!(weights, w)
+		end
+	end
+
+	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points, weights)
 	
     return mesh
 end
