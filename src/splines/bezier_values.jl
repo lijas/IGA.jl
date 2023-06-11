@@ -166,19 +166,19 @@ end
 # NURBS Function values needs to be treated differently than other basis values, since they have weights-factors aswell
 #
 function Ferrite.reinit!(bcv::BezierValues, bc::BezierCoords{dim_s,T}) where {dim_s,T} 
-    set_bezier_operator!(bcv, bc.beow, bc.w)
+    set_bezier_operator!(bcv, bc.beo, bc.w)
 
     _reinit_nurbs!(bcv.cv_store, bcv.cv_bezier, bc.xb, bc.wb) 
-    _cellvalues_bezier_extraction!(bcv.cv_store, copy(bcv.cv_store), bc.beow, bc.w, 1)
+    _cellvalues_bezier_extraction!(bcv.cv_store, copy(bcv.cv_store), bc.beo, bc.w, 1)
 end
 
 function Ferrite.reinit!(bcv::BezierFaceValues, bc::BezierCoords{dim_s,T}, faceid::Int) where {dim_s,T}
-    set_bezier_operator!(bcv, bc.beow, bc.w)
+    set_bezier_operator!(bcv, bc.beo, bc.w)
     bcv.cv_bezier.current_face[] = faceid
     bcv.cv_store.current_face[] = faceid
 
     _reinit_nurbs!(bcv.cv_store, bcv.cv_bezier, bc.xb, bc.wb, faceid) 
-    _cellvalues_bezier_extraction!(bcv.cv_store, copy(bcv.cv_store), bc.beow, bc.w, faceid)
+    _cellvalues_bezier_extraction!(bcv.cv_store, copy(bcv.cv_store), bc.beo, bc.w, faceid)
 end
 
 

@@ -22,8 +22,7 @@ struct BezierCoords{dim_s,T}
     wb   ::Vector{T}
     x    ::Vector{Vec{dim_s,T}}
     w    ::Vector{T}
-    beow ::BezierExtractionOperator{T} #BezierextractionOpeator multiplied with weights
-    #Perhaps add these later:
+    beo ::BezierExtractionOperator{T} 
 end
 
 #Base.zero(Type{BezierCoords{dim,T}}) where {dim,T} = BezierCoords

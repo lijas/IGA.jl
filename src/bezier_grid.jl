@@ -46,21 +46,17 @@ function BezierGrid(mesh::NURBSMesh{pdim,sdim}) where {pdim,sdim}
 	return BezierGrid(cells, nodes, mesh.weights, Cvec)
 end
 
-function Ferrite.Grid(mesh::NURBSMesh{pdim,sdim,T}) where {pdim,sdim,T}
-	if any(mesh.weights .!= 1.0)
-		@warn("You are transforming the NURBSMesh to a Ferrite.Grid. It is better to use a IGA.BezierGrid to also get bezier extraction operators and weights.") 
-		@warn("Some of the weigts are non-unity, so you might want to use BezierGrid instead of a Grid.")
+function BezierGrid(grid::Ferrite.Grid{dim,C,T}) where {dim,C,T}
+	weights = ones(Float64, getnnodes(grid))
+
+	extraction_operator = BezierExtractionOperator{T}[]
+	for cellid in 1:getncells(grid)
+		nnodes = length(grid.cells[cellid].nodes)
+		beo = IGA.diagonal_beo(nnodes)
+		push!(extraction_operator, beo)
 	end
 
-	N = length(mesh.IEN[:,1])
-	
-    CellType = BezierCell{sdim,N,mesh.orders}
-    ordering = _bernstein_ordering(CellType)
-
-	cells = [CellType(Tuple(mesh.IEN[ordering,ie])) for ie in 1:getncells(mesh)]
-	nodes = [Node(x)                                for x  in mesh.control_points]
-
-	return Ferrite.Grid(cells, nodes)
+	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
 end
 
 function Base.getproperty(m::BezierGrid, s::Symbol)
