@@ -198,3 +198,90 @@ function Ferrite.MixedDofHandler(grid::BezierGrid{dim,C,T}) where {dim,C,T}
 	ncells = getncells(grid)
     Ferrite.MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Ferrite.CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), Ferrite.CellVector(Int[],Int[],Int[]), Ferrite.CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
+
+
+
+# for vertices, faces and edges
+Ferrite.getlowerdim(::BernsteinBasis{2, (2, 2)}) = BernsteinBasis{1, (2,)}()
+function Ferrite._update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::Set{<:Ferrite.BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+	components::Vector{Int}, dh::Ferrite.AbstractDofHandler, boundaryvalues::Ferrite.BCValues,
+	dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,Ferrite.DofCoefficients{T}}}, time::Real) where {T}
+
+
+	#
+	ip = Ferrite.default_interpolation( getcelltype(dh.grid, first(first(boundary_entities))) )
+	dim = Ferrite.getdim(ip)
+	refshape = Ferrite.getrefshape(ip)
+	ip_face = Ferrite.getlowerdim(ip)
+	dofcoords = Ferrite.reference_coordinates(ip_face)
+	#Ferrite.create_face_quad_rule(dofcoords, ip)
+    qr = QuadratureRule{dim-1,refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
+
+	boundaryvalues = BezierFaceValues(FaceScalarValues(qr, ip))
+
+	dofs = zeros(Int, 1)
+
+	#
+	local_face_dofs2, local_face_dofs_offset2 =
+        Ferrite._local_face_dofs_for_bc(ip, 1, [1], 0, Ferrite.boundaryfunction(eltype(boundary_entities)))
+
+	nfacecoords = getnbasefunctions(ip_face)
+	N_matrix = zeros(Float64, nfacecoords, nfacecoords)
+	F_matrix = zeros(Float64, nfacecoords, length(components))
+	
+	for (cellidx, entityidx) in boundary_entities
+
+		coords = getcoordinates(dh.grid, cellidx)
+
+		resize!(dofs, ndofs_per_cell(dh,cellidx))
+		celldofs!(dofs, dh, cellidx)
+
+		# no need to reinit!, enough to update current_entity since we only need geometric shape functions M
+		reinit!(boundaryvalues, coords, entityidx)
+		r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
+		r2 = local_face_dofs_offset2[entityidx]:(local_face_dofs_offset2[entityidx+1]-1)
+		#@show r2
+		#@show local_face_dofs2[r2]
+		#@show getnquadpoints(boundaryvalues), nfacecoords
+		#@show display("text/plain", boundaryvalues.cv_store.N[:,:,entityidx])
+		counter = 1
+		for i in 1:nfacecoords
+			j = local_face_dofs2[r2[counter]]
+			counter += 1
+			for location in 1:getnquadpoints(boundaryvalues)
+				N_matrix[location,i] = shape_value(boundaryvalues, location, j)
+			end
+		end
+
+		# local dof-range for this face
+		for location in 1:getnquadpoints(boundaryvalues)
+			x = spatial_coordinate(boundaryvalues, location, coords)
+			value = f(x, time)
+			@assert length(value) == length(components)
+			F_matrix[location,:] .= value
+		end
+
+		#display("text/plain", N_matrix)
+		bc_value = N_matrix\F_matrix	
+		@show bc_value		
+		
+		counter = 1
+		for location in 1:getnquadpoints(boundaryvalues)
+			for i in 1:length(components)
+				# find the global dof
+				globaldof = dofs[local_face_dofs[r[counter]]]
+				counter += 1
+
+				dbc_index = dofmapping[globaldof]
+				# Only DBC dofs are currently update!-able so don't modify inhomogeneities
+				# for affine constraints
+				if dofcoefficients[dbc_index] === nothing
+					@show location, i
+					inhomogeneities[dbc_index] = bc_value[location,i]
+					@debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
+				end
+			end
+		end
+
+	end
+end

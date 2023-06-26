@@ -149,8 +149,9 @@ end;
 # In this example, we will generate the patch called "plate with hole". Note, currently this function can only generate the patch with second order basefunctions. 
 function solve()
     orders = (2,2) # Order in the ξ and η directions .
-    nels = (20,10) # Number of elements
-    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
+    nels = (3,3) # Number of elements
+    #nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
+    nurbsmesh = generate_nurbs_patch(:cube, nels, orders; cornerpos = (-4.0,0.0), size = (4.0,4.0)) 
 
     # Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this 
     # we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `Ferrite.Grid`, but includes the NURBS-weights and 
@@ -183,14 +184,16 @@ function solve()
     ch = ConstraintHandler(dh)
     dbc1 = Dirichlet(:u, getfaceset(grid, "bot"), (x, t) -> 0.0, 2)
     dbc2 = Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.0, 1)
+    dbc3 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.01*(x[2]-2), 1)
     add!(ch, dbc1)
     add!(ch, dbc2)
+    add!(ch, dbc3)
     close!(ch)
     update!(ch, 0.0)
 
     # Define stiffness matrix and traction force
-    stiffmat = get_material(E = 100, ν = 0.3)
-    traction = Vec((-10.0, 0.0))
+    stiffmat = get_material(E = 100.0, ν = 0.3)
+    traction = Vec((-0.0, 0.0))
     K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)
 
     # Solve

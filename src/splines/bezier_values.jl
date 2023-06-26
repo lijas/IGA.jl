@@ -88,6 +88,10 @@ function Ferrite.spatial_coordinate(cv::BezierValues, iqp::Int, (xb, wb)::Tuple{
     return x
 end
 
+function Ferrite.spatial_coordinate(cv::BezierValues, iqp::Int, coords::BezierCoords) 
+    spatial_coordinate(cv, iqp, (coords.xb, coords.wb))
+end
+
 #Function that computs basefunction values from bezier function values and the extraction operator, N = C*B
 function _cellvalues_bezier_extraction!(cv_store::Ferrite.Values{dim_s}, cv_bezier::Ferrite.Values{dim_s}, Cbe::BezierExtractionOperator{T}, w::Optional{Vector{T}}, faceid::Int) where {dim_s,T}
 
