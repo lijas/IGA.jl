@@ -102,22 +102,23 @@ function Ferrite.getweights(grid::BezierGrid, ic::Int)
 	return grid.weights[nodeids]
 end
 
-function Ferrite.getcoordinates!(bc::BezierCoords{dim,T}, grid::BezierGrid, ic::Int) where {dim,T}
-	get_bezier_coordinates!(bc.xb, bc.wb, bc.x, bc.w, grid, ic)
-	return bc
+function Ferrite.getcoordinates(grid::BezierGrid{dim,C,T}, ic::Int) where {dim,C,T}
+    n = Ferrite.nnodes_per_cell(grid, ic)
+    w = zeros(T, n)
+    wb = zeros(T, n)
+    xb = zeros(Vec{dim,T}, n)
+    x = zeros(Vec{dim,T}, n)
+    
+    # copy to avoid reference the extraction operator saved in the grid
+    bc = BezierCoords(xb, wb, x, w, copy(grid.beo[ic]))
+
+    return getcoordinates!(bc,grid,ic)
 end
 
-function Ferrite.getcoordinates(grid::BezierGrid{dim,C,T}, ic::Int) where {dim,C,T}
-
-	n = Ferrite.nnodes_per_cell(grid, ic)
-	w = zeros(T, n)
-	wb = zeros(T, n)
-	xb = zeros(Vec{dim,T}, n)
-	x = zeros(Vec{dim,T}, n)
-	
-	bc = BezierCoords(xb, wb, x, w, grid.beo[ic])
-
-	return getcoordinates!(bc,grid,ic)
+function Ferrite.getcoordinates!(bc::BezierCoords, grid::BezierGrid, ic::Int)
+    get_bezier_coordinates!(bc.xb, bc.wb, bc.x, bc.w, grid, ic)
+    copyto!(bc.beo, get_extraction_operator(grid, ic)) 
+    return bc
 end
 
 function get_bezier_coordinates!(xb::AbstractVector{Vec{dim,T}}, 
