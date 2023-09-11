@@ -231,7 +231,7 @@ function goiga()
     addfaceset!(grid, "left",   (x)->x[1] ≈ -4.0)
     addfaceset!(grid, "bottom", (x)->x[2] ≈ 0.0)
 
-    ip = IGA.BernsteinBasis{dim,(order, order)}()
+    ip = IGA.Bernstein{dim,(order, order)}()
 
     qr = QuadratureRule{dim,RefCube}(4)
     cellvalues = IGA.BezierValues(CellVectorValues(qr, ip))

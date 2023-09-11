@@ -212,7 +212,7 @@ Create the cellvalues storing the shape function values. Note that the `CellVect
 reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed.
 
 ```@example example1
-    ip = BernsteinBasis{2,orders}()
+    ip = Bernstein{2,orders}()
     qr_cell = QuadratureRule{2,RefCube}(3)
     qr_face = QuadratureRule{1,RefCube}(3)
 

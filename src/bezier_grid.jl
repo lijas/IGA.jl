@@ -18,16 +18,15 @@ function BezierGrid(cells::Vector{C},
 		boundary_matrix::SparseArrays.SparseMatrixCSC{Bool,Int}  = SparseArrays.spzeros(Bool, 0, 0)) where {dim,C,T}
 
 	
-	grid = Ferrite.Grid(cells, nodes; cellsets, nodesets, facesets, cellsets, vertexsets, boundary_matrix)
+	grid = Ferrite.Grid(cells, nodes; nodesets, cellsets, facesets, vertexsets, boundary_matrix)
 
 	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
 end
 
 function BezierGrid(mesh::NURBSMesh{pdim,sdim}) where {pdim,sdim}
 
-	N = length(mesh.IEN[:,1])
-	
-    CellType = BezierCell{sdim,N,mesh.orders}
+	N = size(mesh.IEN, 1)
+    CellType = BezierCell{mesh.orders, RefHypercube{pdim}}
     ordering = _bernstein_ordering(CellType)
 	
 	cells = [CellType(Tuple(mesh.IEN[ordering,ie])) for ie in 1:getncells(mesh)]
@@ -73,6 +72,17 @@ function Base.getproperty(m::BezierGrid, s::Symbol)
     else 
         return getfield(m, s)
     end
+end
+
+function Base.show(io::IO, ::MIME"text/plain", grid::BezierGrid)
+    print(io, "$(typeof(grid)) with $(getncells(grid)) ")
+    if isconcretetype(eltype(grid.cells))
+        typestrs = [repr(eltype(grid.cells))]
+    else
+        typestrs = sort!(repr.(Set(typeof(x) for x in grid.cells)))
+    end
+    join(io, typestrs, '/')
+    print(io, " cells and $(getnnodes(grid)) nodes/constrol points")
 end
 
 """
@@ -169,20 +179,14 @@ function get_extraction_operator(grid::BezierGrid, cellid::Int)
 	return grid.beo[cellid]
 end
 
-#Ferrite_to_vtk_order(::Type{<:Ferrite.AbstractCell{dim,N,M}}) where {dim,N,M} = 1:N
-
 # Store the Ferrite to vtk order in a cache for specific cell type
 let cache = Dict{Type{<:BezierCell}, Vector{Int}}()
-	global function Ferrite_to_vtk_order(celltype::Type{BezierCell{3,N,order,M}}) where {N,order,M}
+	global function Ferrite.nodes_to_vtkorder(celltype::Type{<:BezierCell})
 		get!(cache, celltype) do 
-			if length(order) == 3
-				igaorder = _bernstein_ordering(celltype)
-				vtkorder = _vtk_ordering(celltype)
+			igaorder = _bernstein_ordering(celltype)
+			vtkorder = _vtk_ordering(celltype)
 
-				return [findfirst(ivtk-> ivtk == iiga, vtkorder) for iiga in igaorder]
-			else
-				return 1:N
-			end
+			return [findfirst(ivtk-> ivtk == iiga, vtkorder) for iiga in igaorder]
 		end
 	end
 end

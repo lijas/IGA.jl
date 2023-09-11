@@ -51,7 +51,7 @@ end
 
     grid = BezierGrid(nurbsmesh)
 
-    ip = BernsteinBasis{dim, orders}()
+    ip = Bernstein{dim, orders}()
 
     reorder = IGA._bernstein_ordering(ip)
 
@@ -188,7 +188,7 @@ end
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
 
     grid = BezierGrid(nurbsmesh)
-    ip = BernsteinBasis{dim, orders}()
+    ip = Bernstein{dim, orders}()
     qr = QuadratureRule{dim, RefCube}(3)
     cv  = BezierCellValues( CellScalarValues(qr, ip) )
 

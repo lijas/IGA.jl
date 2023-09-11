@@ -63,7 +63,7 @@ function goiga(nelx,nely, order, multiplicity)
     addfaceset!(grid, "bottom", (x)->x[2]<0.001)
     addfaceset!(grid, "top",    (x)->x[2]>Ly*0.9999)
 
-    ip = IGA.BernsteinBasis{dim, (order,order)}()
+    ip = IGA.Bernstein{dim, (order,order)}()
     qr = QuadratureRule{dim, RefCube}(100)
     cellvalues = IGA.BezierValues(CellScalarValues(qr, ip))
 

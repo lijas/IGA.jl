@@ -54,13 +54,13 @@ end=#
 end
 
 @testset "bsplines vs. bernstein" begin
-    #BsplineBasis is the same as BernsteinBasis in interval -1 to 1 
+    #BsplineBasis is the same as Bernstein in interval -1 to 1 
     T = Float64
     for p in (2,4)
         knot_vector = [(ones(T, p+1)*-1)..., ones(T, p+1)...]
     
         ip1 = BSplineBasis((knot_vector,knot_vector), (p,p))
-        ip2 = BernsteinBasis{2,(p,p)}()
+        ip2 = Bernstein{2,(p,p)}()
 
         reorder = IGA._bernstein_ordering(ip2)
 

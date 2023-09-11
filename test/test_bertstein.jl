@@ -2,19 +2,19 @@
 @testset "bernstein" begin
        
     #1d basis function should equal to 2d basis function on the boundary (-1.0)
-    b1 = BernsteinBasis{2,(2,2)}()
-    b2 = BernsteinBasis{1,2}()
+    b1 = Bernstein{2,(2,2)}()
+    b2 = Bernstein{1,2}()
     @test Ferrite.value(b1, 5, Vec((0.0,-1.0))) == Ferrite.value(b2, 3, Vec((0.0)))
 
     #Sum of shape function should equal 1     
-    for bip in (BernsteinBasis{1,(1,)}(),
-                BernsteinBasis{1,(2,)}(),
-                BernsteinBasis{1,(3,)}(),
-                BernsteinBasis{1,(4,)}(),
-                BernsteinBasis{2,(2,2,)}(),
-                BernsteinBasis{2,(3,3,)}(),
-                BernsteinBasis{3,(2,2,2)}(),
-                BernsteinBasis{3,(3,3,3)}()
+    for bip in (Bernstein{1,(1,)}(),
+                Bernstein{1,(2,)}(),
+                Bernstein{1,(3,)}(),
+                Bernstein{1,(4,)}(),
+                Bernstein{2,(2,2,)}(),
+                Bernstein{2,(3,3,)}(),
+                Bernstein{3,(2,2,2)}(),
+                Bernstein{3,(3,3,3)}()
                 )
 
         dim = Ferrite.getdim(bip)
@@ -29,7 +29,7 @@
 
     #Test generated Bernstein values with hardcoded ones
     # ip_list contains interpolation which explicitly been inputed in IGA.jl
-    ip_list = ( BernsteinBasis{1,(2,)}(), BernsteinBasis{2,(2,2,)}(), BernsteinBasis{3,(2,2,2)}())
+    ip_list = ( Bernstein{1,(2,)}(), Bernstein{2,(2,2,)}(), Bernstein{3,(2,2,2)}())
     for bip in ip_list
         dim = Ferrite.getdim(bip)
         for xi in [rand(Vec{dim,Float64}), rand(Vec{dim,Float64})]
