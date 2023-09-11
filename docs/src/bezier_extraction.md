@@ -35,7 +35,7 @@ where $\boldsymbol X^e$ are the control points for the NURBS surface, and $\bold
 The equations above show that we can pre-compute the bernstein basis values at some gauss points (similar to how we pre compute the shape values for Lagrange basis functions), and then using the bezier extraction operator, calculate the NURBS values. In the code, the reinitilzation of the shape functions is performed like this.
 
 ```@example
-ip = BernsteinBasis{2,orders}()
+ip = Bernstein{2,orders}()
 qr_cell = QuadratureRule{2,RefCube}(4)
 
 cv = BezierCellValues( CellVectorValues(qr_cell, ip) )

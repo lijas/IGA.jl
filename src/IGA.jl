@@ -4,8 +4,9 @@ using Reexport
 
 @reexport using Tensors
 @reexport using Ferrite
-@reexport using WriteVTK
+using Ferrite: AbstractRefShape, RefHypercube, RefLine, RefQuadrilateral, RefHexahedron, getnbasefunctions
 
+using WriteVTK
 using LinearAlgebra
 using StaticArrays
 import SparseArrays
@@ -35,52 +36,49 @@ end
 """
 struct BezierCell{order,refshape,N} <: Ferrite.AbstractCell{refshape}
     nodes::NTuple{N,Int}
-    function BezierCell{order}(nodes::NTuple{N,Int}) where {order,N} 
-        @assert(order isa Tuple)
-        @assert(prod(order.+1)==N)
-        refdim = length(order)
-        refshape = Ferrite.RefHypercube{refdim}
-
-		return new{order,refshape,N}(nodes)
+    function BezierCell{orders,shape}(nodes::NTuple{N,Int}) where {rdim, orders, shape<:RefHypercube{rdim}, N} 
+        #@assert(order isa Integer)
+        @assert prod(orders.+1) == N
+        @assert length(orders) == rdim
+		return new{orders,shape,N}(nodes)
     end
 end
 
-getorders(::BezierCell{orders,refshape,N}) where {orders,refshape,N} = orders
 
-include("bezier_extraction.jl")
+Ferrite.default_interpolation(::Type{<:BezierCell{order, shape}}) where {order, shape} = Bernstein{shape, order}()
+#getorders(::BezierCell{orders,refshape,N}) where {orders,refshape,N} = orders
+
 include("nurbsmesh.jl")
 include("mesh_generation.jl")
 include("bezier_grid.jl")
 include("splines/bezier.jl")
-include("splines/bezier_values.jl")
-include("splines/bsplines.jl")
-include("VTK.jl")
-include("L2_projection.jl")
+include("bezier_extraction.jl")
+#include("splines/bezier_values.jl")
+#include("splines/bsplines.jl")
+#include("VTK.jl")
+#include("L2_projection.jl")
 
-Ferrite._mass_qr(::BernsteinBasis{2, (2, 2)}) = QuadratureRule{RefQuadrilatiral}(2+1)
+Ferrite._mass_qr(::Bernstein{2, (2, 2)}) = QuadratureRule{RefQuadrilateral}(2+1)
 
 #Normaly the verices function should only return the 8 corner nodes of the hexa (or 4 in 2d),
 #but since the cell connectivity in IGA is different compared to normal FE elements,
 #we can only distribute cells on the nodes/controlpoints
 Ferrite.vertices(c::BezierCell) = c.nodes
 
-_bernstein_ordering(::Type{<:BezierCell{order}}) where {order} = _bernstein_ordering(BernsteinBasis{length(order),order}())                                        
+_bernstein_ordering(::Type{<:BezierCell{order,shape}}) where {order,shape} = _bernstein_ordering(Bernstein{shape,order}())                                        
 
 function Ferrite.faces(c::BezierCell{dim,N,order}) where {dim,N,order}
-    return getindex.(Ref(c.nodes), collect.(Ferrite.faces(BernsteinBasis{length(order),order}() )))
+    return getindex.(Ref(c.nodes), collect.(Ferrite.faces(Bernstein{length(order),order}() )))
 end
 
 function Ferrite.edges(c::BezierCell{dim,N,order}) where {dim,N,order}
-    return getindex.(Ref(c.nodes), collect.(Ferrite.edges(BernsteinBasis{length(order),order}() )))
+    return getindex.(Ref(c.nodes), collect.(Ferrite.edges(Bernstein{length(order),order}() )))
 end
-
-Ferrite.default_interpolation(::Type{BezierCell{order}}) where {order} = BernsteinBasis{length(order),order}()
-
 
 function Ferrite.cell_to_vtkcell(::Type{BezierCell{order,RefHexahedron}}) where {order}
     return Ferrite.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
 end
-function Ferrite.cell_to_vtkcell(::Type{BezierCell{order,RefQuadrilatiral}}) where {order}
+function Ferrite.cell_to_vtkcell(::Type{BezierCell{order,RefQuadrilateral}}) where {order}
     return Ferrite.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
 end
 function Ferrite.cell_to_vtkcell(::Type{BezierCell{order,RefLine}}) where {order}

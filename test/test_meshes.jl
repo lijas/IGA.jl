@@ -30,7 +30,7 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
     mesh = generate_nurbs_patch(meshsymbol, nels, orders; meshkwargs...)
     grid = BezierGrid(mesh)
 
-    bern_ip = BernsteinBasis{sdim, mesh.orders}()
+    bern_ip = Bernstein{sdim, mesh.orders}()
 
     #Cell values
     qr = Ferrite.QuadratureRule{sdim,Ferrite.RefCube}(5)

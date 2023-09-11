@@ -167,7 +167,7 @@ function solve()
 
     # Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the 
     # reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
-    ip = BernsteinBasis{2,orders}()
+    ip = Bernstein{2,orders}()
     qr_cell = QuadratureRule{2,RefCube}(4)
     qr_face = QuadratureRule{1,RefCube}(3)
 
