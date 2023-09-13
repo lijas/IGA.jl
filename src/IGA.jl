@@ -17,6 +17,7 @@ export BezierCoords
 
 const Optional{T} = Union{T, Nothing}
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
+const CoordsAndWeight{sdim,T} = Tuple{ <: AbstractVector{Vec{sdim,T}}, <: AbstractVector{T}}
 
 struct BezierCoords{dim_s,T} 
     xb   ::Vector{Vec{dim_s,T}}
@@ -53,7 +54,7 @@ include("mesh_generation.jl")
 include("bezier_grid.jl")
 include("splines/bezier.jl")
 include("bezier_extraction.jl")
-#include("splines/bezier_values.jl")
+include("splines/bezier_values.jl")
 #include("splines/bsplines.jl")
 #include("VTK.jl")
 #include("L2_projection.jl")
