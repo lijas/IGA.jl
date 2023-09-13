@@ -19,8 +19,6 @@ struct BezierFaceValues{dim_s,T<:Real,CV<:Ferrite.FaceValues} <: Ferrite.FaceVal
     current_beo::Base.RefValue{BezierExtractionOperator{T}}
     current_w::Vector{T}
 end
-Ferrite.FieldTrait(a::Type{<:BezierFaceValues}) = Ferrite.FieldTrait(a.cv_bezier)
-Ferrite.FieldTrait(a::Type{<:BezierCellValues}) = Ferrite.FieldTrait(a.cv_bezier)
 
 BezierValues{dim_s,T,CV} = Union{BezierCellValues{dim_s,T,CV}, BezierFaceValues{dim_s,T,CV}}
 
