@@ -82,7 +82,7 @@ function Base.show(io::IO, ::MIME"text/plain", grid::BezierGrid)
         typestrs = sort!(repr.(Set(typeof(x) for x in grid.cells)))
     end
     join(io, typestrs, '/')
-    print(io, " cells and $(getnnodes(grid)) nodes/constrol points")
+    print(io, " cells and $(getnnodes(grid)) nodes (contorl points)")
 end
 
 """

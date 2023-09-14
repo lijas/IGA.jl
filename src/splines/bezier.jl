@@ -20,26 +20,18 @@ struct Bernstein{shape, order} <: Ferrite.ScalarInterpolation{shape, order}
     end
 end
 
-Ferrite.getnbasefunctions(ip::Bernstein{shape,order}) where {shape <: RefHypercube, order} = prod(order)
-
-Ferrite.vertexdof_indices(::Bernstein{shape,order}) where {shape <: RefHypercube, order} = 
-    Ferrite.vertexdof_indices(Lagrange{shape,order}())
-
-Ferrite.edgedof_indices(::Bernstein{shape,order}) where {shape <: RefHypercube, order} = 
-    Ferrite.edgedof_indices(Lagrange{shape,order}())
-
-Ferrite.edgedof_interior_indices(::Bernstein{shape,order}) where {shape <: RefHypercube, order} = 
-    Ferrite.edgedof_interior_indices(Lagrange{shape,order}())
-
-Ferrite.facedof_indices(::Bernstein{shape,order}) where {shape <: RefHypercube, order} = 
-    Ferrite.facedof_indices(Lagrange{shape,order}())
-
-Ferrite.facedof_interior_indices(::Bernstein{shape,order}) where {shape <: RefHypercube, order} = 
-    Ferrite.facedof_interior_indices(Lagrange{shape,order}())
+Ferrite.adjust_dofs_during_distribution(::Bernstein) = true
+Ferrite.adjust_dofs_during_distribution(::Bernstein{<:Any, 2}) = false
+Ferrite.adjust_dofs_during_distribution(::Bernstein{<:Any, 1}) = false
 
 # # #
 #   Bernstein line, order 2
 # # #
+Ferrite.getnbasefunctions(::Bernstein{RefLine,(2,)}) = 3
+
+Ferrite.vertexdof_indices(::Bernstein{RefLine,(2,)}) = ((1,),(2,))
+Ferrite.facedof_indices(::Bernstein{RefLine,(2,)}) = ((1,), (2,))
+Ferrite.celldof_interior_indices(::Bernstein{RefLine,(2,)}) = (3,)
 
 function Ferrite.shape_value(ip::Bernstein{RefLine,(2,)}, _ξ::Vec{1}, i::Int)
     ξ = 0.5*(_ξ[1] + 1.0)
@@ -49,9 +41,15 @@ function Ferrite.shape_value(ip::Bernstein{RefLine,(2,)}, _ξ::Vec{1}, i::Int)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+
 # # #
 #   Bernstein Quadrilateral, order 2
 # # #
+Ferrite.getnbasefunctions(::Bernstein{RefQuadrilateral,(2,2)}) = 9
+
+Ferrite.facedof_indices(::Bernstein{RefQuadrilateral,(2,2)}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
+Ferrite.facedof_interior_indices(::Bernstein{RefQuadrilateral,(2,2)}) = ((5,), (6,), (7,), (8,))
+Ferrite.celldof_interior_indices(::Bernstein{RefQuadrilateral,(2,2)}) = (9,)
 
 function Ferrite.shape_value(ip::Bernstein{RefQuadrilateral,(2,2)}, _ξ::Vec{2}, i::Int)
     ξ, η = _ξ
@@ -70,6 +68,36 @@ end
 # # #
 #   Bernstein Hexahedron, order 2
 # # #
+Ferrite.getnbasefunctions(::Bernstein{RefHexahedron,(2,2,2)}) = 27
+
+Ferrite.facedof_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
+    (1,4,3,2, 12,11,10,9, 21),
+    (1,2,6,5, 9,18,13,17, 22),
+    (2,3,7,6, 10,19,14,18, 23),
+    (3,4,8,7, 11,20,15,19, 24),
+    (1,5,8,4, 17,16,20,12, 25),
+    (5,6,7,8, 13,14,15,16, 26),
+)
+Ferrite.facedof_interior_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
+    (21,), (22,), (23,), (24,), (25,), (26,),
+)
+Ferrite.edgedof_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
+    (1,2, 9),
+    (2,3, 10),
+    (3,4, 11),
+    (4,1, 12),
+    (5,6, 13),
+    (6,7, 14),
+    (7,8, 15),
+    (8,5, 16),
+    (1,5, 17),
+    (2,6, 18),
+    (3,7, 19),
+    (4,8, 20),
+)
+Ferrite.edgedof_interior_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
+)
 
 function Ferrite.shape_value(ip::Bernstein{RefHexahedron,(2,2,2)}, _ξ::Vec{3}, i::Int)
     ξ, η, ζ = _ξ
@@ -151,27 +179,6 @@ function Ferrite.shape_value(ip::Bernstein{shape,orders}, i::Int, ξ::Vec{dim,T}
     end
     return val
 end
-    
-function Ferrite.reference_coordinates(ip::Bernstein{shape,order}) where {rdim, shape <: AbstractRefShape{rdim}, order <: Integer}
-
-    T = Float64
-    nbasefunks_dim = ntuple(i->order, rdim)
-    nbasefuncs = prod(nbasefunks_dim)
-    
-    coords = Vec{rdim,T}[]
-
-    ordering = _bernstein_ordering(ip)
-    ranges = [range(T(-1.0), stop=T(1.0), length=nbasefunks_dim[i]) for i in 1:rdim]
-
-    inds = CartesianIndices(nbasefunks_dim)
-    for i in 1:nbasefuncs
-        ind = inds[ordering[i]]
-        x = Vec{rdim,T}(d -> ranges[d][ind[d]])
-        push!(coords, x)
-    end
-
-    return coords
-end
 
 function Ferrite.facedof_indices(ip::Bernstein{RefQuadrilateral,orders}) where {orders}
     faces = Tuple[]
@@ -248,6 +255,32 @@ function _bernstein_basis_derivative_recursive(p::Int, i::Int, xi::T) where T
     return p * (_bernstein_basis_recursive(p - 1, i - 1, xi) - _bernstein_basis_recursive(p - 1, i, xi))
 end
 
+
+# # #
+# Bernstein generation any order
+# # # 
+
+    
+function Ferrite.reference_coordinates(ip::Bernstein{shape,order}) where {rdim, shape <: AbstractRefShape{rdim}, order <: Integer}
+
+    T = Float64
+    nbasefunks_dim = ntuple(i->order, rdim)
+    nbasefuncs = prod(nbasefunks_dim)
+    
+    coords = Vec{rdim,T}[]
+
+    ordering = _bernstein_ordering(ip)
+    ranges = [range(T(-1.0), stop=T(1.0), length=nbasefunks_dim[i]) for i in 1:rdim]
+
+    inds = CartesianIndices(nbasefunks_dim)
+    for i in 1:nbasefuncs
+        ind = inds[ordering[i]]
+        x = Vec{rdim,T}(d -> ranges[d][ind[d]])
+        push!(coords, x)
+    end
+
+    return coords
+end
 
 """
     _bernstein_ordering(::Bernstein)
