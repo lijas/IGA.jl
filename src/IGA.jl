@@ -30,6 +30,40 @@ end
 #Base.zero(Type{BezierCoords{dim,T}}) where {dim,T} = BezierCoords
 
 """
+    IGAInterpolation{shape, order} <: Ferrite.ScalarInterpolation{shape, order}
+"""
+
+struct IGAInterpolation{shape, order} <: Ferrite.ScalarInterpolation{shape, order}
+    function IGAInterpolation{shape,order}() where {rdim, shape<:RefHypercube{rdim}, order} 
+        #Check if you can construct a Bernstein basis
+        try Bernstein{shape,order}() end
+        return new{shape,order}()
+    end
+end
+
+Ferrite.adjust_dofs_during_distribution(::IGAInterpolation) = false
+Ferrite.shape_value(::IGAInterpolation{shape, order}, ξ::Vec, i::Int) where {shape, order} = Ferrite.shape_value(Bernstein{shape, order}(), ξ, i)
+Ferrite.reference_coordinates(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.reference_coordinates(Bernstein{shape, order}())
+Ferrite.getnbasefunctions(::IGAInterpolation{shape, order}) where {shape, order} = getnbasefunctions(Bernstein{shape, order}())
+
+#Ferrite.nvertices(ip::IGAInterpolation) = getnbasefunctions(ip)
+Ferrite.vertexdof_indices(ip::IGAInterpolation) = ntuple(i->i, getnbasefunctions(ip))
+
+#Remove dofs on edges and faces such that dofhandler can distribute dofs correctly
+Ferrite.edgedof_indices(ip::IGAInterpolation{RefHexahedron}) = ntuple(_ -> (), Ferrite.nedges(ip))
+Ferrite.edgedof_interior_indices(ip::IGAInterpolation) = ntuple(_ -> (), Ferrite.nedges(ip))
+Ferrite.facedof_indices(ip::IGAInterpolation{RefHexahedron}) =  ntuple(_ -> (), Ferrite.nfaces(ip))
+Ferrite.facedof_interior_indices(ip::IGAInterpolation{RefHexahedron}) =  ntuple(_ -> (), Ferrite.nfaces(ip))
+Ferrite.facedof_indices(ip::IGAInterpolation{RefQuadrilateral}) =  ntuple(_ -> (), Ferrite.nfaces(ip))
+Ferrite.facedof_interior_indices(ip::IGAInterpolation{RefQuadrilateral}) =  ntuple(_ -> (), Ferrite.nfaces(ip))
+
+Ferrite.dirichlet_facedof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_facedof_indices(Bernstein{shape, order}())
+Ferrite.dirichlet_edgedof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_edgedof_indices(Bernstein{shape, order}())
+Ferrite.dirichlet_vertexdof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_vertexdof_indices(Bernstein{shape, order}())
+
+
+
+"""
     BezierCell{order,refshape,N} <: Ferrite.AbstractCell{refshape}
 
 `N` = number of nodes/controlpoints
@@ -46,7 +80,7 @@ struct BezierCell{order,refshape,N} <: Ferrite.AbstractCell{refshape}
 end
 
 
-Ferrite.default_interpolation(::Type{<:BezierCell{order, shape}}) where {order, shape} = Bernstein{shape, order}()
+Ferrite.default_interpolation(::Type{<:BezierCell{order, shape}}) where {order, shape} = IGAInterpolation{shape, order}()
 #getorders(::BezierCell{orders,refshape,N}) where {orders,refshape,N} = orders
 
 include("nurbsmesh.jl")
@@ -68,12 +102,12 @@ Ferrite.vertices(c::BezierCell) = c.nodes
 
 _bernstein_ordering(::Type{<:BezierCell{order,shape}}) where {order,shape} = _bernstein_ordering(Bernstein{shape,order}())                                        
 
-function Ferrite.faces(c::BezierCell{dim,N,order}) where {dim,N,order}
-    return getindex.(Ref(c.nodes), collect.(Ferrite.faces(Bernstein{length(order),order}() )))
+function Ferrite.faces(c::BezierCell{order,shape}) where {shape,order}
+    return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_facedof_indices(IGAInterpolation{shape,order}() )))
 end
 
-function Ferrite.edges(c::BezierCell{dim,N,order}) where {dim,N,order}
-    return getindex.(Ref(c.nodes), collect.(Ferrite.edges(Bernstein{length(order),order}() )))
+function Ferrite.edges(c::BezierCell{order,RefHexahedron}) where {order}
+    return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_edgedof_indices(IGAInterpolation{RefHexahedron,order}() )))
 end
 
 function Ferrite.cell_to_vtkcell(::Type{BezierCell{order,RefHexahedron}}) where {order}
