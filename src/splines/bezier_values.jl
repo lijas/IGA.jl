@@ -19,8 +19,6 @@ struct BezierFaceValues{dim_s,T<:Real,CV<:Ferrite.FaceValues} <: Ferrite.FaceVal
     current_beo::Base.RefValue{BezierExtractionOperator{T}}
     current_w::Vector{T}
 end
-Ferrite.FieldTrait(a::Type{<:BezierFaceValues}) = Ferrite.FieldTrait(a.cv_bezier)
-Ferrite.FieldTrait(a::Type{<:BezierCellValues}) = Ferrite.FieldTrait(a.cv_bezier)
 
 BezierValues{dim_s,T,CV} = Union{BezierCellValues{dim_s,T,CV}, BezierFaceValues{dim_s,T,CV}}
 
@@ -56,10 +54,16 @@ end
 function Ferrite.function_value(fe_v::BezierValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::AbstractVector{Int} = collect(1:length(u))) where {dim,T} 
     return Ferrite.function_value(fe_v.cv_store, q_point, u, dof_range)
 end
+function Ferrite.function_symmetric_gradient(bv::IGA.BezierValues, q_point::Int, u::AbstractVector, args...)
+    return function_symmetric_gradient(bv.cv_store, q_point, u, args...)
+end
 
 Ferrite.geometric_value(cv::BezierValues{dim}, q_point::Int, i::Int) where {dim} = Ferrite.geometric_value(cv.cv_bezier, q_point, i);
 
 Ferrite.shape_gradient(bcv::BezierValues, q_point::Int, base_func::Int) = Ferrite.shape_gradient(bcv.cv_store, q_point, base_func)#bcv.cv_store.dNdx[base_func, q_point]
+function Ferrite.shape_symmetric_gradient(bv::IGA.BezierValues, q_point::Int, i::Int)
+    return shape_symmetric_gradient(bv.cv_store, q_point, i)
+end
 
 function set_bezier_operator!(bcv::BezierValues, beo::BezierExtractionOperator{T}) where T 
     bcv.current_beo[]=beo
@@ -71,6 +75,10 @@ function set_bezier_operator!(bcv::BezierValues, beo::BezierExtractionOperator{T
 end
 
 _cellvaluestype(::BezierValues{dim_s,T,CV}) where {dim_s,T,CV} = CV
+
+function Ferrite.spatial_coordinate(bv::IGA.BezierValues, q_point::Int, bc::BezierCoords)
+    return spatial_coordinate(bv, q_point, (bc.xb, bc.wb))
+end
 
 function Ferrite.spatial_coordinate(cv::BezierValues, iqp::Int, (xb, wb)::Tuple{<:AbstractVector{Vec{sdim,T}}, <:AbstractVector{T}}) where {sdim,T}
     nbasefunks = Ferrite.getn_scalarbasefunctions(cv)
@@ -87,6 +95,8 @@ function Ferrite.spatial_coordinate(cv::BezierValues, iqp::Int, (xb, wb)::Tuple{
     x /= W
     return x
 end
+
+Ferrite.getnormal(fv::BezierFaceValues, i::Int)= fv.cv_bezier.normals[i]
 
 #Function that computs basefunction values from bezier function values and the extraction operator, N = C*B
 function _cellvalues_bezier_extraction!(cv_store::Ferrite.Values{dim_s}, cv_bezier::Ferrite.Values{dim_s}, Cbe::BezierExtractionOperator{T}, w::Optional{Vector{T}}, faceid::Int) where {dim_s,T}
