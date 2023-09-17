@@ -15,7 +15,7 @@
 
 end
 
-@testset "Test BezierGrid(grid)" begin
+@testset "Test grid to BezierGrid convertion" begin
     
     grid = Ferrite.generate_grid(QuadraticQuadrilateral, (4,4))
     bgrid = BezierGrid(grid)

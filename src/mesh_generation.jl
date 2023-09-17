@@ -43,7 +43,7 @@ function generate_nurbs_patch(s::Symbol, args...; kwargs...)
 	generate_nurbs_patch(Val{s}(), args...; kwargs...)
 end
 
-function generate_nurbs_patch(::Val{:cube}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; cornerpos::NTuple{3,T} = (0.0,0.0,0.0), size::NTuple{3,T}, multiplicity::NTuple{3,Int}=(1,1,1)) where T
+function generate_nurbs_patch(::Val{:cube}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; cornerpos::NTuple{3,T} = (-1.0,-1.0,-1.0), size::NTuple{3,T} = (2.0,2.0,2.0), multiplicity::NTuple{3,Int}=(1,1,1)) where T
 
 	pdim = 3
 	sdim = 3

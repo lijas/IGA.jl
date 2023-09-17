@@ -167,7 +167,7 @@ function get_bezier_coordinates(grid::BezierGrid{dim,C,T}, ic::Int) where {dim,C
 	xb = zeros(Vec{dim,T}, n)
 	
 	get_bezier_coordinates!(xb, wb, x, w, grid, ic)
-	return xb, wb
+	return xb, wb, x, w
 end
 
 function get_nurbs_coordinates(grid::BezierGrid{dim,C,T}, cell::Int) where {dim,C,T}

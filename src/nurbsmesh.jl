@@ -41,6 +41,10 @@ struct NURBSMesh{pdim,sdim,T} #<: Ferrite.AbstractGrid
 
 end
 
+function Base.show(io::IO, ::MIME"text/plain", grid::NURBSMesh)
+    print(io, "$(typeof(NURBSMesh)) and with order $(grid.orders) and $(getncells(grid)) cells and $(getnnodes(grid)) nodes (contorl points) ")
+end
+
 Ferrite.getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
 Ferrite.getnnodes(mesh::NURBSMesh) = maximum(mesh.IEN) 
 const getncontrolponits = Ferrite.getnnodes

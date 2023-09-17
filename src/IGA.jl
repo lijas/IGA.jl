@@ -36,7 +36,7 @@ end
 struct IGAInterpolation{shape, order} <: Ferrite.ScalarInterpolation{shape, order}
     function IGAInterpolation{shape,order}() where {rdim, shape<:RefHypercube{rdim}, order} 
         #Check if you can construct a Bernstein basis
-        try Bernstein{shape,order}() end
+        Bernstein{shape,order}()
         return new{shape,order}()
     end
 end
@@ -89,7 +89,7 @@ include("bezier_grid.jl")
 include("splines/bezier.jl")
 include("bezier_extraction.jl")
 include("splines/bezier_values.jl")
-#include("splines/bsplines.jl")
+include("splines/bsplines.jl")
 #include("VTK.jl")
 #include("L2_projection.jl")
 

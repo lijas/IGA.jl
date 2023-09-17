@@ -77,8 +77,6 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         # we also require the cell weights, and we need to transform them to the bezier mesh. 
         extr = get_extraction_operator(grid, cellid) # Extraction operator
         get_bezier_coordinates!(xb,wb,x,w,grid,cellid) #Nurbs coords
-
-        # Furthermore, we pass the bezier extraction operator and weigts to the CellValues/Beziervalues.
         set_bezier_operator!(cv, extr, w)
         reinit!(cv, (xb,wb)) ## Reinit cellvalues by passsing both bezier coords and weights
         integrate_element!(ke, stiffmat, cv)
@@ -93,8 +91,6 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
         celldofs!(celldofs, dh, cellid)
 
         beziercoords = getcoordinates(grid, cellid)
-
-        #set_bezier_operator!(fv, )
         reinit!(fv, beziercoords, faceid)
 
         integrate_traction_force!(fe, traction, fv)
@@ -152,7 +148,7 @@ function solve()
     nels = (20,10) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
 
-    # Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this 
+    # Performing the computation on a NURBS-patch is possible, but it is much easier to using "bezier-extraction". For this 
     # we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `Ferrite.Grid`, but includes the NURBS-weights and 
     # bezier extraction operators.
     grid = BezierGrid(nurbsmesh)
@@ -160,23 +156,24 @@ function solve()
     # Next, create some facesets. This is done in the same way as in normal Ferrite-code. One thing to note however, is that the nodes/controlpoints, 
     # does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
     # use the Ferrite functions below.
-    addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
+    addnodeset!(grid, "right", (x) -> x[1] ≈ -0.0)
     addfaceset!(grid, "left", (x) -> x[1] ≈ -4.0)
     addfaceset!(grid, "bot", (x) -> x[2] ≈ 0.0)
     addfaceset!(grid, "right", (x) -> x[1] ≈ 0.0)
 
     # Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the 
     # reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
-    ip = Bernstein{2,orders}()
-    qr_cell = QuadratureRule{2,RefCube}(4)
-    qr_face = QuadratureRule{1,RefCube}(3)
+    ip_geo = Bernstein{RefQuadrilateral,2}()
+    ip_u = ip_geo^2
+    qr_cell = QuadratureRule{RefQuadrilateral}(4)
+    qr_face = FaceQuadratureRule{RefQuadrilateral}(3)
 
-    cv = BezierCellValues( CellVectorValues(qr_cell, ip) )
-    fv = BezierFaceValues( FaceVectorValues(qr_face, ip) )
+    cv = BezierCellValues(qr_cell, ip_u, ip_geo)
+    fv = BezierFaceValues(qr_face, ip_u, ip_geo)
 
     # Distribute dofs as normal
-    dh = MixedDofHandler(grid)
-    push!(dh, :u, 2, ip)
+    dh = DofHandler(grid)
+    push!(dh, :u, ip_u)
     close!(dh)
 
     # Add two symmetry boundary condintions. Bottom face should only be able to move in x-direction, and the right boundary should only be able to move in y-direction

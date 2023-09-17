@@ -1,10 +1,11 @@
 export BSplineBasis
 
 """
-Interpolation for bsplines.
-    Not really used, since bezier-interpolation + bezier-extraction is prefered. 
+BSplineBasis{dim,T,order} <: Ferrite.ScalarInterpolation{RefHypercube{dim}, order}
+    
+    Not really used in FE-codes. We use it for testing in IGA.jl
 """
-struct BSplineBasis{dim,T,order} <: Ferrite.Interpolation{dim,Ferrite.RefCube,order}
+struct BSplineBasis{dim,T,order} <: Ferrite.ScalarInterpolation{RefHypercube{dim}, order}
 	knot_vector::NTuple{dim,Vector{T}}
 
     function BSplineBasis(knots::NTuple{dim,Vector{T}}, order::NTuple{dim,Int}) where {dim,T} 
@@ -21,10 +22,9 @@ struct BSplineBasis{dim,T,order} <: Ferrite.Interpolation{dim,Ferrite.RefCube,or
 end
 
 getnbasefunctions_dim(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = ntuple(i -> length(basis.knot_vector[i]) - order[i] - 1, dim)
-Ferrite.getnbasefunctions(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = prod(getnbasefunctions_dim(basis))::Int
+Ferrite.getnbasefunctions(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = prod(getnbasefunctions_dim(basis))
 
-function Ferrite.value(b::BSplineBasis{dim,T,order}, i, xi::Vec{dim}) where {dim,T,order}
-
+function Ferrite.shape_value(b::BSplineBasis{dim,T,order}, xi::Vec{dim}, i::Int) where {dim,T,order}
     @assert( i <= Ferrite.getnbasefunctions(b))
 
     _n = getnbasefunctions_dim(b)
