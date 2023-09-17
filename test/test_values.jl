@@ -37,6 +37,30 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
     return B[reorder], dBdξ[reorder]
 end
 
+@testset "bezier values construction" begin
+
+    sdim = 3
+    shape = Ferrite.RefHypercube{sdim}
+    ip = Bernstein{shape, 2}()
+
+    qr = QuadratureRule{shape}(1)
+    qr_face = FaceQuadratureRule{shape}(1)
+
+    cv  = BezierCellValues( qr, ip, ip)
+    cv2 = BezierCellValues( CellValues(qr, ip, ip) )
+    @test cv.cv_bezier.M == cv2.cv_bezier.M
+
+    cv_vector = BezierCellValues( qr, ip^sdim, ip )
+    cv_vector2 = BezierCellValues( CellValues(qr, ip^sdim, ip) )
+    @test cv_vector.cv_bezier.M == cv_vector2.cv_bezier.M
+
+    @test Ferrite.getngeobasefunctions(cv_vector) == getnbasefunctions(ip)
+    @test Ferrite.getngeobasefunctions(cv) == getnbasefunctions(ip)
+
+    @test Ferrite.getnbasefunctions(cv_vector) == getnbasefunctions(ip)*sdim
+    @test Ferrite.getnbasefunctions(cv) == getnbasefunctions(ip)
+end
+
 @testset "bezier values nurbs" begin
 
     dim = 2
@@ -50,29 +74,29 @@ end
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
 
     grid = BezierGrid(nurbsmesh)
+    shape = Ferrite.RefHypercube{dim}
 
-    ip = Bernstein{dim, orders}()
+    ip = Bernstein{shape, orders}()
 
     reorder = IGA._bernstein_ordering(ip)
 
-    qr = QuadratureRule{dim,RefCube}(3)
-    qr_face = QuadratureRule{dim-1,RefCube}(3)
+    qr = QuadratureRule{shape}(1)
+    qr_face = FaceQuadratureRule{shape}(3)
 
-    fv = BezierFaceValues( FaceScalarValues(qr_face, ip) )
-    cv  = BezierCellValues( CellScalarValues(qr, ip) )
-    cv_vector = BezierCellValues( CellVectorValues(qr, ip) )
+    fv = BezierFaceValues( qr_face, ip, ip )
+    fv_vector = BezierFaceValues( qr_face, ip^dim, ip )
+    cv  = BezierCellValues( qr, ip, ip )
+    cv_vector = BezierCellValues( qr, ip^dim, ip)
 
     #Try some different cells
     for cellnum in [1,4,5]
-        Xb, wb = get_bezier_coordinates(grid, cellnum)
-        C = get_extraction_operator(grid, cellnum)
-        X = get_nurbs_coordinates(grid, cellnum)
-        w = getweights(grid, cellnum)
+        Xb, wb, X, w = get_bezier_coordinates(grid, cellnum)
+        #C = get_extraction_operator(grid, cellnum)
+        #X = get_nurbs_coordinates(grid, cellnum)
+        #w = Ferrite.getweights(grid, cellnum)
         #set_bezier_operator!(cv, w.*C)
-        bc = BezierCoords(Xb, wb, X, w, C)#getcoordinates(grid, cellnum)
+        bc = getcoordinates(grid, cellnum)
         reinit!(cv, bc)
-
-        #set_bezier_operator!(cv_vector, w.*C)
         reinit!(cv_vector, bc)
 
         for (iqp, ξ) in enumerate(qr.points)
@@ -98,31 +122,31 @@ end
             end 
 
             @test dV_patch ≈ getdetJdV(cv, iqp)
-            @test sum(cv.cv_store.N[:,iqp]) ≈ 1
-            @test all(cv.cv_store.dNdξ[:,iqp] .≈ dRdξ_patch)
-            @test all(cv.cv_store.dNdx[:,iqp] .≈ dRdX_patch)
+            @test sum(cv.cv_nurbs.N[:,iqp]) ≈ 1
+            @test all(cv.cv_nurbs.dNdξ[:,iqp] .≈ dRdξ_patch)
+            @test cv.cv_nurbs.dNdx[:,iqp] ≈ dRdX_patch
 
             #Check if VectorValues is same as ScalarValues
             basefunc_count = 1
             for i in 1:nb_per_cell
                 for comp in 1:dim
                     N_comp = zeros(Float64, dim)
-                    N_comp[comp] = cv.cv_store.N[i, iqp]
+                    N_comp[comp] = cv.cv_nurbs.N[i, iqp]
                     _N = Vec{dim,Float64}((N_comp...,))
                     
-                    @test all(cv_vector.cv_store.N[basefunc_count, iqp] .≈ _N)
+                    @test cv_vector.cv_nurbs.N[basefunc_count, iqp] ≈ _N
                     
                     dN_comp = zeros(Float64, dim, dim)
-                    dN_comp[comp, :] = cv.cv_store.dNdξ[i, iqp]
+                    dN_comp[comp, :] = cv.cv_nurbs.dNdξ[i, iqp]
                     _dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
                     
-                    @test all(cv_vector.cv_store.dNdξ[basefunc_count, iqp] .≈ _dNdξ)
+                    @test cv_vector.cv_nurbs.dNdξ[basefunc_count, iqp] ≈ _dNdξ
 
                     dN_comp = zeros(Float64, dim, dim)
-                    dN_comp[comp, :] = cv.cv_store.dNdx[i, iqp]
+                    dN_comp[comp, :] = cv.cv_nurbs.dNdx[i, iqp]
                     _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
                     
-                    @test all(cv_vector.cv_store.dNdx[basefunc_count, iqp] .≈ _dNdx)
+                    @test cv_vector.cv_nurbs.dNdx[basefunc_count, iqp] ≈ _dNdx
 
                     basefunc_count += 1
                 end
@@ -137,13 +161,16 @@ end
         Xb, wb = get_bezier_coordinates(grid, cellnum)
         C = get_extraction_operator(grid, cellnum)
         X = get_nurbs_coordinates(grid, cellnum)
-        w = getweights(grid, cellnum)
+        w = Ferrite.getweights(grid, cellnum)
 
-        bc = BezierCoords(Xb, wb, X, w, C.*w) # getcoordinates(grid, cellnum)
+        bc = getcoordinates(grid, cellnum)
         reinit!(fv, bc, faceidx)
+        reinit!(fv_vector, bc, faceidx)
 
-        qr_face_side = Ferrite.create_face_quad_rule(qr_face, ip)[faceidx]
-        for (iqp, ξ) in enumerate(qr_face_side.points)
+        for iqp in 1:getnquadpoints(fv)
+
+            ξ = qr_face.face_rules[faceidx].points[iqp]
+            qrw = qr_face.face_rules[faceidx].weights[iqp]
 
             #Calculate the value of the NURBS from the nurbs patch
             N, dNdξ = bspline_values(nurbsmesh, cellnum, ξ, reorder)
@@ -158,7 +185,7 @@ end
             end
 
             J = sum(X .⊗ dRdξ_patch)
-            dV_patch = norm(Ferrite.weighted_normal(J, fv, faceidx))*qr_face_side.weights[iqp]
+            dV_patch = norm(Ferrite.weighted_normal(J, shape, faceidx))*qrw
 
             dRdX_patch = similar(dNdξ)
             for i in 1:nb_per_cell
@@ -166,9 +193,36 @@ end
             end 
 
             @test dV_patch ≈ getdetJdV(fv, iqp)
-            @test sum(fv.cv_store.N[:,iqp, faceidx]) ≈ 1
-            @test all(fv.cv_store.dNdξ[:,iqp, faceidx] .≈ dRdξ_patch)
-            @test all(fv.cv_store.dNdx[:,iqp, faceidx] .≈ dRdX_patch)
+            @test sum(fv.cv_nurbs.N[:,iqp, faceidx]) ≈ 1
+            @test all(fv.cv_nurbs.dNdξ[:,iqp, faceidx] .≈ dRdξ_patch)
+            @test all(fv.cv_nurbs.dNdx[:,iqp, faceidx] .≈ dRdX_patch)
+
+            #Check if VectorValues is same as ScalarValues
+            basefunc_count = 1
+            for i in 1:nb_per_cell
+                for comp in 1:dim
+                    N_comp = zeros(Float64, dim)
+                    N_comp[comp] = fv.cv_nurbs.N[i, iqp, faceidx]
+                    _N = Vec{dim,Float64}((N_comp...,))
+                    
+                    @show fv_vector.cv_nurbs.N[basefunc_count, iqp, faceidx] _N
+                    @test fv_vector.cv_nurbs.N[basefunc_count, iqp, faceidx] ≈ _N
+                    
+                    dN_comp = zeros(Float64, dim, dim)
+                    dN_comp[comp, :] = fv.cv_nurbs.dNdξ[i, iqp, faceidx]
+                    _dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
+                    
+                    @test fv_vector.cv_nurbs.dNdξ[basefunc_count, iqp, faceidx] ≈ _dNdξ
+
+                    dN_comp = zeros(Float64, dim, dim)
+                    dN_comp[comp, :] = fv.cv_nurbs.dNdx[i, iqp, faceidx]
+                    _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
+                    
+                    @test fv_vector.cv_nurbs.dNdx[basefunc_count, iqp, faceidx] ≈ _dNdx
+
+                    basefunc_count += 1
+                end
+            end
         end
     end
 
@@ -188,12 +242,12 @@ end
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
 
     grid = BezierGrid(nurbsmesh)
-    ip = Bernstein{dim, orders}()
-    qr = QuadratureRule{dim, RefCube}(3)
-    cv  = BezierCellValues( CellScalarValues(qr, ip) )
+    ip = Bernstein{Ferrite.RefHypercube{dim}, orders}()
+    qr = QuadratureRule{Ferrite.RefHypercube{dim}}(3)
+    cv  = BezierCellValues(qr, ip, ip)
 
     Xb, wb = get_bezier_coordinates(grid, 1)
-    w = getweights(grid, 1)
+    w = Ferrite.getweights(grid, 1)
     C = get_extraction_operator(grid, 1)
 
     set_bezier_operator!(cv, C)

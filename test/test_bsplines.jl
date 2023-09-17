@@ -60,14 +60,16 @@ end
         knot_vector = [(ones(T, p+1)*-1)..., ones(T, p+1)...]
     
         ip1 = BSplineBasis((knot_vector,knot_vector), (p,p))
-        ip2 = Bernstein{2,(p,p)}()
+        ip2 = Bernstein{RefQuadrilateral, p}()
 
         reorder = IGA._bernstein_ordering(ip2)
 
         ξ = Vec((rand(),rand()))
-        N1 = Ferrite.value(ip1, ξ)[reorder]
-        N2 = Ferrite.value(ip2, ξ)
+        for i in 1:getnbasefunctions(ip2)
+            N1 = Ferrite.shape_value(ip1, ξ, reorder[i])
+            N2 = Ferrite.shape_value(ip2, ξ, i)
+            @test N1 ≈ N2
+        end
 
-        @test N1 ≈ N2
     end
 end

@@ -1,6 +1,7 @@
 
 function _calculate_volume(cv, grid, cellset)
     V = 0.0
+
     for cellid in cellset
         bc = getcoordinates(grid, cellid)
         reinit!(cv, bc)
@@ -30,16 +31,15 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
     mesh = generate_nurbs_patch(meshsymbol, nels, orders; meshkwargs...)
     grid = BezierGrid(mesh)
 
-    bern_ip = Bernstein{sdim, mesh.orders}()
+    bern_ip = Bernstein{Ferrite.RefHypercube{sdim}, mesh.orders}()
 
     #Cell values
-    qr = Ferrite.QuadratureRule{sdim,Ferrite.RefCube}(5)
-    cv = IGA.BezierCellValues(Ferrite.CellVectorValues(qr, bern_ip)) 
+    qr = Ferrite.QuadratureRule{Ferrite.RefHypercube{sdim}}(5)
+    cv = IGA.BezierCellValues(qr, bern_ip, bern_ip) 
 
     #Face values
-    qr = Ferrite.QuadratureRule{sdim-1,Ferrite.RefCube}(5)
-    fv = IGA.BezierFaceValues(Ferrite.FaceVectorValues(qr, bern_ip)) 
-
+    qr = FaceQuadratureRule{Ferrite.RefHypercube{sdim}}(5)
+    fv = IGA.BezierFaceValues(qr, bern_ip, bern_ip)
 
     return grid, cv, fv
 end
@@ -47,7 +47,7 @@ end
 function test_cube()
     grid, cv, fv = _get_problem_data(:cube, (2,2,2), (2,2,2), cornerpos=(-1.0,-2.0,0.0), size=(2.0,3.0,4.0))
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "left", (x)->x[1]≈-1.0)
+    addfaceset!(grid, "left", (x)-> x[1]≈-1.0)
     addfaceset!(grid, "right", (x)->x[1]≈1.0)
     addfaceset!(grid, "top", (x)->x[3]≈4.0)
 
@@ -70,7 +70,7 @@ end
 function test_square()
     grid, cv, fv = _get_problem_data(:cube, (1,1,), (2,2,), cornerpos=(-1.0,-1.0), size=(2.0,3.0,))
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "left", (x)->x[1]≈-1.0)
+    addfaceset!(grid, "left", (x)-> x[1] ≈ -1.0)
     addfaceset!(grid, "right", (x)->x[1]≈1.0)
     addfaceset!(grid, "top", (x)->x[2]≈2.0)
 
@@ -129,10 +129,6 @@ function test_singly_curved_2d()
 
     A = _calculate_area(fv, grid, getfaceset(grid, "top"))
     @test isapprox(A, (100+5.0/2)*pi/2, atol = 2.0)
-
-    vtk_grid("singly_curved.vtu", grid) do vtk
-        #
-    end
     
 end
 
@@ -172,8 +168,6 @@ function test_ring()
 
     A = _calculate_area(fv, grid, getfaceset(grid, "outer"))
     @test isapprox(A, 2pi*ro, atol = 0.01)
-
-    
 end
 
 
