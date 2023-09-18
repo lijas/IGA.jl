@@ -50,7 +50,7 @@ function integrate_traction_force!(fe::AbstractVector, t::Vec{2}, fv)
 end;
 
 # The assembly loop is also written in almost the same way as in a standard finite element code. The key differences will be described in the next paragraph,
-function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
+function assemble_problem(dh::DofHandler, grid, cv, fv, stiffmat, traction)
 
     f = zeros(ndofs(dh))
     K = create_sparsity_pattern(dh)

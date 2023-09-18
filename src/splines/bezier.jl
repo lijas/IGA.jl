@@ -139,11 +139,8 @@ using Symbolics
 
 @variables ξ η ζ
 
-ip1d = Bernstein{RefLine, 2}()
-
-dim = 3
-order = (2,2,2)#,2)
-ip = Bernstein{dim,order}()
+order = (2,2,2)
+ip = Bernstein{RefHexahedron,order}()
 ordering = IGA._bernstein_ordering(ip)
 
 cindex = CartesianIndices(order.+1)
