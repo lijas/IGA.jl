@@ -51,7 +51,7 @@ function BezierGrid(grid::Ferrite.Grid{dim,C,T}) where {dim,C,T}
 		push!(extraction_operator, beo)
 	end
 
-	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
+	return BezierGrid{dim,C,T}(grid, weights, extraction_operator, facesets = grid.facesets, nodesets = grid.nodesets, edgesets = grid.edgesets, vertexsets = grid.vertexsets)
 end
 
 function Base.getproperty(m::BezierGrid, s::Symbol)

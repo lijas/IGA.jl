@@ -4,7 +4,8 @@ using Reexport
 
 @reexport using Tensors
 @reexport using Ferrite
-using Ferrite: AbstractRefShape, RefHypercube, RefLine, RefQuadrilateral, RefHexahedron, getnbasefunctions
+using Ferrite: AbstractRefShape, RefHypercube, RefLine, RefQuadrilateral, RefHexahedron, getnbasefunctions,
+               VectorInterpolation, VectorizedInterpolation
 
 using WriteVTK
 using LinearAlgebra
@@ -90,7 +91,7 @@ include("splines/bezier.jl")
 include("bezier_extraction.jl")
 include("splines/bezier_values.jl")
 include("splines/bsplines.jl")
-#include("VTK.jl")
+include("VTK.jl")
 #include("L2_projection.jl")
 
 Ferrite._mass_qr(::Bernstein{2, (2, 2)}) = QuadratureRule{RefQuadrilateral}(2+1)
