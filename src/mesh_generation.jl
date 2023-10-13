@@ -39,11 +39,28 @@ function _generate_equidistant_parametrization(knot_vector::Vector{T}, order::In
 	return range(from, stop=to, length=length(knot_vector)-1-order)
 end
 
+function Ferrite.generate_grid(::Type{<:BezierCell{order,refshape}}, nels::Tuple{Int,Int}, left::Vec{sdim,T}=zero(Vec{sdim}), right::Vec{sdim,T}=one(Vec{sdim})) where {T,order,sdim,refshape<:RefHypercube{sdim}}
+	patch = generate_nurbs_patch(:rectangle, nels, ntuple(i->order,sdim); cornerpos = tuple(left), size = tuple(right-left))
+	return BezierGrid(patch)
+end
+
 function generate_nurbs_patch(s::Symbol, args...; kwargs...)
 	generate_nurbs_patch(Val{s}(), args...; kwargs...)
 end
 
+function generate_nurbs_patch(::Val{:line}, nel::NTuple{1,Int}, orders::NTuple{1,Int}, size::NTuple{1,T};  cornerpos::NTuple{1,T} = (0.0,), multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
+	generate_nurbs_patch(:hypercube, nel, orders; cornerpos, size, multiplicity, sdim)
+end
+
+function generate_nurbs_patch(::Val{:rectangle}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; cornerpos::NTuple{2,T} = (0.0,0.0), size::NTuple{2,T}, multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
+	generate_nurbs_patch(:hypercube, nel, orders; cornerpos, size, multiplicity, sdim=sdim)
+end
+
 function generate_nurbs_patch(::Val{:cube}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; cornerpos::NTuple{3,T} = (-1.0,-1.0,-1.0), size::NTuple{3,T} = (2.0,2.0,2.0), multiplicity::NTuple{3,Int}=(1,1,1)) where T
+	generate_nurbs_patch(:hypercube, nel, orders; cornerpos, size, multiplicity)
+end
+
+function generate_nurbs_patch(::Val{:hypercube}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; cornerpos::NTuple{3,T} = (-1.0,-1.0,-1.0), size::NTuple{3,T} = (2.0,2.0,2.0), multiplicity::NTuple{3,Int}=(1,1,1)) where T
 
 	pdim = 3
 	sdim = 3
@@ -70,10 +87,7 @@ function generate_nurbs_patch(::Val{:cube}, nel::NTuple{3,Int}, orders::NTuple{3
 	return IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
 end
 
-function generate_nurbs_patch(::Val{:rectangle}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; cornerpos::NTuple{2,T} = (0.0,0.0), size::NTuple{2,T}, multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
-	generate_nurbs_patch(:cube, nel, orders; cornerpos=cornerpos, size=size, multiplicity=multiplicity, sdim=sdim)
-end
-function generate_nurbs_patch(::Val{:cube}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; cornerpos::NTuple{2,T} = (0.0,0.0), size::NTuple{2,T}, multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
+function generate_nurbs_patch(::Val{:hypercube}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; cornerpos::NTuple{2,T} = (0.0,0.0), size::NTuple{2,T}, multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
 
 	@assert( all(orders .>= multiplicity) )
 
@@ -105,10 +119,7 @@ function generate_nurbs_patch(::Val{:cube}, nel::NTuple{2,Int}, orders::NTuple{2
 
 end
 
-function generate_nurbs_patch(::Val{:line}, nel::NTuple{1,Int}, orders::NTuple{1,Int}, size::NTuple{1,T};  cornerpos::NTuple{1,T} = (0.0,), multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
-	generate_nurbs_patch(:cube, nel, orders; cornerpos=cornerpos, size=size, multiplicity=multiplicity, sdim=sdim)
-end
-function generate_nurbs_patch(::Val{:cube}, nel::NTuple{1,Int}, orders::NTuple{1,Int}; cornerpos::NTuple{1,T} = (0.0,), size::NTuple{1,T}, multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
+function generate_nurbs_patch(::Val{:hypercube}, nel::NTuple{1,Int}, orders::NTuple{1,Int}; cornerpos::NTuple{1,T} = (0.0,), size::NTuple{1,T}, multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
 
 	@assert( all(orders .>= multiplicity) )
 

@@ -12,9 +12,11 @@ using LinearAlgebra
 using StaticArrays
 import SparseArrays
 
+export IGAInterpolation
 export BezierExtractionOperator
 export BezierCell
 export BezierCoords
+export VTKIGAFile
 
 const Optional{T} = Union{T, Nothing}
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
@@ -82,7 +84,8 @@ end
 
 
 Ferrite.default_interpolation(::Type{<:BezierCell{order, shape}}) where {order, shape} = IGAInterpolation{shape, order}()
-#getorders(::BezierCell{orders,refshape,N}) where {orders,refshape,N} = orders
+Ferrite.nnodes(::BezierCell{order, shape, N}) where {order, shape, N} = N
+getorders(::BezierCell{orders,refshape,N}) where {orders,refshape,N} = orders
 
 include("nurbsmesh.jl")
 include("mesh_generation.jl")
@@ -94,7 +97,9 @@ include("splines/bsplines.jl")
 include("VTK.jl")
 #include("L2_projection.jl")
 
-Ferrite._mass_qr(::Bernstein{2, (2, 2)}) = QuadratureRule{RefQuadrilateral}(2+1)
+Ferrite._mass_qr(::IGAInterpolation{shape,order}) where {shape,order}= Ferrite._mass_qr(Bernstein{shape, order}())
+Ferrite._mass_qr(::Bernstein{RefQuadrilateral, (2,2)}) = QuadratureRule{RefQuadrilateral}(2+1)
+Ferrite._mass_qr(::Bernstein{RefCube, (2,2,2)}) = QuadratureRule{RefCube}(2+1)
 
 #Normaly the verices function should only return the 8 corner nodes of the hexa (or 4 in 2d),
 #but since the cell connectivity in IGA is different compared to normal FE elements,
@@ -111,14 +116,42 @@ function Ferrite.edges(c::BezierCell{order,RefHexahedron}) where {order}
     return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_edgedof_indices(IGAInterpolation{RefHexahedron,order}() )))
 end
 
-function Ferrite.cell_to_vtkcell(::Type{BezierCell{order,RefHexahedron}}) where {order}
-    return Ferrite.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
+
+function Ferrite._apply_analytical!(
+    a::AbstractVector, dh::Ferrite.AbstractDofHandler, celldofinds, field_dim,
+    ip_fun::Interpolation{RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape<:AbstractRefShape{dim}}
+
+    coords = getcoordinates(Ferrite.get_grid(dh), first(cellset))
+    ref_points = Ferrite.reference_coordinates(ip_fun)
+    dummy_weights = zeros(length(ref_points))
+    qr = QuadratureRule{RefShape}(dummy_weights, ref_points)
+    # Note: Passing ip_geo as the function interpolation here, it is just a dummy.
+    cv = CellValues(qr, ip_geo, ip_geo)
+    c_dofs = celldofs(dh, first(cellset))
+    f_dofs = zeros(Int, length(celldofinds))
+
+    # Check f before looping
+    #length(f(first(coords))) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
+
+    for cellnr in cellset
+        getcoordinates!(coords, Ferrite.get_grid(dh), cellnr)
+        celldofs!(c_dofs, dh, cellnr)
+        for (i, celldofind) in enumerate(celldofinds)
+            f_dofs[i] = c_dofs[celldofind]
+        end
+        _apply_analytical2!(a, f_dofs, coords, field_dim, cv, f)
+    end
+    return a
 end
-function Ferrite.cell_to_vtkcell(::Type{BezierCell{order,RefQuadrilateral}}) where {order}
-    return Ferrite.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
-end
-function Ferrite.cell_to_vtkcell(::Type{BezierCell{order,RefLine}}) where {order}
-    return Ferrite.VTKCellTypes.VTK_BEZIER_CURVE
+
+function _apply_analytical2!(a::AbstractVector, dofs::Vector{Int}, coords, field_dim, cv::Ferrite.AbstractCellValues, f)
+    for i_dof in 1:getnquadpoints(cv)
+        x_dof = spatial_coordinate(cv, i_dof, coords)
+        for (idim, icval) in enumerate(f(x_dof))
+            a[dofs[field_dim*(i_dof-1)+idim]] = icval
+        end
+    end
+    return a
 end
 
 end #end module

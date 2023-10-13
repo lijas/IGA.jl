@@ -163,18 +163,21 @@ function solve()
 
     # Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the 
     # reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
-    ip_geo = Bernstein{RefQuadrilateral,2}()
+    ip_geo = IGAInterpolation{RefQuadrilateral,2}()
     ip_u = ip_geo^2
     qr_cell = QuadratureRule{RefQuadrilateral}(4)
     qr_face = FaceQuadratureRule{RefQuadrilateral}(3)
 
-    cv = BezierCellValues(qr_cell, ip_u, ip_geo)
-    fv = BezierFaceValues(qr_face, ip_u, ip_geo)
+    cv = CellValues(qr_cell, ip_u, ip_geo)
+    fv = FaceValues(qr_face, ip_u, ip_geo)
 
     # Distribute dofs as normal
     dh = DofHandler(grid)
     push!(dh, :u, ip_u)
     close!(dh)
+
+    ae = zeros(ndofs(dh))
+    apply_analytical!(ae, dh, :u, x->x)
 
     # Add two symmetry boundary condintions. Bottom face should only be able to move in x-direction, and the right boundary should only be able to move in y-direction
     ch = ConstraintHandler(dh)

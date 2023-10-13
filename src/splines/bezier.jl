@@ -46,7 +46,7 @@ end
 #   Bernstein Quadrilateral, order 2
 # # #
 Ferrite.getnbasefunctions(::Bernstein{RefQuadrilateral,(2,2)}) = 9
-
+Ferrite.vertexdof_indices(::Bernstein{RefQuadrilateral,(2,2)}) = ((1,),(2,),(3,),(4,))
 Ferrite.facedof_indices(::Bernstein{RefQuadrilateral,(2,2)}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
 Ferrite.facedof_interior_indices(::Bernstein{RefQuadrilateral,(2,2)}) = ((5,), (6,), (7,), (8,))
 Ferrite.celldof_interior_indices(::Bernstein{RefQuadrilateral,(2,2)}) = (9,)
@@ -261,10 +261,10 @@ end
 # # # 
 Ferrite.getnbasefunctions(::Bernstein{shape,orders}) where {shape, orders}= prod(orders.+1)
     
-function Ferrite.reference_coordinates(ip::Bernstein{shape,order}) where {rdim, shape <: AbstractRefShape{rdim}, order <: Integer}
+function Ferrite.reference_coordinates(ip::Bernstein{shape,orders}) where {rdim, shape <: AbstractRefShape{rdim}, orders}
 
     T = Float64
-    nbasefunks_dim = ntuple(i->order, rdim)
+    nbasefunks_dim = orders .+ 1
     nbasefuncs = prod(nbasefunks_dim)
     
     coords = Vec{rdim,T}[]
@@ -374,7 +374,15 @@ function _bernstein_ordering(::Bernstein{RefHexahedron, orders}) where {orders}
 end
 
 #Almost the same orderign as _bernstein_ordering, but some changes for faces and edges
-function _vtk_ordering(::BezierCell{orders}) where {orders}
+function _vtk_ordering(c::BezierCell{RefLine})
+    _bernstein_ordering(c)
+end
+
+function _vtk_ordering(c::BezierCell{RefQuadrilateral}) 
+    _bernstein_ordering(c)
+end
+
+function _vtk_ordering(::BezierCell{RefHexahedron, orders}) where {orders}
     @assert(length(orders) == 3)
 
     ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)
