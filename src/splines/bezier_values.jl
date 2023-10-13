@@ -59,6 +59,21 @@ function BezierCellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {T, QR, IP
     return BezierCellValues(cv)
 end
 
+#Entrypoints for vector valued IGAInterpolation, which creates BezierCellValues
+function Ferrite.CellValues(qr::QuadratureRule, ::IP, ::IGAInterpolation{shape,order}) where {shape,order,vdim,IP<:VectorizedInterpolation{vdim, shape, <:Any, <:IGAInterpolation{shape,order}}}
+    _ip = Bernstein{shape,order}()^vdim
+    _ip_geo = Bernstein{shape,order}()
+    cv = CellValues(qr, _ip, _ip_geo)
+    return BezierCellValues(cv)
+end
+
+function Ferrite.CellValues(qr::QuadratureRule, ::IGAInterpolation{shape,order}, ::IGAInterpolation{shape,order}) where {shape,order}
+    _ip = Bernstein{shape,order}()
+    _ip_geo = Bernstein{shape,order}()
+    cv = CellValues(qr, _ip, _ip_geo)
+    return BezierCellValues(cv)
+end
+
 function BezierFaceValues(qr::FaceQuadratureRule, ip::Interpolation, gip::Interpolation)
     return BezierFaceValues(Float64, qr, ip, gip)
 end
@@ -99,6 +114,17 @@ end
 function set_bezier_operator!(bcv::BezierCellAndFaceValues, beo::BezierExtractionOperator{T}, w::Vector{T}) where T 
     bcv.current_w   .= w
     bcv.current_beo[]=beo
+end
+
+#This function can be called when we know that the weights are all equal to one.
+function Ferrite.spatial_coordinate(cv::BezierCellAndFaceValues, iqp::Int, xb::Vector{<:Vec})
+    x = spatial_coordinate(cv.cv_bezier, iqp, xb)
+    return x
+end
+
+function Ferrite.spatial_coordinate(cv::BezierCellAndFaceValues, iqp::Int, bcoords::BezierCoords)
+    x = spatial_coordinate(cv, iqp, (bcoords.xb, bcoords.wb))
+    return x
 end
 
 function Ferrite.spatial_coordinate(cv::BezierCellAndFaceValues, iqp::Int, (xb, wb)::CoordsAndWeight{sdim,T}) where {sdim,T}
@@ -269,4 +295,17 @@ function _reinit_nurbs!(cv_nurbs::Ferrite.AbstractValues, cv_bezier::Ferrite.Abs
             cv_nurbs.dNdx[j, i, cb] = cv_nurbs.dNdξ[j, i, cb] ⋅ Jinv
         end
     end
+end
+
+function Base.show(io::IO, m::MIME"text/plain", fv::BezierFaceValues)
+    println(io, "FaceValues with")
+    nqp = getnquadpoints.(fv.cv_bezier.qr.face_rules)
+    if all(n==first(nqp) for n in nqp)
+        println(io, "- Quadrature rule with ", first(nqp), " points per face")
+    else
+        println(io, "- Quadrature rule with ", tuple(nqp...), " points on each face")
+    end
+    print(io, "- Function interpolation: "); show(io, m, fv.cv_bezier.func_interp)
+    println(io)
+    print(io, "- Geometric interpolation: "); show(io, m, fv.cv_bezier.geo_interp)
 end

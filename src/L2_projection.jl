@@ -1,5 +1,6 @@
 
 
+#=
 function Ferrite.L2Projector(
     func_ip::Interpolation,
     grid::BezierGrid;
@@ -57,4 +58,4 @@ function igaproject(proj::L2Projector,
     else
         return projected_vals
     end
-end
+end=#

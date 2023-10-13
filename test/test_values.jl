@@ -41,23 +41,32 @@ end
 
     sdim = 3
     shape = Ferrite.RefHypercube{sdim}
-    ip = Bernstein{shape, 2}()
+    ip = IGAInterpolation{shape, 2}()
+    bip = Bernstein{shape, 2}()
 
     qr = QuadratureRule{shape}(1)
     qr_face = FaceQuadratureRule{shape}(1)
 
     cv  = BezierCellValues( qr, ip, ip)
-    cv2 = BezierCellValues( CellValues(qr, ip, ip) )
+    cv2 = BezierCellValues( CellValues(qr, bip, bip) )
+    cv3 = CellValues( qr, ip, ip)
+
     @test cv.cv_bezier.M == cv2.cv_bezier.M
+    @test cv.cv_bezier.M == cv3.cv_bezier.M
+    @test cv3 isa BezierCellValues
 
-    cv_vector = BezierCellValues( qr, ip^sdim, ip )
-    cv_vector2 = BezierCellValues( CellValues(qr, ip^sdim, ip) )
+    cv_vector1 = BezierCellValues( qr, ip^sdim, ip )
+    cv_vector2 = BezierCellValues( CellValues(qr, bip^sdim, bip) )
+    cv_vector3 = CellValues( qr, ip^sdim, ip )
+
     @test cv_vector.cv_bezier.M == cv_vector2.cv_bezier.M
+    @test cv_vector.cv_bezier.M == cv_vector3.cv_bezier.M
+    @test cv_vector3 isa BezierCellValues
 
-    @test Ferrite.getngeobasefunctions(cv_vector) == getnbasefunctions(ip)
+    @test Ferrite.getngeobasefunctions(cv_vector1) == getnbasefunctions(ip)
     @test Ferrite.getngeobasefunctions(cv) == getnbasefunctions(ip)
 
-    @test Ferrite.getnbasefunctions(cv_vector) == getnbasefunctions(ip)*sdim
+    @test Ferrite.getnbasefunctions(cv_vector1) == getnbasefunctions(ip)*sdim
     @test Ferrite.getnbasefunctions(cv) == getnbasefunctions(ip)
 end
 

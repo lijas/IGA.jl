@@ -178,15 +178,3 @@ end
 function get_extraction_operator(grid::BezierGrid, cellid::Int)
 	return grid.beo[cellid]
 end
-
-# Store the Ferrite to vtk order in a cache for specific cell type
-let cache = Dict{Type{<:BezierCell}, Vector{Int}}()
-	global function Ferrite.nodes_to_vtkorder(celltype::Type{<:BezierCell})
-		get!(cache, celltype) do 
-			igaorder = _bernstein_ordering(celltype)
-			vtkorder = _vtk_ordering(celltype)
-
-			return [findfirst(ivtk-> ivtk == iiga, vtkorder) for iiga in igaorder]
-		end
-	end
-end

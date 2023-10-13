@@ -1,34 +1,28 @@
-# Use the vtk bezier cells for the outputs.
 
-function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid{dim,C,T}) where {dim,C,T}
-    
-	if !isconcretetype(C)
-		@warn "It appears that you are using a BezierGrid with mixed elements (both IGA elements and FE-elements). 
-		It is not possible to output the IGA elements like normal FE-element, and they will there for not be shown correctly in the output.
-		Read the docs on how to handle export of IGA-elements to VTK."
-	end
-
-	vtkfile = vtk_grid(filename, grid.grid)
-	
-	#= Can be used for anistropic orders
-	vtkfile["RationalWeights", WriteVTK.VTKPointData()] = grid.weights
-	cellorders = Int[]
-	for (cellid, cell) in enumerate(grid.cells)
-		for p in getorders(cell)
-			push!(cellorders, p)
-		end
-	end
-	#vtkfile["HigherOrderDegrees", VTKCellData()] = reshape(cellorders, 1, length(grid.cells))
-    =#
-	
-    return vtkfile
+function Ferrite.cell_to_vtkcell(::Type{<:BezierCell{order,RefHexahedron}}) where {order}
+    return Ferrite.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
+end
+function Ferrite.cell_to_vtkcell(::Type{<:BezierCell{order,RefQuadrilateral}}) where {order}
+    return Ferrite.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
+end
+function Ferrite.cell_to_vtkcell(::Type{<:BezierCell{order,RefLine}}) where {order}
+    return Ferrite.VTKCellTypes.VTK_BEZIER_CURVE
 end
 
-function WriteVTK.vtk_grid(filename::AbstractString, grid::BezierGrid{dim,<:BezierCell,T}) where {dim,T}
-    
-	
+# Store the Ferrite to vtk order in a cache for specific cell type
+let cache = Dict{Type{<:BezierCell}, Vector{Int}}()
+	global function _iga_to_vtkorder(celltype::Type{<:BezierCell{orders,shape,N}}) where {orders,shape,N}
+		get!(cache, celltype) do 
+			if shape == RefHexahedron
+				igaorder = _bernstein_ordering(celltype)
+				vtkorder = _vtk_ordering(celltype)
 
-    return vtkfile
+				return [findfirst(ivtk-> ivtk == iiga, vtkorder) for iiga in igaorder]
+			else
+				return collect(1:N)
+			end
+		end
+	end
 end
 
 struct VTKIGAFile{VTK<:WriteVTK.DatasetFile}
@@ -38,9 +32,17 @@ end
 
 function VTKIGAFile(filename::String, grid::BezierGrid, cellset; kwargs...)
     vtk = _create_iga_vtk_grid(filename, grid, cellset; kwargs...)
+	cellset = sort(collect(copy(cellset)))
     return VTKIGAFile(vtk, cellset)
 end
 
+Base.close(vtk::VTKIGAFile) = WriteVTK.vtk_save(vtk.vtk)
+
+function Base.show(io::IO, ::MIME"text/plain", vtk::VTKIGAFile)
+    open_str = WriteVTK.isopen(vtk.vtk) ? "open" : "closed"
+    filename = vtk.vtk.path
+    print(io, "VTKFile for the $open_str file \"$(filename)\".")
+end
 
 # Makes it possible to use the `do`-block syntax
 function VTKIGAFile(f::Function, args...; kwargs...)
@@ -52,22 +54,19 @@ function VTKIGAFile(f::Function, args...; kwargs...)
     end
 end
 
-
-
 function _create_iga_vtk_grid(filename, grid::BezierGrid{sdim,C,T}, cellset; kwargs...) where {sdim,C,T}
-
-	Ferrite._check_same_cellset(grid, cellset)
+	Ferrite._check_same_celltype(grid, cellset)
 
 	cellset = collect(cellset)
 	sort!(cellset)
 
-	CT = typeof(grid.cells[first(cellset)])
-	nnodes_per_cell = Ferrite.nnodes(CT)
-	reorder = Ferrite.nodes_to_vtkorder(CT)
+	cell = grid.cells[first(cellset)]
+	reorder = _iga_to_vtkorder(typeof(cell))
+	nnodes_per_cell = Ferrite.nnodes(cell)
 
 	#Variables for the vtk file
 	cls = MeshCell[]
-	beziercoords = Vec{dim,T}[]
+	beziercoords = Vec{sdim,T}[]
 	weights = T[]
 	cellorders = Int[]
 
@@ -78,7 +77,9 @@ function _create_iga_vtk_grid(filename, grid::BezierGrid{sdim,C,T}, cellset; kwa
 	w  = zeros(T, nnodes_per_cell)
 
 	offset = 0
-	for (cellid, cell) in enumerate(cellset)
+	for cellid in cellset
+		cell = grid.cells[cellid]
+
 		vtktype = Ferrite.cell_to_vtkcell(typeof(cell))
 		for p in getorders(cell)
 			push!(cellorders, p)
@@ -98,7 +99,7 @@ function _create_iga_vtk_grid(filename, grid::BezierGrid{sdim,C,T}, cellset; kwa
 	coords = reshape(reinterpret(T, beziercoords), (sdim, length(beziercoords)))
 	vtkfile = WriteVTK.vtk_grid(filename, coords, cls; kwargs...)
 	vtkfile["RationalWeights",    WriteVTK.VTKPointData()] = weights
-	vtkfile["HigherOrderDegrees", WriteVTK.VTKCellData()] = reshape(cellorders, 1, length(grid.cells))
+	#vtkfile["HigherOrderDegrees", WriteVTK.VTKCellData()] = reshape(cellorders, 1, length(grid.cells))
 	
 	return vtkfile
 end
@@ -130,14 +131,21 @@ function WriteVTK.vtk_point_data(
     return vtkfile
 end
 
+function write_solution(vtk, dh::DofHandler, a, suffix="")
+	for fieldname in Ferrite.getfieldnames(dh)
+		data = _evaluate_at_geometry_nodes!(vtk, dh, a, fieldname)
+		vtk_point_data(vtk.vtk, data, string(fieldname, suffix))
+	end
+end
+
 
 function _evaluate_at_geometry_nodes!(
 	vtk       ::VTKIGAFile,
     dh        ::Ferrite.AbstractDofHandler, 
-    a         ::Vector, 
-    fieldname ::Symbol)
+    a         ::Vector{T}, 
+    fieldname ::Symbol) where T
 
-	Ferrite._check_same_cellset(dh.grid, vtk.cellset)
+	Ferrite._check_same_celltype(dh.grid, vtk.cellset)
     fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found in the dofhandler.")
 
     # 
@@ -170,40 +178,54 @@ function _evaluate_at_geometry_nodes!(
 	local_node_coords = Ferrite.reference_coordinates(ip_geo)
 	qr = QuadratureRule{shape}(zeros(length(local_node_coords)), local_node_coords)
 	ip = Ferrite.getfieldinterpolation(sdh, field_idx)
+	
+	# TODO: Remove this hack when embedding works...
+	RT = ip isa ScalarInterpolation ? T : Vec{Ferrite.n_components(ip),T}
 	if ip isa VectorizedInterpolation
-		# TODO: Remove this hack when embedding works...
 		cv = BezierCellValues(qr, ip.ip, ip_geo)
 	else
 		cv = BezierCellValues(qr, ip, ip_geo)
 	end
 
-    _evaluate_at_geometry_nodes!(data, sdh, a, cv, drange, vtk.cellset)
+    _evaluate_at_geometry_nodes!(data, sdh, a, cv, drange, vtk.cellset, RT)
         
     return data
 end
 
 
-function _evaluate_at_geometry_nodes!(data, dh, a, cv, drange, cellset)
+function _evaluate_at_geometry_nodes!(data, sdh, a::Vector{T}, cv, drange, cellset, ::Type{RT}) where {T, RT}
+
+	dh = sdh.dh
+	grid = dh.grid
 
 	n_eval_points = Ferrite.getngeobasefunctions(cv)
-	ae = zeros(eltype(a), n_eval_points)
+	ncelldofs = length(drange)
+	ue = zeros(eltype(a), ncelldofs)
+
+	# TODO: Remove this hack when embedding works...
+    if RT <: Vec && cv isa BezierCellValues{T, <:CellValues{<:ScalarInterpolation}}
+        uer = reinterpret(RT, ue)
+    else
+        uer = ue
+    end
+
+	dofs = zeros(Int, ncelldofs)
 	bcoords = getcoordinates(dh.grid, first(cellset))
-	dofs = zeros(Int, getnbasefunctions(cv))
     offset = 0
     for cellid in cellset
 
         getcoordinates!(bcoords, dh.grid, cellid)
         reinit!(cv, bcoords)
 
-        celldofs!(dofs, dh, cellid)
+        celldofs!(dofs, sdh, cellid)
 		for (i, I) in pairs(drange)
-            ae[i] = a[dofs[I]]
+            ue[i] = a[dofs[I]]
         end
 
         cellnodes = (1:n_eval_points) .+ offset
 
         for (iqp, nodeid) in pairs(cellnodes)
-            val = function_value(cv, iqp, ae)
+            val = function_value(cv, iqp, uer)
 			if data isa Matrix # VTK
                 data[1:length(val), nodeid] .= val
                 data[(length(val)+1):end, nodeid] .= 0 # purge the NaN
