@@ -25,8 +25,10 @@ end
 
 function BezierGrid(mesh::NURBSMesh{pdim,sdim}) where {pdim,sdim}
 
+	@assert allequal(mesh.orders)
+	order = first(mesh.orders)
 	N = size(mesh.IEN, 1)
-    CellType = BezierCell{mesh.orders, RefHypercube{pdim}}
+    CellType = BezierCell{RefHypercube{pdim},order}
     ordering = _bernstein_ordering(CellType)
 	
 	cells = [CellType(Tuple(mesh.IEN[ordering,ie])) for ie in 1:getncells(mesh)]

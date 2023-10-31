@@ -1,17 +1,17 @@
 
-function Ferrite.cell_to_vtkcell(::Type{<:BezierCell{order,RefHexahedron}}) where {order}
+function Ferrite.cell_to_vtkcell(::Type{<:BezierCell{RefHexahedron,order}}) where {order}
     return Ferrite.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
 end
-function Ferrite.cell_to_vtkcell(::Type{<:BezierCell{order,RefQuadrilateral}}) where {order}
+function Ferrite.cell_to_vtkcell(::Type{<:BezierCell{RefQuadrilateral,order}}) where {order}
     return Ferrite.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
 end
-function Ferrite.cell_to_vtkcell(::Type{<:BezierCell{order,RefLine}}) where {order}
+function Ferrite.cell_to_vtkcell(::Type{<:BezierCell{RefLine,order}}) where {order}
     return Ferrite.VTKCellTypes.VTK_BEZIER_CURVE
 end
 
 # Store the Ferrite to vtk order in a cache for specific cell type
 let cache = Dict{Type{<:BezierCell}, Vector{Int}}()
-	global function _iga_to_vtkorder(celltype::Type{<:BezierCell{orders,shape,N}}) where {orders,shape,N}
+	global function _iga_to_vtkorder(celltype::Type{<:BezierCell{shape,order,N}}) where {order,shape,N}
 		get!(cache, celltype) do 
 			if shape == RefHexahedron
 				igaorder = _bernstein_ordering(celltype)

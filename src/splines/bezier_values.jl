@@ -24,9 +24,12 @@ struct BezierCellValues{T<:Real,CV<:Ferrite.CellValues} <: Ferrite.AbstractCellV
 end
 
 struct BezierFaceValues{T<:Real,CV<:Ferrite.FaceValues} <: Ferrite.AbstractFaceValues
-    cv_bezier::CV
-    cv_tmp::CV
+    # cv_bezier stores the bernstein basis. These are the same for all elements, and does not change
+    cv_bezier::CV 
+    # cv_nurbs sotres the nurbs/b-spline basis. These will change for each element
     cv_nurbs::CV
+    # cv_tmp is just and intermidiate state need when converting from cv_bezier to cv_nurbs
+    cv_tmp::CV
 
     current_beo::Base.RefValue{BezierExtractionOperator{T}}
     current_w::Vector{T}
@@ -77,6 +80,21 @@ function Ferrite.CellValues(qr::QuadratureRule, ::IGAInterpolation{shape,order},
     return BezierCellValues(cv)
 end
 
+#Entrypoints for vector valued IGAInterpolation, which creates BezierCellValues
+function Ferrite.FaceValues(qr::FaceQuadratureRule, ::IP, ::IGAInterpolation{shape,order}) where {shape,order,vdim,IP<:VectorizedInterpolation{vdim, shape, <:Any, <:IGAInterpolation{shape,order}}}
+    _ip = Bernstein{shape,order}()^vdim
+    _ip_geo = Bernstein{shape,order}()
+    cv = FaceValues(qr, _ip, _ip_geo)
+    return BezierFaceValues(cv)
+end
+
+function Ferrite.FaceValues(qr::FaceQuadratureRule, ::IGAInterpolation{shape,order}, ::IGAInterpolation{shape,order}) where {shape,order}
+    _ip = Bernstein{shape,order}()
+    _ip_geo = Bernstein{shape,order}()
+    cv = FaceValues(qr, _ip, _ip_geo)
+    return BezierFaceValues(cv)
+end
+
 function BezierFaceValues(qr::FaceQuadratureRule, ip::Interpolation, gip::Interpolation)
     return BezierFaceValues(Float64, qr, ip, gip)
 end
@@ -124,14 +142,14 @@ function Ferrite.spatial_coordinate(cv::BezierCellAndFaceValues, iqp::Int, xb::V
     return x
 end
 
-function Ferrite.spatial_coordinate(cv::BezierCellAndFaceValues, iqp::Int, bcoords::BezierCoords)
+function Ferrite.spatial_coordinate(cv::Ferrite.AbstractCellValues, iqp::Int, bcoords::BezierCoords)
     x = spatial_coordinate(cv, iqp, (bcoords.xb, bcoords.wb))
     return x
 end
 
-function Ferrite.spatial_coordinate(cv::BezierCellAndFaceValues, iqp::Int, (xb, wb)::CoordsAndWeight{sdim,T}) where {sdim,T}
+function Ferrite.spatial_coordinate(cv::Ferrite.AbstractCellValues, iqp::Int, (xb, wb)::CoordsAndWeight{sdim,T}) where {sdim,T}
     nbasefunks = Ferrite.getngeobasefunctions(cv)
-    @boundscheck Ferrite.checkquadpoint(cv.cv_bezier, iqp)
+    @boundscheck Ferrite.checkquadpoint(cv, iqp)
     W = 0.0
     x = zero(Vec{sdim,T})
     for i in 1:nbasefunks
