@@ -7,7 +7,7 @@ end
 
 
 function test_projection()
-    element = BezierCell{2,RefQuadrilateral}
+    element = BezierCell{RefQuadrilateral,2}
     grid = generate_grid(Quadrilateral, (1,1), Vec((0.,0.)), Vec((1.,1.)))
     
    # grid = BezierGrid( generate_nurbs_patch(:rectangle, (1,1), (2,2); size=(1.0,1.0)) )

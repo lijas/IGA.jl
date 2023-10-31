@@ -67,25 +67,27 @@ Ferrite.dirichlet_vertexdof_indices(::IGAInterpolation{shape, order}) where {sha
 
 
 """
-    BezierCell{order,refshape,N} <: Ferrite.AbstractCell{refshape}
+    BezierCell{refshape,order,N} <: Ferrite.AbstractCell{refshape}
 
 `N` = number of nodes/controlpoints
 `order` = tuple with order in each parametric dimension (does not need to be equal to `dim`)
 """
-struct BezierCell{order,refshape,N} <: Ferrite.AbstractCell{refshape}
+struct BezierCell{refshape,order,N} <: Ferrite.AbstractCell{refshape}
     nodes::NTuple{N,Int}
-    function BezierCell{orders,shape}(nodes::NTuple{N,Int}) where {rdim, orders, shape<:RefHypercube{rdim}, N} 
-        #@assert(order isa Integer)
-        @assert prod(orders.+1) == N
-        @assert length(orders) == rdim
-		return new{orders,shape,N}(nodes)
+    function BezierCell{refshape,order}(nodes::NTuple{N,Int}) where {rdim, order, refshape<:RefHypercube{rdim}, N} 
+        @assert(order isa Integer)
+        @assert (order+1)^rdim == N
+		return new{refshape,order,N}(nodes)
     end
 end
 
+function BezierCell{refshape,order,N}(nodes::NTuple{N,Int}) where {rdim, order, refshape<:RefHypercube{rdim}, N} 
+    return BezierCell{refshape,order}(nodes)
+end
 
-Ferrite.default_interpolation(::Type{<:BezierCell{order, shape}}) where {order, shape} = IGAInterpolation{shape, order}()
-Ferrite.nnodes(::BezierCell{order, shape, N}) where {order, shape, N} = N
-getorders(::BezierCell{orders,refshape,N}) where {orders,refshape,N} = orders
+Ferrite.default_interpolation(::Type{<:BezierCell{shape,order}}) where {order, shape} = IGAInterpolation{shape, order}()
+Ferrite.nnodes(::BezierCell{shape, order, N}) where {order, shape, N} = N
+getorders(::BezierCell{refshape, orders, N}) where {orders,refshape,N} = orders
 
 include("nurbsmesh.jl")
 include("mesh_generation.jl")
@@ -106,9 +108,9 @@ Ferrite._mass_qr(::Bernstein{RefCube, (2,2,2)}) = QuadratureRule{RefCube}(2+1)
 #we can only distribute cells on the nodes/controlpoints
 Ferrite.vertices(c::BezierCell) = c.nodes
 
-_bernstein_ordering(::Type{<:BezierCell{order,shape}}) where {order,shape} = _bernstein_ordering(Bernstein{shape,order}())                                        
+_bernstein_ordering(::Type{<:BezierCell{shape,order}}) where {order,shape} = _bernstein_ordering(Bernstein{shape,order}())                                        
 
-function Ferrite.faces(c::BezierCell{order,shape}) where {shape,order}
+function Ferrite.faces(c::BezierCell{shape,order}) where {shape,order}
     return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_facedof_indices(IGAInterpolation{shape,order}() )))
 end
 
