@@ -30,6 +30,8 @@ struct BezierCoords{dim_s,T}
     beo  ::Base.RefValue{ BezierExtractionOperator{T} }
 end
 
+zero_bezier_coord(dim, T, nnodes) = BezierCoords{dim,T}(zeros(Vec{dim,T}, nnodes), zeros(T, nnodes), zeros(Vec{dim,T}, nnodes), zeros(T, nnodes), Base.RefValue(diagonal_beo(1)))
+
 #Base.zero(Type{BezierCoords{dim,T}}) where {dim,T} = BezierCoords
 
 """
