@@ -37,6 +37,11 @@ end
 
 BezierCellAndFaceValues{T,CV} = Union{BezierCellValues{T,CV}, BezierFaceValues{T,CV}}
 
+function Ferrite.checkface(fv::BezierFaceValues, face::Int)
+    0 < face <= nfaces(fv) || error("Face index out of range.")
+    return nothing
+end
+
 Ferrite.nfaces(fv::BezierFaceValues) = size(fv.cv_nurbs.N, 3)
 
 function BezierCellValues(cv::Ferrite.CellValues)
@@ -67,14 +72,14 @@ end
 
 #Entrypoints for vector valued IGAInterpolation, which creates BezierCellValues
 function Ferrite.CellValues(qr::QuadratureRule, ::IP, ::IGAInterpolation{shape,order}) where {shape,order,vdim,IP<:VectorizedInterpolation{vdim, shape, <:Any, <:IGAInterpolation{shape,order}}}
-    _ip = Bernstein{shape,order}()^vdim
+    _ip = IGAInterpolation{shape,order}()^vdim
     _ip_geo = Bernstein{shape,order}()
     cv = CellValues(qr, _ip, _ip_geo)
     return BezierCellValues(cv)
 end
 
 function Ferrite.CellValues(qr::QuadratureRule, ::IGAInterpolation{shape,order}, ::IGAInterpolation{shape,order}) where {shape,order}
-    _ip = Bernstein{shape,order}()
+    _ip = IGAInterpolation{shape,order}()
     _ip_geo = Bernstein{shape,order}()
     cv = CellValues(qr, _ip, _ip_geo)
     return BezierCellValues(cv)
@@ -82,14 +87,14 @@ end
 
 #Entrypoints for vector valued IGAInterpolation, which creates BezierCellValues
 function Ferrite.FaceValues(qr::FaceQuadratureRule, ::IP, ::IGAInterpolation{shape,order}) where {shape,order,vdim,IP<:VectorizedInterpolation{vdim, shape, <:Any, <:IGAInterpolation{shape,order}}}
-    _ip = Bernstein{shape,order}()^vdim
+    _ip = IGAInterpolation{shape,order}()^vdim
     _ip_geo = Bernstein{shape,order}()
     cv = FaceValues(qr, _ip, _ip_geo)
     return BezierFaceValues(cv)
 end
 
 function Ferrite.FaceValues(qr::FaceQuadratureRule, ::IGAInterpolation{shape,order}, ::IGAInterpolation{shape,order}) where {shape,order}
-    _ip = Bernstein{shape,order}()
+    _ip = IGAInterpolation{shape,order}()
     _ip_geo = Bernstein{shape,order}()
     cv = FaceValues(qr, _ip, _ip_geo)
     return BezierFaceValues(cv)
@@ -320,7 +325,7 @@ function _reinit_nurbs!(cv_nurbs::Ferrite.AbstractValues, cv_bezier::Ferrite.Abs
 end
 
 function Base.show(io::IO, m::MIME"text/plain", fv::BezierFaceValues)
-    println(io, "FaceValues with")
+    println(io, "BezierFaceValues with")
     nqp = getnquadpoints.(fv.cv_bezier.qr.face_rules)
     if all(n==first(nqp) for n in nqp)
         println(io, "- Quadrature rule with ", first(nqp), " points per face")

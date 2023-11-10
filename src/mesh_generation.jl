@@ -43,10 +43,30 @@ function Ferrite.generate_grid(::Type{<:BezierCell{RefQuadrilateral,order}}, nel
 	#IGnore LR and UL for now
 	patch = generate_nurbs_patch(:rectangle, nels, ntuple(i->order,2); cornerpos = Tuple(LL), size = Tuple(UR-LL))
 	grid = BezierGrid(patch)
+	
 	addfaceset!(grid, "left", x->x[1]≈LL[1])
 	addfaceset!(grid, "right", x->x[1]≈UR[1])
+	
 	addfaceset!(grid, "top", x->x[2]≈UR[2])
 	addfaceset!(grid, "bottom", x->x[2]≈LL[2])
+
+	return grid
+end
+
+function Ferrite.generate_grid(::Type{<:BezierCell{RefHexahedron,order}}, nels::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {order,T}
+	#IGnore LR and UL for now
+	patch = generate_nurbs_patch(:cube, nels, ntuple(i->order,3); cornerpos = Tuple(left), size = Tuple(right-left))
+	grid = BezierGrid(patch)
+	
+	addfaceset!(grid, "left", x->x[1]≈left[1])
+	addfaceset!(grid, "right", x->x[1]≈right[1])
+	
+	addfaceset!(grid, "front", x->x[2]≈left[2])
+	addfaceset!(grid, "back", x->x[2]≈right[2])
+
+	addfaceset!(grid, "top", x->x[3]≈right[3])
+	addfaceset!(grid, "bottom", x->x[3]≈left[3])
+	return grid
 end
 
 function generate_nurbs_patch(s::Symbol, args...; kwargs...)
