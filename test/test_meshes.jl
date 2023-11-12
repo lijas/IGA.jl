@@ -31,7 +31,8 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
     mesh = generate_nurbs_patch(meshsymbol, nels, orders; meshkwargs...)
     grid = BezierGrid(mesh)
 
-    bern_ip = Bernstein{Ferrite.RefHypercube{sdim}, mesh.orders}()
+    @assert allequal(orders)
+    bern_ip = Bernstein{Ferrite.RefHypercube{sdim}, orders[1]}()
 
     #Cell values
     qr = Ferrite.QuadratureRule{Ferrite.RefHypercube{sdim}}(5)
@@ -68,7 +69,7 @@ function test_cube()
 end
 
 function test_square()
-    grid, cv, fv = _get_problem_data(:cube, (1,1,), (2,2,), cornerpos=(-1.0,-1.0), size=(2.0,3.0,))
+    grid, cv, fv = _get_problem_data(:hypercube, (1,1,), (2,2,), cornerpos=(-1.0,-1.0), size=(2.0,3.0,))
     addcellset!(grid, "all", (x)->true)
     addfaceset!(grid, "left", (x)-> x[1] ≈ -1.0)
     addfaceset!(grid, "right", (x)->x[1]≈1.0)

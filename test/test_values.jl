@@ -3,10 +3,13 @@
 function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pdim}, reorder) where {pdim,sdim}
 
     Ξ = nurbsmesh.knot_vectors
-
+    bspline = BSplineBasis(Ξ, nurbsmesh.orders)
+    
     nbasefuncs = length(nurbsmesh.IEN[:, cellid]) # number of basefunctions per cell
     B = zeros(Float64, nbasefuncs)
-    dBdξ = zeros(Vec{pdim,Float64}, nbasefuncs)
+    dBdξ = zeros(Tensor{1,pdim,Float64}, nbasefuncs)
+    dBdξ = zeros(Tensor{2,pdim,Float64}, nbasefuncs)
+
     for i in 1:nbasefuncs
         global_basefunk = nurbsmesh.IEN[i, cellid]
     
@@ -21,6 +24,7 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
 
         value = 1.0
         deriv = ones(Float64, pdim)
+        #ddN, dN, N = Tensors.hessian(x -> Ferrite.shape_value(bspline, x, iqp), Vec(ξηζ...), :all)
         for d in 1:pdim
             value *= IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
             for d2 in 1:pdim
@@ -33,8 +37,9 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
         end
         B[i] = value
         dBdξ[i] = Vec(Tuple(deriv)) ⋅ dξdξᴾ
+        #d²Bdξ²[i] = dξdξᴾ' ⋅ ddN ⋅ dξdξᴾ
     end
-    return B[reorder], dBdξ[reorder]
+    return B[reorder], dBdξ[reorder], d²Bdξ²[reorder]
 end
 
 @testset "bezier values construction" begin
@@ -47,7 +52,7 @@ end
     qr = QuadratureRule{shape}(1)
     qr_face = FaceQuadratureRule{shape}(1)
 
-    cv  = BezierCellValues( qr, ip, ip)
+    cv  = CellValues( qr, ip, ip)
     cv2 = BezierCellValues( CellValues(qr, bip, bip) )
     cv3 = CellValues( qr, ip, ip)
 
@@ -55,12 +60,12 @@ end
     @test cv.cv_bezier.M == cv3.cv_bezier.M
     @test cv3 isa BezierCellValues
 
-    cv_vector1 = BezierCellValues( qr, ip^sdim, ip )
+    cv_vector1 = CellValues( qr, ip^sdim, ip )
     cv_vector2 = BezierCellValues( CellValues(qr, bip^sdim, bip) )
     cv_vector3 = CellValues( qr, ip^sdim, ip )
 
-    @test cv_vector.cv_bezier.M == cv_vector2.cv_bezier.M
-    @test cv_vector.cv_bezier.M == cv_vector3.cv_bezier.M
+    @test cv_vector1.cv_bezier.M == cv_vector2.cv_bezier.M
+    @test cv_vector1.cv_bezier.M == cv_vector3.cv_bezier.M
     @test cv_vector3 isa BezierCellValues
 
     @test Ferrite.getngeobasefunctions(cv_vector1) == getnbasefunctions(ip)
@@ -73,9 +78,9 @@ end
 @testset "bezier values nurbs" begin
 
     dim = 2
-    orders = (2,2)
+    order = 2
     nels = (4,3)
-    nb_per_cell = prod(orders.+1)
+    nb_per_cell = (2+1)^dim
 
     ##
     # Build the problem
@@ -85,21 +90,22 @@ end
     grid = BezierGrid(nurbsmesh)
     shape = Ferrite.RefHypercube{dim}
 
-    ip = Bernstein{shape, orders}()
+    ip = IGAInterpolation{shape, order}()
+    bip = Bernstein{shape, order}()
 
-    reorder = IGA._bernstein_ordering(ip)
+    reorder = IGA._bernstein_ordering(bip)
 
     qr = QuadratureRule{shape}(1)
     qr_face = FaceQuadratureRule{shape}(3)
 
-    fv = BezierFaceValues( qr_face, ip, ip )
-    fv_vector = BezierFaceValues( qr_face, ip^dim, ip )
-    cv  = BezierCellValues( qr, ip, ip )
-    cv_vector = BezierCellValues( qr, ip^dim, ip)
+    fv = FaceValues( qr_face, ip, ip )
+    fv_vector = FaceValues( qr_face, ip^dim, ip )
+    cv  = CellValues( qr, ip, ip )
+    cv_vector = CellValues( qr, ip^dim, ip)
 
     #Try some different cells
     for cellnum in [1,4,5]
-        Xb, wb, X, w = get_bezier_coordinates(grid, cellnum)
+        #Xb, wb, X, w = get_bezier_coordinates(grid, cellnum)
         #C = get_extraction_operator(grid, cellnum)
         #X = get_nurbs_coordinates(grid, cellnum)
         #w = Ferrite.getweights(grid, cellnum)
@@ -111,7 +117,7 @@ end
         for (iqp, ξ) in enumerate(qr.points)
 
             #Calculate the value of the NURBS from the nurbs patch
-            N, dNdξ = bspline_values(nurbsmesh, cellnum, ξ, reorder)
+            N, dNdξ, d²Ndξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
 
             Wb = sum(N.*w)
             dWbdξ = sum(dNdξ.*w)
@@ -182,7 +188,7 @@ end
             qrw = qr_face.face_rules[faceidx].weights[iqp]
 
             #Calculate the value of the NURBS from the nurbs patch
-            N, dNdξ = bspline_values(nurbsmesh, cellnum, ξ, reorder)
+            N, dNdξ, d²Ndξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
 
             Wb = sum(N.*w)
             dWbdξ = sum(dNdξ.*w)

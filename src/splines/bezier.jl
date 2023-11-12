@@ -11,12 +11,8 @@ IGA, together with bezier extraction + BezierValues.
 """  
 struct Bernstein{shape, order} <: Ferrite.ScalarInterpolation{shape, order}
     function Bernstein{shape,order}() where {rdim, shape<:RefHypercube{rdim}, order} 
-        orders = order
-        if order isa Integer
-            orders = ntuple(i->order, rdim)
-        end
-        @assert length(orders) == rdim
-        return new{shape,orders}()
+        @assert order isa Int
+        return new{shape,order}()
     end
 end
 
@@ -27,13 +23,13 @@ Ferrite.adjust_dofs_during_distribution(::Bernstein{<:Any, 1}) = false
 # # #
 #   Bernstein line, order 2
 # # #
-Ferrite.getnbasefunctions(::Bernstein{RefLine,(2,)}) = 3
+Ferrite.getnbasefunctions(::Bernstein{RefLine,2}) = 3
 
-Ferrite.vertexdof_indices(::Bernstein{RefLine,(2,)}) = ((1,),(2,))
-Ferrite.facedof_indices(::Bernstein{RefLine,(2,)}) = ((1,), (2,))
-Ferrite.celldof_interior_indices(::Bernstein{RefLine,(2,)}) = (3,)
+Ferrite.vertexdof_indices(::Bernstein{RefLine,2}) = ((1,),(2,))
+Ferrite.facedof_indices(::Bernstein{RefLine,2}) = ((1,), (2,))
+Ferrite.celldof_interior_indices(::Bernstein{RefLine,2}) = (3,)
 
-function Ferrite.shape_value(ip::Bernstein{RefLine,(2,)}, _ξ::Vec{1}, i::Int)
+function Ferrite.shape_value(ip::Bernstein{RefLine,2}, _ξ::Vec{1}, i::Int)
     ξ = 0.5*(_ξ[1] + 1.0)
     i == 1 && return (1-ξ)^2
     i == 2 && return ξ^2
@@ -45,13 +41,13 @@ end
 # # #
 #   Bernstein Quadrilateral, order 2
 # # #
-Ferrite.getnbasefunctions(::Bernstein{RefQuadrilateral,(2,2)}) = 9
-Ferrite.vertexdof_indices(::Bernstein{RefQuadrilateral,(2,2)}) = ((1,),(2,),(3,),(4,))
-Ferrite.facedof_indices(::Bernstein{RefQuadrilateral,(2,2)}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
-Ferrite.facedof_interior_indices(::Bernstein{RefQuadrilateral,(2,2)}) = ((5,), (6,), (7,), (8,))
-Ferrite.celldof_interior_indices(::Bernstein{RefQuadrilateral,(2,2)}) = (9,)
+Ferrite.getnbasefunctions(::Bernstein{RefQuadrilateral,2}) = 9
+Ferrite.vertexdof_indices(::Bernstein{RefQuadrilateral,2}) = ((1,),(2,),(3,),(4,))
+Ferrite.facedof_indices(::Bernstein{RefQuadrilateral,2}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
+Ferrite.facedof_interior_indices(::Bernstein{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
+Ferrite.celldof_interior_indices(::Bernstein{RefQuadrilateral,2}) = (9,)
 
-function Ferrite.shape_value(ip::Bernstein{RefQuadrilateral,(2,2)}, _ξ::Vec{2}, i::Int)
+function Ferrite.shape_value(ip::Bernstein{RefQuadrilateral,2}, _ξ::Vec{2}, i::Int)
     ξ, η = _ξ
     i == 1 && return 0.0625((1 - η)^2)*((1 - ξ)^2)
     i == 2 && return 0.0625((1 + ξ)^2)*((1 - η)^2)
@@ -68,9 +64,9 @@ end
 # # #
 #   Bernstein Hexahedron, order 2
 # # #
-Ferrite.getnbasefunctions(::Bernstein{RefHexahedron,(2,2,2)}) = 27
+Ferrite.getnbasefunctions(::Bernstein{RefHexahedron,2}) = 27
 
-Ferrite.facedof_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
+Ferrite.facedof_indices(::Bernstein{RefHexahedron,2}) = (
     (1,4,3,2, 12,11,10,9, 21),
     (1,2,6,5, 9,18,13,17, 22),
     (2,3,7,6, 10,19,14,18, 23),
@@ -78,10 +74,10 @@ Ferrite.facedof_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
     (1,5,8,4, 17,16,20,12, 25),
     (5,6,7,8, 13,14,15,16, 26),
 )
-Ferrite.facedof_interior_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
+Ferrite.facedof_interior_indices(::Bernstein{RefHexahedron,2}) = (
     (21,), (22,), (23,), (24,), (25,), (26,),
 )
-Ferrite.edgedof_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
+Ferrite.edgedof_indices(::Bernstein{RefHexahedron,2}) = (
     (1,2, 9),
     (2,3, 10),
     (3,4, 11),
@@ -95,11 +91,11 @@ Ferrite.edgedof_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
     (3,7, 19),
     (4,8, 20),
 )
-Ferrite.edgedof_interior_indices(::Bernstein{RefHexahedron,(2,2,2)}) = (
+Ferrite.edgedof_interior_indices(::Bernstein{RefHexahedron,2}) = (
     (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
 )
 
-function Ferrite.shape_value(ip::Bernstein{RefHexahedron,(2,2,2)}, _ξ::Vec{3}, i::Int)
+function Ferrite.shape_value(ip::Bernstein{RefHexahedron,2}, _ξ::Vec{3}, i::Int)
     ξ, η, ζ = _ξ
     i == 1 && return 0.015625((1 - ζ)^2)*((1 - η)^2)*((1 - ξ)^2)
     i == 2 && return 0.015625((1 + ξ)^2)*((1 - ζ)^2)*((1 - η)^2)
@@ -168,25 +164,27 @@ function Ferrite.shape_value(ip::Bernstein, _ξ::Vec, i::Int)
     _compute_bezier_shape_value(ip,_ξ, i)
 end
 
-function _compute_bezier_shape_value(ip::Bernstein{shape,orders}, ξ::Vec{dim,T}, i::Int) where {shape,dim,orders,T} 
-    _n = orders .+ 1
+function _compute_bezier_shape_value(ip::Bernstein{shape,order}, ξ::Vec{dim,T}, i::Int) where {shape,dim,order,T} 
+    _n = ntuple(i->order+1, dim)
     ordering = _bernstein_ordering(ip)
     basefunction_indeces = CartesianIndices(_n)[ordering[i]]
 
     val = one(T)
     for i in 1:dim
-        val *= IGA._bernstein_basis_recursive(orders[i], basefunction_indeces[i], ξ[i])
+        val *= IGA._bernstein_basis_recursive(order, basefunction_indeces[i], ξ[i])
     end
     return val
 end
 
-function _compute_facedof_indices(ip::Bernstein{RefQuadrilateral,orders}) where {orders}
+function _compute_facedof_indices(ip::Bernstein{RefQuadrilateral,order}) where {order}
     faces = Tuple[]
+    orders = (order, order)
+
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
     #Order for 1d interpolation.
-    order_1d1 = _bernstein_ordering(Bernstein{RefLine,orders[1:1]}())
-    order_1d2 = _bernstein_ordering(Bernstein{RefLine,orders[2:2]}())
+    order_1d1 = _bernstein_ordering(Bernstein{RefLine,order}())
+    order_1d2 = _bernstein_ordering(Bernstein{RefLine,order}())
 
     push!(faces, Tuple(ind[:,1][order_1d1])) #bot
     push!(faces, Tuple(ind[end,:][order_1d2]))# right
@@ -196,12 +194,14 @@ function _compute_facedof_indices(ip::Bernstein{RefQuadrilateral,orders}) where 
     return Tuple(faces) 
 end
 
-function _compute_facedof_indices(ip::Bernstein{RefHexahedron,orders}) where {orders}
+function _compute_facedof_indices(ip::Bernstein{RefHexahedron,order}) where {order}
     faces = Tuple[]
+    orders = (order, order, order)
+
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
     
     #Order for 2d interpolation.
-    order_2d = _bernstein_ordering(Bernstein{RefQuadrilateral,first(orders)}())
+    order_2d = _bernstein_ordering(Bernstein{RefQuadrilateral,order}())
     
     push!(faces, Tuple(ind[:,:,1][order_2d])) # bottom
     push!(faces, Tuple(ind[:,1,:][order_2d]))   # front
@@ -213,12 +213,14 @@ function _compute_facedof_indices(ip::Bernstein{RefHexahedron,orders}) where {or
     return Tuple(faces)
 end
 
-function _compute_edgedof_indices(ip::Bernstein{RefHexahedron,orders}) where {orders}
+function _compute_edgedof_indices(ip::Bernstein{RefHexahedron,order}) where {order}
     edges = Tuple[]
+    orders = (order, order, order)
+
     ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
 
     #Order for 1d interpolation.
-    order_1d = _bernstein_ordering(Bernstein{1,orders[1:1]}())
+    order_1d = _bernstein_ordering(Bernstein{1,order}())
 
     # bottom
     push!(edges, Tuple(ind[:,1,1][order_1d]))
@@ -259,12 +261,12 @@ end
 # # #
 # Bernstein generation any order
 # # # 
-Ferrite.getnbasefunctions(::Bernstein{shape,orders}) where {shape, orders}= prod(orders.+1)
+Ferrite.getnbasefunctions(::Bernstein{shape,order}) where {rdim, shape <: AbstractRefShape{rdim}, order}= (order+1)^rdim
     
-function Ferrite.reference_coordinates(ip::Bernstein{shape,orders}) where {rdim, shape <: AbstractRefShape{rdim}, orders}
+function Ferrite.reference_coordinates(ip::Bernstein{shape,order}) where {rdim, shape <: AbstractRefShape{rdim}, order}
 
     T = Float64
-    nbasefunks_dim = orders .+ 1
+    nbasefunks_dim = ntuple(i->order+1, rdim)
     nbasefuncs = prod(nbasefunks_dim)
     
     coords = Vec{rdim,T}[]
@@ -288,8 +290,8 @@ end
 Return the ordering of the bernstein basis base-functions, from a "CartesianIndices-ordering".
 The ordering is the same as in VTK: https://blog.kitware.com/wp-content/uploads/2020/03/Implementation-of-rational-Be%CC%81zier-cells-into-VTK-Report.pdf.
 """
-function _bernstein_ordering(::Bernstein{RefLine, orders}) where {orders}
-    ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)
+function _bernstein_ordering(::Bernstein{RefLine, order}) where {order}
+    ind = reshape(1:prod(order+1), order+1)
     ordering = Int[]
 
     # Corners
@@ -302,7 +304,8 @@ function _bernstein_ordering(::Bernstein{RefLine, orders}) where {orders}
     return ordering
 end
 
-function _bernstein_ordering(::Bernstein{RefQuadrilateral,orders}) where {orders}
+function _bernstein_ordering(::Bernstein{RefQuadrilateral,order}) where {order}
+    orders = (order, order)
     ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)
     ordering = Int[]
 
@@ -324,8 +327,8 @@ function _bernstein_ordering(::Bernstein{RefQuadrilateral,orders}) where {orders
     return ordering
 end
 
-function _bernstein_ordering(::Bernstein{RefHexahedron, orders}) where {orders}
-
+function _bernstein_ordering(::Bernstein{RefHexahedron, order}) where {order}
+    orders = (order, order, order)
     ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)
     ordering = Int[]
     
@@ -382,8 +385,8 @@ function _vtk_ordering(c::BezierCell{RefQuadrilateral})
     _bernstein_ordering(c)
 end
 
-function _vtk_ordering(::BezierCell{RefHexahedron, orders}) where {orders}
-    @assert(length(orders) == 3)
+function _vtk_ordering(::BezierCell{RefHexahedron, order}) where {order}
+    orders = (order, order, order)
 
     ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)
 

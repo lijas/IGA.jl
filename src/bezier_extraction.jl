@@ -113,7 +113,8 @@ Computes the bezier extraction operator in each parametric direction, and uses t
 
 		#Reorder
 		#
-		ordering = _bernstein_ordering(Bernstein{RefHypercube{pdim}, orders}())
+		@assert allequal(orders)
+		ordering = _bernstein_ordering(Bernstein{RefHypercube{pdim}, orders[1]}())
 		nel = prod(nels)
 		C_reorder = Vector{eltype(first(Ce))}()
 		for i in 1:nel
