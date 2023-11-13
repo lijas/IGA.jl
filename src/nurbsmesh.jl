@@ -42,7 +42,7 @@ struct NURBSMesh{pdim,sdim,T} #<: Ferrite.AbstractGrid
 end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::NURBSMesh)
-    print(io, "$(typeof(NURBSMesh)) and with order $(grid.orders) and $(getncells(grid)) cells and $(getnnodes(grid)) nodes (contorl points) ")
+    print(io, "NURBSMesh and with order $(grid.orders) and $(getncells(grid)) cells and $(getnnodes(grid)) nodes (control points) ")
 end
 
 Ferrite.getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
