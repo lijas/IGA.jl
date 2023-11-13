@@ -8,7 +8,7 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
     nbasefuncs = length(nurbsmesh.IEN[:, cellid]) # number of basefunctions per cell
     B = zeros(Float64, nbasefuncs)
     dBdξ = zeros(Tensor{1,pdim,Float64}, nbasefuncs)
-    dBdξ = zeros(Tensor{2,pdim,Float64}, nbasefuncs)
+    d²Bdξ² = zeros(Tensor{2,pdim,Float64}, nbasefuncs)
 
     for i in 1:nbasefuncs
         global_basefunk = nurbsmesh.IEN[i, cellid]
@@ -24,7 +24,7 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
 
         value = 1.0
         deriv = ones(Float64, pdim)
-        #ddN, dN, N = Tensors.hessian(x -> Ferrite.shape_value(bspline, x, iqp), Vec(ξηζ...), :all)
+        #ddN, dN, N = Tensors.hessian(x -> Ferrite.shape_value(bspline, x, i), Vec(ξηζ...), :all)
         for d in 1:pdim
             value *= IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
             for d2 in 1:pdim
@@ -35,8 +35,8 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
                 end
             end
         end
-        B[i] = value
-        dBdξ[i] = Vec(Tuple(deriv)) ⋅ dξdξᴾ
+        B[i] = N
+        dBdξ[i] = vec(Tuple(deriv)) ⋅ dξdξᴾ
         #d²Bdξ²[i] = dξdξᴾ' ⋅ ddN ⋅ dξdξᴾ
     end
     return B[reorder], dBdξ[reorder], d²Bdξ²[reorder]
@@ -105,7 +105,7 @@ end
 
     #Try some different cells
     for cellnum in [1,4,5]
-        #Xb, wb, X, w = get_bezier_coordinates(grid, cellnum)
+        Xb, wb, X, w = get_bezier_coordinates(grid, cellnum)
         #C = get_extraction_operator(grid, cellnum)
         #X = get_nurbs_coordinates(grid, cellnum)
         #w = Ferrite.getweights(grid, cellnum)
@@ -113,6 +113,7 @@ end
         bc = getcoordinates(grid, cellnum)
         reinit!(cv, bc)
         reinit!(cv_vector, bc)
+      #  (; xb, wb, x, w) = bc
 
         for (iqp, ξ) in enumerate(qr.points)
 
@@ -247,9 +248,9 @@ end
 @testset "bezier values give NaN" begin
 
     dim = 2
-    orders = (2,2)
+    order = 2
     nels = (4,3)
-    nb_per_cell = prod(orders.+1)
+    nb_per_cell = (order+1)^dim
 
     ##
     # Build the problem
@@ -257,9 +258,9 @@ end
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
 
     grid = BezierGrid(nurbsmesh)
-    ip = Bernstein{Ferrite.RefHypercube{dim}, orders}()
+    ip = Bernstein{Ferrite.RefHypercube{dim}, order}()
     qr = QuadratureRule{Ferrite.RefHypercube{dim}}(3)
-    cv  = BezierCellValues(qr, ip, ip)
+    cv  = BezierCellValues(CellValues(qr, ip, ip))
 
     Xb, wb = get_bezier_coordinates(grid, 1)
     w = Ferrite.getweights(grid, 1)

@@ -98,7 +98,7 @@ Returns the weights (for the nurbs interpolation) for cell with id `cellid`.
 end
 
 @inline function getweights!(w::Vector{T}, grid::BezierGrid, cell::Ferrite.AbstractCell) where {T}
-    @inbounds for i in 1:length(w)
+    for i in 1:length(w)
         w[i] = grid.weights[cell.nodes[i]]
     end
     return w

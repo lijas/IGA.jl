@@ -80,13 +80,13 @@ function BezierCellValues(cv::Ferrite.CellValues)
     end
 
     n_geom_basefuncs = getnbasefunctions(cv.gip)
-    n_func_basefuncs = getnbasefunctions(cv.gip)
+    n_func_basefuncs = getnbasefunctions(cv.ip)
     n_qpoints        = getnquadpoints(cv)
     d²MdX² = fill(zero(d²MdX²_t) * T(NaN), n_geom_basefuncs, n_qpoints)
     d²NdX² = fill(zero(d²NdX²_t) * T(NaN), n_func_basefuncs, n_qpoints)
 
     for (qp, ξ) in pairs(Ferrite.getpoints(cv.qr))
-        for ib in 1:n_func_basefuncs
+        for ib in 1:n_geom_basefuncs
             d²MdX²[ib, qp] = Tensors.hessian(ξ -> shape_value(cv.gip, ξ, ib), ξ)
         end
         for ib in 1:n_func_basefuncs
@@ -96,8 +96,8 @@ function BezierCellValues(cv::Ferrite.CellValues)
 
     return BezierCellValues(
         cv, d²MdX², d²NdX², 
-        deepcopy(cv), copy(d²NdX²), copy(d²NdX²) ,
-        deepcopy(cv), copy(d²NdX²), copy(d²NdX²) ,
+        deepcopy(cv), deepcopy(d²NdX²), deepcopy(d²NdX²) ,
+        deepcopy(cv), deepcopy(d²NdX²), deepcopy(d²NdX²) ,
         undef_beo, undef_w)
 end
 
@@ -123,13 +123,13 @@ function BezierFaceValues(cv::Ferrite.FaceValues)
     end
 
     n_geom_basefuncs = getnbasefunctions(cv.geo_interp)
-    n_func_basefuncs = getnbasefunctions(cv.geo_interp)
+    n_func_basefuncs = getnbasefunctions(cv.func_interp)
     n_qpoints        = getnquadpoints(cv.qr, 1)
     d²MdX² = fill(zero(d²MdX²_t) * T(NaN), n_geom_basefuncs, n_qpoints, nfaces)
     d²NdX² = fill(zero(d²NdX²_t) * T(NaN), n_func_basefuncs, n_qpoints, nfaces)
 
     for (qp, ξ) in pairs(Ferrite.getpoints(cv.qr, 1)), iface in 1:nfaces
-        for ib in 1:n_func_basefuncs
+        for ib in 1:n_geom_basefuncs
             d²MdX²[ib, qp, iface] = Tensors.hessian(ξ -> shape_value(cv.geo_interp, ξ, ib), ξ)
         end
         for ib in 1:n_func_basefuncs
@@ -370,6 +370,7 @@ end
 
 function Ferrite.reinit!(bcv::BezierCellValues, xb::AbstractVector{<:Vec})#; updateflags = CellValuesFlags())
     #Ferrite.reinit!(bcv.cv_bezier, xb) #call the normal reinit function first
+    @assert bcv.current_w .== 1.0 |> all
     _reinit_nurbs!(
         bcv.cv_tmp, bcv.cv_bezier,
         bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
@@ -405,8 +406,8 @@ function Ferrite.reinit!(bcv::BezierCellValues, bc::BezierCoords)
     _reinit_nurbs!(
         bcv.cv_tmp, bcv.cv_bezier,
         bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
-        bc.xb, bcv.current_w, 1) 
-    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bc.beo[], bc.w, 1)
+        bc.xb, bc.wb, 1) 
+    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bc.beo[], bcv.current_w, 1)
     _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, 1)
 end
 
@@ -449,7 +450,7 @@ function _reinit_nurbs!(
     !is_vector_valued && @assert eltype(d²Bdξ²_func) <: Tensor{2}
 
     qrweights = cv_bezier isa Ferrite.FaceValues ? Ferrite.getweights(cv_bezier.qr, cb) : Ferrite.getweights(cv_bezier.qr)
-    @inbounds for (i,qr_w) in pairs(qrweights)
+    for (i,qr_w) in pairs(qrweights)
 
         W = zero(T)
         dWdξ = zero(Vec{dim,T})
