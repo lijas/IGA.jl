@@ -24,13 +24,13 @@ end
 getnbasefunctions_dim(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = ntuple(i -> length(basis.knot_vector[i]) - order[i] - 1, dim)
 Ferrite.getnbasefunctions(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = prod(getnbasefunctions_dim(basis))
 
-function Ferrite.shape_value(b::BSplineBasis{dim,T,order}, xi::Vec{dim}, i::Int) where {dim,T,order}
+function Ferrite.shape_value(b::BSplineBasis{dim,T,order}, xi::Vec{dim,T2}, i::Int) where {dim,T,T2,order}
     @assert( i <= Ferrite.getnbasefunctions(b))
 
     _n = getnbasefunctions_dim(b)
     
     indecies = CartesianIndices(_n)[i]
-    val = 1.0
+    val = one(T2)
     for i in 1:dim
         val *= IGA._bspline_basis_value_alg1(order[i], b.knot_vector[i], indecies[i], xi[i])
     end

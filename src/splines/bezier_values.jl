@@ -330,8 +330,11 @@ function _cellvalues_bezier_extraction_higher_order!(
     Cbe::BezierExtractionOperator{T}, w::Optional{Vector{T}}, faceid::Int) where {T, dim_s, d²Ndξ²_t <: Tensor{<:Any,dim_s}}
 
     is_scalar_valued = !(eltype(d²Ndξ²_nurbs) <: Tensor{3})
+    ngeobasefunctions = size(d²Ndξ²_nurbs, 1)
 
-    ngeobasefunctions = size(d²Ndξ²_nurbs, 1) ÷ dim_s
+    if !is_scalar_valued
+        ngeobasefunctions ÷= dim_s
+    end
     n_quad_ponts      = size(d²Ndξ²_nurbs, 2)
 
     for iq in 1:n_quad_ponts
@@ -458,6 +461,7 @@ function _reinit_nurbs!(
         for j in 1:n_geom_basefuncs
             W += w[j]*B[j, i, cb]
             dWdξ += w[j]*dBdξ[j, i, cb]
+            #d²Wdξ² += w[j]*d²Bdξ²_geom[j, i, cb]
         end
 
         J = zero(Tensor{2,dim})
@@ -501,8 +505,10 @@ function _reinit_nurbs!(
         Jinv = inv(J)
         for j in 1:n_func_basefuncs
             cv_nurbs.dNdx[j, i, cb] = cv_nurbs.dNdξ[j, i, cb] ⋅ Jinv
-            #@assert isapprox(norm(H), 0.0; atol = 1e-15)
-            d²NdX²_nurbs[j, i, cb]  = Jinv' ⋅ d²Ndξ²_nurbs[j, i, cb] ⋅ Jinv
+            #@assert isapprox(norm(H), 0.0; atol = 1e-14)
+            #d²NdX²_nurbs[j, i, cb]  = Jinv' ⋅ d²Ndξ²_nurbs[j, i, cb] ⋅ Jinv
+            FF = cv_nurbs.dNdx[j, i, cb] ⋅ H
+            d²NdX²_nurbs[j, i, cb] = Jinv' ⋅ d²Ndξ²_nurbs[j, i, cb] ⋅ Jinv - Jinv'⋅FF⋅Jinv
         end
     end
 end
