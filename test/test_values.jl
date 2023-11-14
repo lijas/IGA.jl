@@ -186,7 +186,7 @@ end
         end
     end
     
-    addfaceset!(grid, "face1", (x)-> x[1] == -40.0)
+    addfaceset!(grid, "face1", (x)-> x[1] == -4.0)
     for (cellnum, faceidx) in getfaceset(grid, "face1")
 
         Xb, wb = get_bezier_coordinates(grid, cellnum)
@@ -204,35 +204,33 @@ end
             qrw = qr_face.face_rules[faceidx].weights[iqp]
 
             #Calculate the value of the NURBS from the nurbs patch
-            N, dNdξ, d²Ndξ², R2, dR2dξ, d²R2dξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
+            R, dRdξ, d²Rdξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
 
-            Wb = sum(N.*w)
-            dWbdξ = sum(dNdξ.*w)
-            R_patch = w.*N/Wb
-            
-            dRdξ_patch = similar(dNdξ)
-            for i in 1:nb_per_cell
-                dRdξ_patch[i] = w[i]*(1/Wb * dNdξ[i] - inv(Wb^2)*dWbdξ * N[i])
-            end
+            #Calculate the value of the NURBS from the nurbs patch
+            R, dRdξ, d²Rdξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
 
-            J = sum(X .⊗ dRdξ_patch)
+            J = sum(x .⊗ dRdξ)
+            H = sum(x .⊗ d²Rdξ²)
             dV_patch = norm(Ferrite.weighted_normal(J, shape, faceidx))*qrw
 
-            dRdX_patch = similar(dNdξ)
+            dRdX = similar(dRdξ)
             for i in 1:nb_per_cell
-                dRdX_patch[i] = dRdξ_patch[i] ⋅ inv(J)
+                dRdX[i] = dRdξ[i] ⋅ inv(J)
+            end 
+
+            d²RdX² = similar(d²Rdξ²)
+            for i in 1:nb_per_cell
+                FF = dRdX[i] ⋅ H
+                d²RdX²[i] = inv(J)' ⋅ d²Rdξ²[i] ⋅ inv(J) - inv(J)' ⋅ FF ⋅ inv(J)
             end 
 
             @test dV_patch ≈ getdetJdV(cv, iqp)
-            @test sum(cv.cv_nurbs.N[:,iqp]) ≈ 1
-            @test cv.cv_nurbs.N[:,iqp] ≈ R_patch
-            @test cv.cv_nurbs.dNdξ[:,iqp] ≈ dRdξ_patch
-            @test R2 ≈ R_patch
-            @test dR2dξ ≈ dRdξ_patch
-            @test cv.cv_nurbs.dNdx[:,iqp] ≈ dRdX_patch
-            @test d²R2dξ² ≈ d²Ndξ² atol=1e-14
-            @test cv.d²Ndξ²[:,iqp] ≈ d²Ndξ² atol=1e-14
-            @test cv.d²NdX²[:,iqp] ≈ d²RdX² atol=1e-14
+            @test sum(fv.cv_nurbs.N[:,iqp]) ≈ 1
+            @test fv.cv_nurbs.N[:,iqp] ≈ R
+            @test fv.cv_nurbs.dNdξ[:,iqp] ≈ dRdξ
+            @test fv.cv_nurbs.dNdx[:,iqp] ≈ dRdX
+            @test fv.d²Ndξ²[:,iqp] ≈ d²Rdξ² atol=1e-14
+            @test fv.d²NdX²[:,iqp] ≈ d²RdX²  atol=1e-14
 
             #Check if VectorValues is same as ScalarValues
             basefunc_count = 1
