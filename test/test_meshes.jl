@@ -32,15 +32,15 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
     grid = BezierGrid(mesh)
 
     @assert allequal(orders)
-    bern_ip = Bernstein{Ferrite.RefHypercube{sdim}, orders[1]}()
+    bern_ip = IGAInterpolation{Ferrite.RefHypercube{sdim}, orders[1]}()
 
     #Cell values
     qr = Ferrite.QuadratureRule{Ferrite.RefHypercube{sdim}}(5)
-    cv = IGA.BezierCellValues(qr, bern_ip, bern_ip) 
+    cv = CellValues(qr, bern_ip, bern_ip)
 
     #Face values
     qr = FaceQuadratureRule{Ferrite.RefHypercube{sdim}}(5)
-    fv = IGA.BezierFaceValues(qr, bern_ip, bern_ip)
+    fv = FaceValues(qr, bern_ip, bern_ip)
 
     return grid, cv, fv
 end

@@ -44,19 +44,14 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
             end
             return _Nvec[i]*_wvec[i]/W
         end
-
-        _ddN, _dN, _N = Tensors.hessian(x->__bspline_shape_value__(x, _ni, ni, Ξ, nurbsmesh), xi, :all)
+        
         _ddR, _dR, _R = Tensors.hessian(x->__nurbs_shape_value__(x), xi, :all)
-
-        d²Ndξ²[i] = _ddN
-        dNdξ[i] = _dN
-        N[i] = _N
 
         d²Rdξ²[i] = _ddR
         dRdξ[i] = _dR
         R[i] = _R
     end
-    return N[reorder], dNdξ[reorder], d²Ndξ²[reorder], R[reorder], dRdξ[reorder], d²Rdξ²[reorder]
+    return R[reorder], dRdξ[reorder], d²Rdξ²[reorder]
 end
 
 @testset "bezier values construction" begin
@@ -104,7 +99,7 @@ end
     ##
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
     #nurbsmesh = generate_nurbs_patch(:rectangle, nels, (order,order), size = (20.0,20.0))
-    nurbsmesh.weights .= 1.0
+    #nurbsmesh.weights .= 1.0
 
     grid = BezierGrid(nurbsmesh)
     shape = Ferrite.RefHypercube{dim}
@@ -131,47 +126,36 @@ end
         bc = getcoordinates(grid, cellnum)
         reinit!(cv, bc)
         reinit!(cv_vector, bc)
+        @show cv.current_w
         (; xb, wb, x, w) = bc
 
         for (iqp, ξ) in enumerate(qr.points)
 
             #Calculate the value of the NURBS from the nurbs patch
-            N, dNdξ, d²Ndξ², R2, dR2dξ, d²R2dξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
+            R, dRdξ, d²Rdξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
 
-            Wb = sum(N.*w)
-            dWbdξ = sum(dNdξ.*w)
-            R_patch = w.*N/Wb
-            
-            dRdξ_patch = similar(dNdξ)
-            for i in 1:nb_per_cell
-                dRdξ_patch[i] = w[i]*(1/Wb * dNdξ[i] - inv(Wb^2)*dWbdξ * N[i])
-            end
-
-            J = sum(x .⊗ dRdξ_patch)
-            H = sum(x .⊗ d²R2dξ²)
+            J = sum(x .⊗ dRdξ)
+            H = sum(x .⊗ d²Rdξ²)
             dV_patch = det(J)*qr.weights[iqp]
 
-            dRdX_patch = similar(dNdξ)
+            dRdX = similar(dRdξ)
             for i in 1:nb_per_cell
-                dRdX_patch[i] = dRdξ_patch[i] ⋅ inv(J)
+                dRdX[i] = dRdξ[i] ⋅ inv(J)
             end 
-            
-            d²RdX² = similar(d²R2dξ²)
+
+            d²RdX² = similar(d²Rdξ²)
             for i in 1:nb_per_cell
-                FF = dRdX_patch[i] ⋅ H
-                d²RdX²[i] = inv(J)' ⋅ d²R2dξ²[i] ⋅ inv(J) - inv(J)' ⋅ FF ⋅ inv(J)
+                FF = dRdX[i] ⋅ H
+                d²RdX²[i] = inv(J)' ⋅ d²Rdξ²[i] ⋅ inv(J) - inv(J)' ⋅ FF ⋅ inv(J)
             end 
 
             @test dV_patch ≈ getdetJdV(cv, iqp)
             @test sum(cv.cv_nurbs.N[:,iqp]) ≈ 1
-            @test cv.cv_nurbs.N[:,iqp] ≈ R_patch
-            @test cv.cv_nurbs.dNdξ[:,iqp] ≈ dRdξ_patch
-            @test R2 ≈ R_patch
-            @test dR2dξ ≈ dRdξ_patch
-            @test cv.cv_nurbs.dNdx[:,iqp] ≈ dRdX_patch
-            @test d²R2dξ² ≈ d²Ndξ² atol=1e-14
-            @test cv.d²Ndξ²[:,iqp] ≈ d²Ndξ² atol=1e-14
-            @test cv.d²NdX²[:,iqp] ≈ d²RdX² atol=1e-14
+            @test cv.cv_nurbs.N[:,iqp] ≈ R
+            @test cv.cv_nurbs.dNdξ[:,iqp] ≈ dRdξ
+            @test cv.cv_nurbs.dNdx[:,iqp] ≈ dRdX
+            @test cv.d²Ndξ²[:,iqp] ≈ d²Rdξ² atol=1e-14
+            @test cv.d²NdX²[:,iqp] ≈ d²RdX²  atol=1e-14
 
             #Check if VectorValues is same as ScalarValues
             basefunc_count = 1
@@ -181,19 +165,19 @@ end
                     N_comp[comp] = cv.cv_nurbs.N[i, iqp]
                     _N = Vec{dim,Float64}((N_comp...,))
                     
-                    @test cv_vector.cv_nurbs.N[basefunc_count, iqp] ≈ _N
+                    @test cv_vector.cv_nurbs.N[basefunc_count, iqp] ≈ _N atol = 1e-15
                     
                     dN_comp = zeros(Float64, dim, dim)
                     dN_comp[comp, :] = cv.cv_nurbs.dNdξ[i, iqp]
                     _dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
                     
-                    @test cv_vector.cv_nurbs.dNdξ[basefunc_count, iqp] ≈ _dNdξ
+                    @test cv_vector.cv_nurbs.dNdξ[basefunc_count, iqp] ≈ _dNdξ atol = 1e-15
 
                     dN_comp = zeros(Float64, dim, dim)
                     dN_comp[comp, :] = cv.cv_nurbs.dNdx[i, iqp]
                     _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
                     
-                    @test cv_vector.cv_nurbs.dNdx[basefunc_count, iqp] ≈ _dNdx
+                    @test cv_vector.cv_nurbs.dNdx[basefunc_count, iqp] ≈ _dNdx atol = 1e-15
 
                     basefunc_count += 1
                 end

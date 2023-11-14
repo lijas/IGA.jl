@@ -412,7 +412,7 @@ function Ferrite.reinit!(bcv::BezierCellValues, bc::BezierCoords)
         bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
         bc.xb, bc.wb, 1) 
     _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bc.beo[], bcv.current_w, 1)
-    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, 1)
+    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], bcv.current_w, 1)
 end
 
 function Ferrite.reinit!(bcv::BezierFaceValues, bc::BezierCoords, faceid::Int)
@@ -423,7 +423,7 @@ function Ferrite.reinit!(bcv::BezierFaceValues, bc::BezierCoords, faceid::Int)
     _reinit_nurbs!(
         bcv.cv_tmp, bcv.cv_bezier,
         bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
-        bc.xb, bcv.current_w, faceid) 
+        bc.xb, bc.wb, faceid) 
     _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bc.beo[], bc.w, faceid)
     _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, 1)
 end
@@ -446,6 +446,7 @@ function _reinit_nurbs!(
     @assert length(xᴮ) == n_geom_basefuncs == length(w)
     @assert typeof(cv_nurbs) == typeof(cv_bezier)
 
+    hessian = true
     B =  cv_bezier.M
     dBdξ = cv_bezier.dMdξ
 
@@ -458,36 +459,70 @@ function _reinit_nurbs!(
 
         W = zero(T)
         dWdξ = zero(Vec{dim,T})
+        d²Wdξ² = zero(Tensor{2,dim,T})
         for j in 1:n_geom_basefuncs
-            W += w[j]*B[j, i, cb]
-            dWdξ += w[j]*dBdξ[j, i, cb]
-            #d²Wdξ² += w[j]*d²Bdξ²_geom[j, i, cb]
+            W      += w[j]*B[j, i, cb]
+            dWdξ   += w[j]*dBdξ[j, i, cb]
+            d²Wdξ² += w[j]*d²Bdξ²_geom[j, i, cb]
         end
 
         J = zero(Tensor{2,dim})
         H = zero(Tensor{3,dim})
         for j in 1:n_geom_basefuncs
-            #
-            R = B[j, i, cb]./W
-            dRdξ = inv(W)*dBdξ[j, i, cb] - inv(W^2)* dWdξ * B[j, i, cb]
+            S = W^2
+            Fi = dBdξ[j, i, cb]*W - B[j, i, cb]*dWdξ
+            dRdξ = Fi/S
 
             #Jacobian
             J += xᴮ[j] ⊗ (w[j]*dRdξ)
 
             #Hessian
-            #NOTE: assume weights == 1.0
-            d²Rdξ² = d²Bdξ²_geom[j, i, cb] 
-            H += xᴮ[j] ⊗ (d²Rdξ²)
+            if hessian
+                Fi_j = (d²Bdξ²_geom[j, i, cb]*W + dBdξ[j, i, cb]⊗dWdξ) - (dWdξ⊗dBdξ[j, i, cb] + B[j, i, cb]*d²Wdξ²)
+                S_j = 2*W*dWdξ
+
+                d²Rdξ² = (Fi_j*S - Fi⊗S_j)/S^2
+                H += xᴮ[j] ⊗ (w[j]*d²Rdξ²)
+            end
         end
 
         #Store nurbs
         for j in 1:n_func_basefuncs
             if is_vector_valued
                 cv_nurbs.dNdξ[j, i, cb] = inv(W)*cv_bezier.dNdξ[j, i, cb] - inv(W^2) * cv_bezier.N[j, i, cb] ⊗ dWdξ
-                d²Ndξ²_nurbs[j, i, cb] = d²Bdξ²_func[j, i, cb] 
+                
+                if hessian
+                    _B = cv_bezier.N[j, i, cb]
+                    _dBdξ = cv_bezier.dNdξ[j, i, cb]
+                    _d²Bdξ² = d²Bdξ²_func[j, i, cb]
+                    tmp = _dBdξ⊗dWdξ
+                    tmp = permutedims(tmp, (1,3,2))
+                    tmp = Tensor{3,dim}(tmp)
+
+                    Fij = _dBdξ*W - _B⊗dWdξ
+                    S = W^2
+                    Fij_k = (_d²Bdξ²*W + _dBdξ⊗dWdξ) - (tmp + _B⊗d²Wdξ²)
+                    S_k = 2*W*dWdξ
+                        
+                    d²Ndξ²_nurbs[j, i, cb] = (Fij_k*S - Fij⊗S_k)/S^2
+                end
             else
-                cv_nurbs.dNdξ[j, i, cb] = inv(W)*cv_bezier.dNdξ[j, i, cb] - inv(W^2) * cv_bezier.N[j, i, cb] * dWdξ
-                d²Ndξ²_nurbs[j, i, cb] = d²Bdξ²_func[j, i, cb] 
+                _B = cv_bezier.N[j, i, cb]
+                _dBdξ = cv_bezier.dNdξ[j, i, cb]
+                S = W^2
+                Fi = _dBdξ*W - _B⊗dWdξ
+                #cv_nurbs.dNdξ[j, i, cb] = inv(W)*cv_bezier.dNdξ[j, i, cb] - inv(W^2) * cv_bezier.N[j, i, cb] * dWdξ
+                cv_nurbs.dNdξ[j, i, cb] = Fi/S
+
+                if hessian
+                    _d²Bdξ² = d²Bdξ²_func[j, i, cb]
+                    S = W^2
+                    Fi = _dBdξ*W - _B⊗dWdξ
+                    Fi_j = (_d²Bdξ²*W + _dBdξ⊗dWdξ) - (dWdξ⊗_dBdξ + _B⊗d²Wdξ²)
+                    S_j = 2*W*dWdξ
+                    d²Ndξ²_nurbs[j, i, cb] = (Fi_j*S - Fi⊗S_j)/S^2
+                end
+
             end
             cv_nurbs.N[j,i,cb] = cv_bezier.N[j, i, cb]/W
         end
