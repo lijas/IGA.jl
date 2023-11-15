@@ -51,6 +51,9 @@ struct BezierFaceValues{T<:Real,CV<:Ferrite.FaceValues, d²MdX²_t, d²NdX²_t} 
     current_w::Vector{T}
 end
 
+Ferrite.shape_value_type(cv::Union{BezierCellValues, BezierFaceValues}) = Ferrite.shape_value_type(cv.cv_bezier)
+Ferrite.shape_gradient_type(cv::Union{BezierCellValues, BezierFaceValues}) = Ferrite.shape_gradient_type(cv.cv_bezier)
+
 BezierCellAndFaceValues{T,CV} = Union{BezierCellValues{T,CV}, BezierFaceValues{T,CV}}
 
 function Ferrite.checkface(fv::BezierFaceValues, face::Int)
@@ -59,6 +62,7 @@ function Ferrite.checkface(fv::BezierFaceValues, face::Int)
 end
 
 Ferrite.nfaces(fv::BezierFaceValues) = size(fv.cv_nurbs.N, 3)
+Ferrite.getnormal(fv::BezierFaceValues, iqp::Int) = getnormal(fv.cv_bezier, iqp)
 
 function BezierCellValues(cv::Ferrite.CellValues)
     T = eltype(cv.M)
@@ -224,6 +228,8 @@ Ferrite.geometric_value(cv::BezierCellAndFaceValues, q_point::Int, i::Int) = Fer
 Ferrite.shape_gradient(bcv::BezierCellAndFaceValues, q_point::Int, i::Int) = Ferrite.shape_gradient(bcv.cv_nurbs, q_point, i)
 Ferrite.geometric_value(cv::BezierCellValues, q_point::Int, base_func::Int) = cv.cv_bezier.M[base_func, q_point]
 Ferrite.geometric_value(cv::BezierFaceValues, q_point::Int, base_func::Int) = cv.cv_bezier.M[base_func, q_point, cv.cv_bezier.current_face[]]
+shape_hessian(bv::BezierFaceValues, q_point::Int, base_func::Int) = bv.d²NdX²[base_func, q_point, bv.cv_bezier.current_face[]]
+shape_hessian(bv::BezierCellValues, q_point::Int, base_func::Int) = bv.d²NdX²[base_func, q_point]
 
 function Ferrite.function_symmetric_gradient(bv::BezierCellAndFaceValues, q_point::Int, u::AbstractVector)
     return function_symmetric_gradient(bv.cv_nurbs, q_point, u)
@@ -236,6 +242,22 @@ function Ferrite.function_gradient(fe_v::BezierCellAndFaceValues, q_point::Int, 
 end
 function Ferrite.function_value(fe_v::BezierCellAndFaceValues, q_point::Int, u::AbstractVector)
     return function_value(fe_v.cv_nurbs, q_point, u)
+end
+
+# TODO: Deprecate this, nobody is using this in practice...
+function function_hessian(fe_v::Ferrite.AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(u) == n_base_funcs || Ferrite.throw_incompatible_dof_length(length(u), n_base_funcs)
+    @boundscheck Ferrite.checkquadpoint(fe_v, q_point)
+    hess = function_hessian_init(fe_v, u)
+    @inbounds for i in 1:n_base_funcs
+        hess += u[i] ⊗ shape_hessian(fe_v, q_point, i)
+    end
+    return hess
+end
+shape_hessian_type(::Union{BezierCellValues{<:Any, <:Any, <:Any, d²NdX²_t}, BezierFaceValues{<:Any, <:Any, <:Any, d²NdX²_t}}) where d²NdX²_t = d²NdX²_t
+function function_hessian_init(cv::Ferrite.AbstractValues, ::AbstractVector{T}) where {T}
+    return zero(shape_hessian_type(cv)) * zero(T)
 end
 
 function set_bezier_operator!(bcv::BezierCellAndFaceValues, beo::BezierExtractionOperator{T}) where T 
@@ -374,21 +396,29 @@ end
 
 function Ferrite.reinit!(bcv::BezierCellValues, xb::AbstractVector{<:Vec})#; updateflags = CellValuesFlags())
     #Ferrite.reinit!(bcv.cv_bezier, xb) #call the normal reinit function first
-    @assert bcv.current_w .== 1.0 |> all
+    @assert all(bcv.current_w .== 1.0)
+    wb = bcv.current_w
     _reinit_nurbs!(
         bcv.cv_tmp, bcv.cv_bezier,
         bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
-        xb, bcv.current_w, 1) 
-    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_bezier, bcv.current_beo[], nothing, 1)
+        xb, wb, 1) 
+    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bcv.current_beo[], nothing, 1)
     _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, 1)
 end
 
 function Ferrite.reinit!(bcv::BezierFaceValues, xb::AbstractVector{<:Vec}, faceid::Int) 
-    Ferrite.reinit!(bcv.cv_bezier, xb, faceid) #call the normal reinit function first
+    @assert all(bcv.current_w .== 1.0)
     bcv.cv_nurbs.current_face[]  = faceid
     bcv.cv_bezier.current_face[] = faceid
 
-    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_bezier, bcv.current_beo[], nothing, faceid)
+    wb = bcv.current_w # borrow
+    _reinit_nurbs!(
+        bcv.cv_tmp, bcv.cv_bezier,
+        bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
+        xb, wb, faceid) 
+    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bcv.current_beo[], nothing, faceid)
+    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, faceid)
+
 end
 
 function Ferrite.reinit!(bcv::BezierCellValues, (xb, wb)::CoordsAndWeight)
@@ -463,7 +493,9 @@ function _reinit_nurbs!(
         for j in 1:n_geom_basefuncs
             W      += w[j]*B[j, i, cb]
             dWdξ   += w[j]*dBdξ[j, i, cb]
-            d²Wdξ² += w[j]*d²Bdξ²_geom[j, i, cb]
+            if hessian
+                d²Wdξ² += w[j]*d²Bdξ²_geom[j, i, cb]
+            end
         end
 
         J = zero(Tensor{2,dim})
@@ -542,8 +574,10 @@ function _reinit_nurbs!(
             cv_nurbs.dNdx[j, i, cb] = cv_nurbs.dNdξ[j, i, cb] ⋅ Jinv
             #@assert isapprox(norm(H), 0.0; atol = 1e-14)
             #d²NdX²_nurbs[j, i, cb]  = Jinv' ⋅ d²Ndξ²_nurbs[j, i, cb] ⋅ Jinv
-            FF = cv_nurbs.dNdx[j, i, cb] ⋅ H
-            d²NdX²_nurbs[j, i, cb] = Jinv' ⋅ d²Ndξ²_nurbs[j, i, cb] ⋅ Jinv - Jinv'⋅FF⋅Jinv
+            if hessian
+                FF = cv_nurbs.dNdx[j, i, cb] ⋅ H
+                d²NdX²_nurbs[j, i, cb] = Jinv' ⋅ d²Ndξ²_nurbs[j, i, cb] ⋅ Jinv - Jinv'⋅FF⋅Jinv
+            end
         end
     end
 end
