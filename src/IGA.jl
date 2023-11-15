@@ -17,6 +17,7 @@ export BezierExtractionOperator
 export BezierCell
 export BezierCoords
 export VTKIGAFile
+export IGACellCache
 
 const Optional{T} = Union{T, Nothing}
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
@@ -28,6 +29,14 @@ struct BezierCoords{dim_s,T}
     x    ::Vector{Vec{dim_s,T}}
     w    ::Vector{T}
     beo  ::Base.RefValue{ BezierExtractionOperator{T} }
+end
+
+function resize_bezier_coord!(X::BezierCoords, N::Int)
+    (; xb, wb, x, w) = X
+    resize!(xb, N)
+    resize!(wb, N)
+    resize!(x,  N)
+    resize!(w,  N)
 end
 
 zero_bezier_coord(dim, T, nnodes) = BezierCoords{dim,T}(zeros(Vec{dim,T}, nnodes), zeros(T, nnodes), zeros(Vec{dim,T}, nnodes), zeros(T, nnodes), Base.RefValue(diagonal_beo(1)))
@@ -99,6 +108,7 @@ include("bezier_extraction.jl")
 include("splines/bezier_values.jl")
 include("splines/bsplines.jl")
 include("VTK.jl")
+include("iterators.jl")
 #include("L2_projection.jl")
 
 Ferrite._mass_qr(::IGAInterpolation{shape,order}) where {shape,order}= Ferrite._mass_qr(Bernstein{shape, order}())
