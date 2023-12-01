@@ -91,6 +91,31 @@ function test_square()
 
 end
 
+function test_plate_with_hole()
+    grid, cv, fv = _get_problem_data(:plate_with_hole, (4,4,), (2,2,))
+    L = 4.0
+    r = 1.0
+    addcellset!(grid, "all", (x)->true)
+    addfaceset!(grid, "right", (x)->x[1]≈-4.0)
+    addfaceset!(grid, "top", (x)->x[2]≈4.0)
+    addfaceset!(grid, "circle", (x)-> r*0.9 < norm(x) < r*1.1)
+
+    #Volume
+    V = _calculate_volume(cv, grid, getcellset(grid, "all"))
+    @test V ≈ L*L - 0.25*pi*r^2
+
+    #Area
+    A = _calculate_area(fv, grid, getfaceset(grid, "right"))
+    @test A ≈ L
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "top"))
+    @test A ≈ L
+
+    A = _calculate_area(fv, grid, getfaceset(grid, "circle"))
+    @test A ≈ 2r*pi/4 #forth of circumfrence
+
+end
+
 function test_singly_curved_3d()
     grid, cv, fv = _get_problem_data(:singly_curved, (20,2,1), (2,2,2), α = pi/2, R = 100.0, width = 5.0, thickness = 3.0)
     addcellset!(grid, "all", (x)->true)
@@ -194,11 +219,23 @@ function test_cylinder_sector_3d()
 
 end
 
+
+
 @testset "Geometries, vtk-outputing and integration" begin
     test_cube()
     test_square()
+    test_plate_with_hole()
     test_singly_curved_2d()
     test_singly_curved_3d()
     test_ring()
     test_cylinder_sector_3d()
+end
+
+@testset "test grid_generator"
+    #Check that it is possible to generate gird with ferrite-api:
+    #TODO: What to test?
+    generate_grid(BezierCell{RefQuadrilateral, 2}, (2,2))
+    generate_grid(BezierCell{RefQuadrilateral, 2}, (2,2), left = Vec((0.0,0.0)), right = Vec((1.0,1.0)))
+    generate_grid(BezierCell{RefHexahedron, 2}, (2,2,2))
+    generate_grid(BezierCell{RefHexahedron, 2}, (2,2,2), left = Vec((0.0,0.0)), right = Vec((1.0,1.0)))
 end

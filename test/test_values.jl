@@ -3,12 +3,7 @@
 function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pdim}, reorder) where {pdim,sdim}
 
     Ξ = nurbsmesh.knot_vectors
-    bspline = BSplineBasis(Ξ, nurbsmesh.orders)
-    
     nbasefuncs = length(nurbsmesh.IEN[:, cellid]) # number of basefunctions per cell
-    N = zeros(Float64, nbasefuncs)
-    dNdξ = zeros(Tensor{1,pdim,Float64}, nbasefuncs)
-    d²Ndξ² = zeros(Tensor{2,pdim,Float64}, nbasefuncs)
 
     R = zeros(Float64, nbasefuncs)
     dRdξ = zeros(Tensor{1,pdim,Float64}, nbasefuncs)

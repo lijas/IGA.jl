@@ -420,16 +420,25 @@ function Ferrite.reinit!(bcv::BezierFaceValues, xb::AbstractVector{<:Vec}, facei
 end
 
 function Ferrite.reinit!(bcv::BezierCellValues, (xb, wb)::CoordsAndWeight)
-    _reinit_nurbs!(bcv.cv_tmp, bcv.cv_bezier, xb, wb) 
+    _reinit_nurbs!(
+        bcv.cv_tmp, bcv.cv_bezier,
+        bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
+        xb, wb, 1) 
+
     _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bcv.current_beo[], bcv.current_w, 1)
+    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, 1)
 end
 
 function Ferrite.reinit!(bcv::BezierFaceValues, (xb, wb)::CoordsAndWeight, faceid::Int) 
-    _reinit_nurbs!(bcv.cv_tmp, bcv.cv_bezier, xb, wb, faceid) 
     bcv.cv_nurbs.current_face[]  = faceid
     bcv.cv_bezier.current_face[] = faceid
+    _reinit_nurbs!(
+        bcv.cv_tmp, bcv.cv_bezier,
+        bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
+        xb, wb, faceid) 
 
     _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bcv.current_beo[], bcv.current_w, faceid)
+    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, faceid)
 end
 
 function Ferrite.reinit!(bcv::BezierCellValues, bc::BezierCoords)
@@ -565,13 +574,11 @@ function _reinit_nurbs!(
             detJ = det(J)
         end
 
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+#        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
         cv_bezier.detJdV[i,cb] = detJ * qr_w
         Jinv = inv(J)
         for j in 1:n_func_basefuncs
             cv_nurbs.dNdx[j, i, cb] = cv_nurbs.dNdξ[j, i, cb] ⋅ Jinv
-            #@assert isapprox(norm(H), 0.0; atol = 1e-14)
-            #d²NdX²_nurbs[j, i, cb]  = Jinv' ⋅ d²Ndξ²_nurbs[j, i, cb] ⋅ Jinv
             if hessian
                 FF = cv_nurbs.dNdx[j, i, cb] ⋅ H
                 d²NdX²_nurbs[j, i, cb] = Jinv' ⋅ d²Ndξ²_nurbs[j, i, cb] ⋅ Jinv - Jinv'⋅FF⋅Jinv

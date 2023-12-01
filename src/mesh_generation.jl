@@ -40,6 +40,7 @@ function _generate_equidistant_parametrization(knot_vector::Vector{T}, order::In
 end
 
 function Ferrite.generate_grid(::Type{<:BezierCell{RefQuadrilateral,order}}, nels::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}) where {T,order}
+	
 	#IGnore LR and UL for now
 	patch = generate_nurbs_patch(:rectangle, nels, ntuple(i->order,2); cornerpos = Tuple(LL), size = Tuple(UR-LL))
 	grid = BezierGrid(patch)
@@ -69,8 +70,14 @@ function Ferrite.generate_grid(::Type{<:BezierCell{RefHexahedron,order}}, nels::
 	return grid
 end
 
-function generate_nurbs_patch(s::Symbol, args...; kwargs...)
-	generate_nurbs_patch(Val{s}(), args...; kwargs...)
+function generate_nurbs_patch(s::Symbol, nel::NTuple{N,Int}, order::Int; kwargs...) where N
+	orders = ntuple(i->order, N)
+	generate_nurbs_patch(Val{s}(), nel, orders; kwargs...)
+end
+
+function generate_nurbs_patch(s::Symbol, nel::NTuple{N1,Int}, orders::NTuple{N2,Int}; kwargs...) where {N1,N2}
+	@assert N1 == N2
+	generate_nurbs_patch(Val{s}(), nel, orders; kwargs...)
 end
 
 function generate_nurbs_patch(::Val{:line}, nel::NTuple{1,Int}, orders::NTuple{1,Int}; size::NTuple{1,T}, cornerpos::NTuple{1,T} = (0.0,), multiplicity::NTuple{1,Int}=(1,), sdim::Int=1) where T
@@ -549,8 +556,8 @@ end
 	mesh = IGA.NURBSMesh((kvxi, kveta), orders, control_points)
 end=#
 
-function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int})
-
+function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int}, orders::NTuple{2,Int})
+	@assert orders[1]==2 && orders[2]==2
 	@assert(nel[1]>=2 && nel[2]>=1)
 	@assert(iseven(nel[1]))
 
