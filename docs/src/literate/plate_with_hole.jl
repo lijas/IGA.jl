@@ -113,7 +113,7 @@ function get_material(; E, ν)
 end;
 
 # We also create a function that calculates the stress in each quadrature point, given the cell displacement and such...
-function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+function calculate_stress(dh, cv::BezierCellValues, C::SymmetricTensor{4,2}, u::Vector{Float64})
     
     celldofs = zeros(Int, ndofs_per_cell(dh))
 
@@ -144,9 +144,9 @@ end;
 # We begin by generating the mesh. IGA.jl includes a couple of different functions that can generate different nurbs patches.
 # In this example, we will generate the patch called "plate with hole". Note, currently this function can only generate the patch with second order basefunctions. 
 function solve()
-    orders = (2,2) # Order in the ξ and η directions .
+    order = 2 # order of the NURBS
     nels = (20,10) # Number of elements
-    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels) 
+    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels, order) 
 
     # Performing the computation on a NURBS-patch is possible, but it is much easier to using "bezier-extraction". For this 
     # we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `Ferrite.Grid`, but includes the NURBS-weights and 
@@ -163,7 +163,7 @@ function solve()
 
     # Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the 
     # reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
-    ip_geo = IGAInterpolation{RefQuadrilateral,2}()
+    ip_geo = IGAInterpolation{RefQuadrilateral,order}()
     ip_u = ip_geo^2
     qr_cell = QuadratureRule{RefQuadrilateral}(4)
     qr_face = FaceQuadratureRule{RefQuadrilateral}(3)
@@ -204,14 +204,19 @@ function solve()
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
 
     #csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
-    projector = L2Projector(ip, grid)
-    σ_nodes = IGA.igaproject(projector, cellstresses, qr_cell; project_to_nodes=true)
-    
+    projector = L2Projector(ip_u, grid)
+    σ_nodes = project(projector, cellstresses, qr_cell)
+    @show σ_nodes
     # Output results to VTK
-    vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
-    vtk_point_data(vtkgrid, dh, u, :u)
-    vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
-    vtk_save(vtkgrid)
+    #vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
+    #vtk_point_data(vtkgrid, dh, u, :u)
+   # vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
+   # vtk_save(vtkgrid)
+
+    IGA.VTKIGAFile("plate_with_hole.vtu", grid, collect(1:getncells(grid))) do vtk
+        IGA.write_solution(vtk, dh, u)
+        IGA.write_projected(vtk, dh, u)
+    end
 
 end;
 

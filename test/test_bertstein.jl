@@ -14,6 +14,7 @@
                 Bernstein{RefQuadrilateral, 2}(),
                 #Bernstein{RefQuadrilateral, 3}(),
                 Bernstein{RefHexahedron, 2}(),
+                IGAInterpolation{RefHexahedron, 2}(),
                 #Bernstein{RefHexahedron, 3}()
                 )
 

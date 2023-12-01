@@ -23,7 +23,7 @@ function IGACellCache(dh::DofHandler{dim,G}, flags::UpdateFlags=UpdateFlags()) w
     return IGACellCache(flags, grid, Ferrite.ScalarWrapper(-1), nodes, coords, dh, celldofs)
 end
 
-function reinit!(cc::IGACellCache, i::Int)
+function Ferrite.reinit!(cc::IGACellCache, i::Int)
     cc.cellid[] = i
     if cc.flags.nodes
         resize!(cc.nodes, Ferrite.nnodes_per_cell(cc.grid, i))

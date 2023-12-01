@@ -131,13 +131,19 @@ function WriteVTK.vtk_point_data(
     return vtkfile
 end
 
-function write_solution(vtk, dh::DofHandler, a, suffix="")
+function #=Ferrite.=#write_solution(vtk::VTKIGAFile, dh::DofHandler, a, suffix="")
 	for fieldname in Ferrite.getfieldnames(dh)
 		data = _evaluate_at_geometry_nodes!(vtk, dh, a, fieldname)
 		vtk_point_data(vtk.vtk, data, string(fieldname, suffix))
 	end
 end
 
+function #=Ferrite.=#write_projection(vtk::VTKIGAFile, proj::L2Projector, vals, name)
+    data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
+    @assert size(data, 2) == getnnodes(get_grid(proj.dh))
+    vtk_node_data(vtk.vtk, data, name; component_names=Ferrite.component_names(eltype(vals)))
+    return vtk
+end
 
 function _evaluate_at_geometry_nodes!(
 	vtk       ::VTKIGAFile,
@@ -182,9 +188,9 @@ function _evaluate_at_geometry_nodes!(
 	# TODO: Remove this hack when embedding works...
 	RT = ip isa ScalarInterpolation ? T : Vec{Ferrite.n_components(ip),T}
 	if ip isa VectorizedInterpolation
-		cv = BezierCellValues(qr, ip.ip, ip_geo)
+		cv = CellValues(qr, ip.ip, ip_geo)
 	else
-		cv = BezierCellValues(qr, ip, ip_geo)
+		cv = CellValues(qr, ip, ip_geo)
 	end
 
     _evaluate_at_geometry_nodes!(data, sdh, a, cv, drange, vtk.cellset, RT)
