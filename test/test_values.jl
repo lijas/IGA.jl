@@ -92,7 +92,7 @@ end
     ##
     # Build the problem
     ##
-    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
+    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels, (2,2))
     #nurbsmesh = generate_nurbs_patch(:rectangle, nels, (order,order), size = (20.0,20.0))
     #nurbsmesh.weights .= 1.0
 
@@ -113,6 +113,7 @@ end
     cv_vector = CellValues( qr, ip^dim, ip)
 
     #Try some different cells
+    cellnum = 1
     for cellnum in 1:getncells(grid)#[1,4,5]
         #C = get_extraction_operator(grid, cellnum)
         #X = get_nurbs_coordinates(grid, cellnum)
@@ -124,6 +125,8 @@ end
         @show cv.current_w
         (; xb, wb, x, w) = bc
 
+        iqp = 1
+        ξ = qr.points[iqp]
         for (iqp, ξ) in enumerate(qr.points)
 
             #Calculate the value of the NURBS from the nurbs patch
@@ -145,10 +148,12 @@ end
             end 
 
             @test dV_patch ≈ getdetJdV(cv, iqp)
-            @test sum(cv.cv_nurbs.N[:,iqp]) ≈ 1
-            @test cv.cv_nurbs.N[:,iqp] ≈ R
-            @test cv.cv_nurbs.dNdξ[:,iqp] ≈ dRdξ
-            @test cv.cv_nurbs.dNdx[:,iqp] ≈ dRdX
+            @test sum(cv.nurbs_values.Nξ[:,iqp]) ≈ 1
+            for i in 1:getnbasefunctions(cv)
+                @test shape_value(cv,iqp,i) ≈ R[i]
+                @test shape_gradient(cv, iqp, i) ≈ dRdX[i]
+                @test cv.nurbs_values.dNdξ[i,iqp] ≈ dRdξ[i]
+            end
             @test cv.d²Ndξ²[:,iqp] ≈ d²Rdξ² atol=1e-14
             @test cv.d²NdX²[:,iqp] ≈ d²RdX²  atol=1e-14
 
