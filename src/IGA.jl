@@ -4,8 +4,10 @@ using Reexport
 
 @reexport using Tensors
 @reexport using Ferrite
-using Ferrite: AbstractRefShape, RefHypercube, RefLine, RefQuadrilateral, RefHexahedron, getnbasefunctions,
-               VectorInterpolation, VectorizedInterpolation
+using Ferrite: 
+    AbstractRefShape, RefHypercube, RefLine, RefQuadrilateral, RefHexahedron, getnbasefunctions,
+    VectorInterpolation, VectorizedInterpolation,
+    FunctionValues, GeometryMapping, MappingValues
 
 using WriteVTK
 using LinearAlgebra

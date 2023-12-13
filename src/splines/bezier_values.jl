@@ -1,9 +1,5 @@
 export BezierCellValues, BezierFaceValues, set_bezier_operator!
 
-"""
-Wraps a standard `Ferrite.CellValues`, but multiplies the shape values with the bezier extraction operator each time the 
-`reinit!` function is called. 
-"""
 function Ferrite.default_geometric_interpolation(::IGAInterpolation{shape, order}) where {order, dim, shape <: AbstractRefShape{dim}}
     return VectorizedInterpolation{dim}(IGAInterpolation{shape, order}())
 end
@@ -11,240 +7,122 @@ function Ferrite.default_geometric_interpolation(::Bernstein{shape, order}) wher
     return VectorizedInterpolation{dim}(Bernstein{shape, order}())
 end
 
-struct BezierCellValues{T<:Real,CV<:Ferrite.CellValues, d²MdX²_t, d²NdX²_t} <: Ferrite.AbstractCellValues
-    # cv_bezier stores the shape values from the bernstein basis. These are the same for all elements, and does not change
-    cv_bezier::CV 
-    d²Bdξ²_geom::Matrix{d²MdX²_t}
-    d²Bdξ²_func::Matrix{d²NdX²_t}
-
-    # cv_nurbs stores the nurbs/b-spline basis. These will change for each element
-    cv_nurbs::CV
-    d²Ndξ²::Matrix{d²NdX²_t}
-    d²NdX²::Matrix{d²NdX²_t}
-
-    # cv_tmp is just an intermidiate state needed for converting from cv_bezier to cv_nurbs
-    cv_tmp::CV
-    d²Ndξ²_tmp::Matrix{d²NdX²_t}
-    d²NdX²_tmp::Matrix{d²NdX²_t}
+struct BezierCellValues{FV, GM, QR, T} <: Ferrite.AbstractCellValues
+    bezier_values::FV # FunctionValues
+    tmp_values::FV    # FunctionValues
+    nurbs_values::FV  # FunctionValues
+    geo_mapping::GM   # GeometryMapping
+    qr::QR            # QuadratureRule
+    detJdV::Vector{T}
 
     current_beo::Base.RefValue{BezierExtractionOperator{T}}
     current_w::Vector{T}
 end
 
-struct BezierFaceValues{T<:Real,CV<:Ferrite.FaceValues, d²MdX²_t, d²NdX²_t} <: Ferrite.AbstractFaceValues
-    # cv_bezier stores the shape values from the bernstein basis. These are the same for all elements, and does not change
-    cv_bezier::CV 
-    d²Bdξ²_geom::Array{d²MdX²_t,3}
-    d²Bdξ²_func::Array{d²NdX²_t,3}
-
-    # cv_nurbs stores the nurbs/b-spline basis. These will change for each element
-    cv_nurbs::CV
-    d²Ndξ²::Array{d²NdX²_t,3}
-    d²NdX²::Array{d²NdX²_t,3}
-
-    # cv_tmp is just an intermidiate state needed for converting from cv_bezier to cv_nurbs
-    cv_tmp::CV
-    d²Ndξ²_tmp::Array{d²NdX²_t,3}
-    d²NdX²_tmp::Array{d²NdX²_t,3}
+struct BezierFaceValues{FV, GM, FQR, dim, T, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: Ferrite.AbstractFaceValues
+    bezier_values::V_FV # FunctionValues
+    tmp_values::V_FV    # FunctionValues
+    nurbs_values::V_FV  # FunctionValues
+    geo_mapping::V_GM   # GeometryMapping
+    qr::QR            # QuadratureRule
+    detJdV::Vector{T}
+    normals::Vector{Vec{dim,T}}
 
     current_beo::Base.RefValue{BezierExtractionOperator{T}}
     current_w::Vector{T}
+    current_face::Ferrite.ScalarWrapper{Int}
 end
 
-Ferrite.shape_value_type(cv::Union{BezierCellValues, BezierFaceValues}) = Ferrite.shape_value_type(cv.cv_bezier)
-Ferrite.shape_gradient_type(cv::Union{BezierCellValues, BezierFaceValues}) = Ferrite.shape_gradient_type(cv.cv_bezier)
+Ferrite.shape_value_type(cv::Union{BezierCellValues, BezierFaceValues}) = Ferrite.shape_value_type(cv.bezier_values)
+Ferrite.shape_gradient_type(cv::Union{BezierCellValues, BezierFaceValues}) = Ferrite.shape_gradient_type(cv.bezier_values)
 
 BezierCellAndFaceValues{T,CV} = Union{BezierCellValues{T,CV}, BezierFaceValues{T,CV}}
 
-function Ferrite.checkface(fv::BezierFaceValues, face::Int)
-    0 < face <= nfaces(fv) || error("Face index out of range.")
-    return nothing
-end
+Ferrite.nfaces(fv::BezierFaceValues) = length(fv.geo_mapping)
+Ferrite.getnormal(fv::BezierFaceValues, iqp::Int) = fv.normals[iqp]
+Ferrite.function_interpolation(cv::BezierCellAndFaceValues) = Ferrite.function_interpolation(cv.bezier_values)
+Ferrite.geometric_interpolation(cv::BezierCellAndFaceValues) = Ferrite.geometric_interpolation(cv.bezier_values)
 
-Ferrite.nfaces(fv::BezierFaceValues) = size(fv.cv_nurbs.N, 3)
-Ferrite.getnormal(fv::BezierFaceValues, iqp::Int) = getnormal(fv.cv_bezier, iqp)
+function BezierCellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
+    update_gradients::Bool = true, update_detJdV::Bool = true) where T 
 
-function BezierCellValues(cv::Ferrite.CellValues)
-    T = eltype(cv.M)
-    dim = Ferrite.getdim(cv.ip)
+    @assert update_detJdV == true
 
-    is_vector_valued = cv.ip isa Ferrite.VectorInterpolation
+    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    GeoDiffOrder = max(Ferrite.required_geo_diff_order(Ferrite.mapping_type(ip_fun), FunDiffOrder), update_detJdV)
+    geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
+    fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
+    detJdV = fill(T(NaN), getnquadpoints(qr))
 
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
-    undef_w   = NaN .* zeros(Float64, Ferrite.getngeobasefunctions(cv))
-
-    #
-    # Higher order functions
-    #
-    d²MdX²_t = Tensor{2,dim,Float64,Tensors.n_components(Tensor{2,dim})}
-    d²NdX²_t = if is_vector_valued
-        Tensor{3,dim,Float64,Tensors.n_components(Tensor{3,dim})}
-    else
-        Tensor{2,dim,Float64,Tensors.n_components(Tensor{2,dim})}
-    end
-
-    n_geom_basefuncs = getnbasefunctions(cv.gip)
-    n_func_basefuncs = getnbasefunctions(cv.ip)
-    n_qpoints        = getnquadpoints(cv)
-    d²MdX² = fill(zero(d²MdX²_t) * T(NaN), n_geom_basefuncs, n_qpoints)
-    d²NdX² = fill(zero(d²NdX²_t) * T(NaN), n_func_basefuncs, n_qpoints)
-
-    for (qp, ξ) in pairs(Ferrite.getpoints(cv.qr))
-        for ib in 1:n_geom_basefuncs
-            d²MdX²[ib, qp] = Tensors.hessian(ξ -> shape_value(cv.gip, ξ, ib), ξ)
-        end
-        for ib in 1:n_func_basefuncs
-            d²NdX²[ib, qp] = Tensors.hessian(ξ -> shape_value(cv.ip, ξ, ib), ξ)
-        end
-    end
+    undef_w   = NaN .* zeros(Float64, Ferrite.getngeobasefunctions(geo_mapping))
 
     return BezierCellValues(
-        cv, d²MdX², d²NdX², 
-        deepcopy(cv), deepcopy(d²NdX²), deepcopy(d²NdX²) ,
-        deepcopy(cv), deepcopy(d²NdX²), deepcopy(d²NdX²) ,
-        undef_beo, undef_w)
+        fun_values, 
+        deepcopy(fun_values), 
+        deepcopy(fun_values), 
+        geo_mapping, qr, detJdV, undef_beo, undef_w)
 end
 
+BezierCellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = BezierCellValues(Float64, qr, ip, args...; kwargs...)
 
-function BezierFaceValues(cv::Ferrite.FaceValues)
-    T = eltype(cv.M)
-    dim = Ferrite.getdim(cv.func_interp)
-    nfaces = dim*2
+function BezierFaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
+    update_gradients::Bool = true) where {T,sdim} 
 
-    is_vector_valued = cv.func_interp isa Ferrite.VectorInterpolation
-
+    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    GeoDiffOrder = max(Ferrite.required_geo_diff_order(Ferrite.mapping_type(ip_fun), FunDiffOrder), 1)
+    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
+    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
+    max_nquadpoints = maximum(qr->length(Ferrite.getweights(qr)), fqr.face_rules)
+    detJdV  = fill(T(NaN), max_nquadpoints)
+    normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
-    undef_w   = NaN .* zeros(Float64, Ferrite.getngeobasefunctions(cv))
-
-    #
-    # Higher order functions
-    #
-    d²MdX²_t = Tensor{2,dim,Float64,Tensors.n_components(Tensor{2,dim})}
-    d²NdX²_t = if is_vector_valued
-        Tensor{3,dim,Float64,Tensors.n_components(Tensor{3,dim})}
-    else
-        Tensor{2,dim,Float64,Tensors.n_components(Tensor{2,dim})}
-    end
-
-    n_geom_basefuncs = getnbasefunctions(cv.geo_interp)
-    n_func_basefuncs = getnbasefunctions(cv.func_interp)
-    n_qpoints        = getnquadpoints(cv.qr, 1)
-    d²MdX² = fill(zero(d²MdX²_t) * T(NaN), n_geom_basefuncs, n_qpoints, nfaces)
-    d²NdX² = fill(zero(d²NdX²_t) * T(NaN), n_func_basefuncs, n_qpoints, nfaces)
-
-    for (qp, ξ) in pairs(Ferrite.getpoints(cv.qr, 1)), iface in 1:nfaces
-        for ib in 1:n_geom_basefuncs
-            d²MdX²[ib, qp, iface] = Tensors.hessian(ξ -> shape_value(cv.geo_interp, ξ, ib), ξ)
-        end
-        for ib in 1:n_func_basefuncs
-            d²NdX²[ib, qp, iface] = Tensors.hessian(ξ -> shape_value(cv.func_interp, ξ, ib), ξ)
-        end
-    end
-
+    undef_w   = NaN .* zeros(Float64, Ferrite.getngeobasefunctions(geo_mapping))
     return BezierFaceValues(
-        cv, d²MdX², d²NdX², 
-        deepcopy(cv), copy(d²NdX²), copy(d²NdX²) ,
-        deepcopy(cv), copy(d²NdX²), copy(d²NdX²) ,
-        undef_beo, undef_w)
+        fun_values, 
+        deepcopy(fun_values), 
+        deepcopy(fun_values), 
+        geo_mapping, qr, detJdV, normals, undef_beo, undef_w, Ferrite.ScalarWrapper(1))
 end
 
-#=function BezierCellValues(qr::QuadratureRule, ip::Interpolation, gip::Interpolation)
-    return BezierCellValues(Float64, qr, ip, gip)
-end=#
+#Intercept construction of CellValues called with IGAInterpolation
+function Ferrite.CellValues(
+    ::Type{T}, 
+    qr::QuadratureRule, 
+    ip_fun::Union{IGAInterpolation, VectorizedInterpolation{<:Any, <:Any, <:Any, <: IGAInterpolation}}, 
+    ip_geo::VectorizedInterpolation; 
+    update_gradients::Bool = true, update_detJdV::Bool = true) where T 
 
-#=function BezierCellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {T, QR, IP, VGIP}
-    cv = CellValues(T, qr, ip, gip)
-    return BezierCellValues(cv)
-end=#
+    cv = BezierCellValues(T, qr, ip_fun, ip_geo; update_gradients, update_detJdV)
 
-# Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim) with IGAInterpolation
-function Ferrite.CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
-    order, dim, shape <: AbstractRefShape{dim}, T,
-    QR   <: QuadratureRule{shape},
-    IP   <: VectorizedInterpolation{dim, shape, order, <: IGAInterpolation{shape,order}},
-    GIP  <: IGAInterpolation{shape,order},
-    VGIP <: VectorizedInterpolation{dim, shape, order, GIP},
-}
-    # Field interpolation
-    N_t    = Vec{dim, T}
-    dNdx_t = dNdξ_t = Tensor{2, dim, T, Tensors.n_components(Tensor{2,dim})}
-    
-    # Geometry interpolation
-    M_t    = T
-    dMdξ_t = Vec{dim, T}
-    cv = CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
-
-    return BezierCellValues(cv)
+    return cv
 end
 
-# Entrypoint for `ScalarInterpolation`s (rdim == sdim)
-function Ferrite.CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
-    order, dim, shape <: AbstractRefShape{dim}, T,
-    QR   <: QuadratureRule{shape},
-    IP   <: IGAInterpolation{shape,order},
-    GIP  <: IGAInterpolation{shape,order},
-    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
-}
-    # Function interpolation
-    N_t    = T
-    dNdx_t = dNdξ_t = Vec{dim, T}
-    # Geometry interpolation
-    M_t    = T
-    dMdξ_t = Vec{dim, T}
-    cv = CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
-    return BezierCellValues(cv)
+#Intercept construction of FaceValues called with IGAInterpolation
+function Ferrite.FaceValues(
+    ::Type{T}, 
+    qr::FaceQuadratureRule, 
+    ip_fun::Union{IGAInterpolation, VectorizedInterpolation{<:Any, <:Any, <:Any, <: IGAInterpolation}}, 
+    ip_geo::VectorizedInterpolation; 
+    update_gradients::Bool = true) where T 
+
+    cv = BezierFaceValues(T, qr, ip_fun, ip_geo; update_gradients)
+
+    return cv
 end
 
-#Entrypoints for vector valued IGAInterpolation, which creates BezierCellValues
-function Ferrite.FaceValues(qr::FaceQuadratureRule, ::IP, ::IGAInterpolation{shape,order}) where {shape,order,vdim,IP<:VectorizedInterpolation{vdim, shape, <:Any, <:IGAInterpolation{shape,order}}}
-    _ip = IGAInterpolation{shape,order}()^vdim
-    _ip_geo = Bernstein{shape,order}()
-    cv = FaceValues(qr, _ip, _ip_geo)
-    return BezierFaceValues(cv)
-end
+Ferrite.getnbasefunctions(bcv::BezierCellAndFaceValues)            = getnbasefunctions(bcv.nurbs_values)
+Ferrite.getngeobasefunctions(bcv::BezierCellAndFaceValues)         = Ferrite.getngeobasefunctions(bcv.geo_mapping)
+Ferrite.getnquadpoints(bcv::BezierCellAndFaceValues)               = Ferrite.getnquadpoints(bcv.qr)
+Ferrite.getdetJdV(bv::BezierCellAndFaceValues, q_point::Int)       = bv.detJdV[q_point]
+Ferrite.shape_value(bcv::BezierCellAndFaceValues, qp::Int, i::Int) = Ferrite.shape_value(bcv.nurbs_values, qp, i)
+Ferrite.shape_gradient(bcv::BezierCellAndFaceValues, q_point::Int, i::Int) = Ferrite.shape_gradient(bcv.nurbs_values, q_point, i)
+Ferrite.geometric_value(cv::BezierCellValues, q_point::Int, i::Int) = Ferrite.geometric_value(cv.geo_mapping, q_point, i)
 
-function Ferrite.FaceValues(qr::FaceQuadratureRule, ::IGAInterpolation{shape,order}, ::IGAInterpolation{shape,order}) where {shape,order}
-    _ip = IGAInterpolation{shape,order}()
-    _ip_geo = Bernstein{shape,order}()
-    cv = FaceValues(qr, _ip, _ip_geo)
-    return BezierFaceValues(cv)
-end
-
-function BezierFaceValues(qr::FaceQuadratureRule, ip::Interpolation, gip::Interpolation)
-    return BezierFaceValues(Float64, qr, ip, gip)
-end
-
-function BezierFaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {T, QR, IP, VGIP}
-    cv = FaceValues(T, qr, ip, gip)
-    return BezierFaceValues(cv)
-end
-
-Ferrite.getnbasefunctions(bcv::BezierCellAndFaceValues)            = size(bcv.cv_bezier.N, 1)
-Ferrite.getngeobasefunctions(bcv::BezierCellAndFaceValues)         = size(bcv.cv_bezier.M, 1)
-Ferrite.getnquadpoints(bcv::BezierCellAndFaceValues)               = Ferrite.getnquadpoints(bcv.cv_bezier)
-Ferrite.getdetJdV(bv::BezierCellAndFaceValues, q_point::Int)       = Ferrite.getdetJdV(bv.cv_bezier, q_point)
-Ferrite.shape_value(bcv::BezierCellAndFaceValues, qp::Int, i::Int) = Ferrite.shape_value(bcv.cv_nurbs,qp,i)
-Ferrite.geometric_value(cv::BezierCellAndFaceValues, q_point::Int, i::Int) = Ferrite.geometric_value(cv.cv_bezier, q_point, i)
-Ferrite.shape_gradient(bcv::BezierCellAndFaceValues, q_point::Int, i::Int) = Ferrite.shape_gradient(bcv.cv_nurbs, q_point, i)
-Ferrite.geometric_value(cv::BezierCellValues, q_point::Int, base_func::Int) = cv.cv_bezier.M[base_func, q_point]
-Ferrite.geometric_value(cv::BezierFaceValues, q_point::Int, base_func::Int) = cv.cv_bezier.M[base_func, q_point, cv.cv_bezier.current_face[]]
 shape_hessian(bv::BezierFaceValues, q_point::Int, base_func::Int) = bv.d²NdX²[base_func, q_point, bv.cv_bezier.current_face[]]
 shape_hessian(bv::BezierCellValues, q_point::Int, base_func::Int) = bv.d²NdX²[base_func, q_point]
 
-function Ferrite.function_symmetric_gradient(bv::BezierCellAndFaceValues, q_point::Int, u::AbstractVector)
-    return function_symmetric_gradient(bv.cv_nurbs, q_point, u)
-end
-function Ferrite.shape_symmetric_gradient(bv::BezierCellAndFaceValues, q_point::Int, i::Int)
-    return shape_symmetric_gradient(bv.cv_nurbs, q_point, i)
-end
-function Ferrite.function_gradient(fe_v::BezierCellAndFaceValues, q_point::Int, u::AbstractVector) 
-    return function_gradient(fe_v.cv_nurbs, q_point, u)
-end
-function Ferrite.function_value(fe_v::BezierCellAndFaceValues, q_point::Int, u::AbstractVector)
-    return function_value(fe_v.cv_nurbs, q_point, u)
-end
-
-# TODO: Deprecate this, nobody is using this in practice...
+#=
 function function_hessian(fe_v::Ferrite.AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
     n_base_funcs = getnbasefunctions(fe_v)
     length(u) == n_base_funcs || Ferrite.throw_incompatible_dof_length(length(u), n_base_funcs)
@@ -259,6 +137,7 @@ shape_hessian_type(::Union{BezierCellValues{<:Any, <:Any, <:Any, d²NdX²_t}, Be
 function function_hessian_init(cv::Ferrite.AbstractValues, ::AbstractVector{T}) where {T}
     return zero(shape_hessian_type(cv)) * zero(T)
 end
+=#
 
 function set_bezier_operator!(bcv::BezierCellAndFaceValues, beo::BezierExtractionOperator{T}) where T 
     bcv.current_beo[]=beo
@@ -392,79 +271,119 @@ function _cellvalues_bezier_extraction_higher_order!(
 
 end
 
-function Ferrite.reinit!(bcv::BezierCellValues, xb::AbstractVector{<:Vec})#; updateflags = CellValuesFlags())
-    #Ferrite.reinit!(bcv.cv_bezier, xb) #call the normal reinit function first
-    @assert all(bcv.current_w .== 1.0)
-    wb = bcv.current_w
-    _reinit_nurbs!(
-        bcv.cv_tmp, bcv.cv_bezier,
-        bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
-        xb, wb, 1) 
-    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bcv.current_beo[], nothing, 1)
-    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, 1)
+function Ferrite.reinit!(cv::BezierCellValues, bc::BezierCoords)
+    set_bezier_operator!(cv, bc.beo[], bc.w)
+    return reinit!(cv, (bc.xb, bc.wb))
 end
 
-function Ferrite.reinit!(bcv::BezierFaceValues, xb::AbstractVector{<:Vec}, faceid::Int) 
-    @assert all(bcv.current_w .== 1.0)
-    bcv.cv_nurbs.current_face[]  = faceid
-    bcv.cv_bezier.current_face[] = faceid
+function Ferrite.reinit!(cv::BezierCellValues, (x,w)::CoordsAndWeight)
+    n_geom_basefuncs = Ferrite.getngeobasefunctions(cv.geo_mapping)
+    @assert isa(Ferrite.mapping_type(cv.bezier_values), Ferrite.IdentityMapping)
+    @assert checkbounds(Bool, x, 1:n_geom_basefuncs)
+    @assert checkbounds(Bool, w, 1:n_geom_basefuncs)
 
-    wb = bcv.current_w # borrow
-    _reinit_nurbs!(
-        bcv.cv_tmp, bcv.cv_bezier,
-        bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
-        xb, wb, faceid) 
-    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bcv.current_beo[], nothing, faceid)
-    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, faceid)
+    for (q_point, gauss_w) in enumerate(Ferrite.getweights(cv.qr))
+        mapping = Ferrite.calculate_mapping(cv.geo_mapping, q_point, x, w)
+       
+        detJ = Ferrite.calculate_detJ(Ferrite.getjacobian(mapping))
+        detJ > 0.0 || Ferrite.throw_detJ_not_pos(detJ)
+        cv.detJdV[q_point] = detJ * gauss_w
+
+        _compute_intermidiate!(cv.tmp_values, cv.bezier_values, cv.geo_mapping, q_point, w)
+        Ferrite.apply_mapping!(cv.tmp_values, q_point, mapping)
+        _bezier_transform(cv.nurbs_values, cv.tmp_values, q_point, cv.current_beo[], cv.current_w)
+    end
+    return nothing
+end
+
+function _bezier_transform(nurbs::FunctionValues{1}, bezier::FunctionValues{1}, iq::Int, Cbe::BezierExtractionOperator{T}, w::Optional{Vector{T}}) where {T}
+   
+    N = length(Cbe)
+
+    dBdx   = bezier.dNdx 
+    dBdξ   = bezier.dNdξ
+    B      = bezier.Nξ
+
+    is_scalar_valued = !(Ferrite.shape_value_type(nurbs) <: Tensor)
+    dim_s = Ferrite.sdim_from_gradtype(Ferrite.shape_gradient_type(nurbs))
+
+    for ib in 1:N
+        if is_scalar_valued
+            nurbs.Nξ[ib, iq] = zero(eltype(nurbs.Nξ))
+            nurbs.dNdξ[ib, iq] = zero(eltype(nurbs.dNdξ))
+            nurbs.dNdx[ib, iq] = zero(eltype(nurbs.dNdx))
+        else #if FieldTrait(cv_nurbs) == Ferrite.VectorValued()
+            for d in 1:dim_s
+                nurbs.Nξ[(ib-1)*dim_s+d, iq] = zero(eltype(nurbs.Nξ))
+                nurbs.dNdξ[(ib-1)*dim_s+d, iq] = zero(eltype(nurbs.dNdξ))
+                nurbs.dNdx[(ib-1)*dim_s+d, iq] = zero(eltype(nurbs.dNdx))
+            end
+        end
+
+        Cbe_ib = Cbe[ib]
+        
+        for (i, nz_ind) in enumerate(Cbe_ib.nzind)                
+            val = Cbe_ib.nzval[i]
+            if (w !== nothing) 
+                val*=w[ib]
+            end
+            if is_scalar_valued
+                nurbs.Nξ[ib, iq]    += val*   B[nz_ind, iq]
+                nurbs.dNdξ[ib, iq] += val*dBdξ[nz_ind, iq]
+                nurbs.dNdx[ib, iq] += val*dBdx[nz_ind, iq]
+            else 
+                for d in 1:dim_s
+                    nurbs.Nξ[(ib-1)*dim_s + d, iq] += val*   B[(nz_ind-1)*dim_s + d, iq]
+                    nurbs.dNdξ[(ib-1)*dim_s + d, iq] += val*dBdξ[(nz_ind-1)*dim_s + d, iq]
+                    nurbs.dNdx[(ib-1)*dim_s + d, iq] += val*dBdx[(nz_ind-1)*dim_s + d, iq]
+                end
+            end
+        end
+    end
 
 end
 
-function Ferrite.reinit!(bcv::BezierCellValues, (xb, wb)::CoordsAndWeight)
-    _reinit_nurbs!(
-        bcv.cv_tmp, bcv.cv_bezier,
-        bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
-        xb, wb, 1) 
+Ferrite.otimes_helper(x::Number, dMdξ::Vec{dim}) where dim = x * dMdξ
 
-    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bcv.current_beo[], bcv.current_w, 1)
-    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, 1)
+function _compute_intermidiate!(tmp_values::FunctionValues{1}, bezier_values::FunctionValues{1}, geom_values::GeometryMapping, q_point::Int, w::Vector{T}) where {T}
+    dim = Ferrite.sdim_from_gradtype(Ferrite.shape_gradient_type(tmp_values))
+
+    W = zero(T)
+    dWdξ = zero(Vec{dim,T})
+    for j in 1:Ferrite.getngeobasefunctions(geom_values)
+        W      += w[j]*geom_values.M[j, q_point]
+        dWdξ   += w[j]*geom_values.dMdξ[j, q_point]
+    end
+    for j in 1:getnbasefunctions(tmp_values)
+        tmp_values.dNdξ[j, q_point] = ( bezier_values.dNdξ[j, q_point]*W - Ferrite.otimes_helper(bezier_values.Nξ[j, q_point], dWdξ) ) / W^2
+        tmp_values.Nξ[j,q_point] = bezier_values.Nξ[j, q_point]/W
+    end
 end
 
-function Ferrite.reinit!(bcv::BezierFaceValues, (xb, wb)::CoordsAndWeight, faceid::Int) 
-    bcv.cv_nurbs.current_face[]  = faceid
-    bcv.cv_bezier.current_face[] = faceid
-    _reinit_nurbs!(
-        bcv.cv_tmp, bcv.cv_bezier,
-        bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
-        xb, wb, faceid) 
-
-    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bcv.current_beo[], bcv.current_w, faceid)
-    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, faceid)
+function Ferrite.apply_mapping!(tmp_values::FunctionValues{1}, q_point::Int, mapping::MappingValues)
+    Jinv = Ferrite.calculate_Jinv(Ferrite.getjacobian(mapping))
+    for j in 1:getnbasefunctions(tmp_values)
+        tmp_values.dNdx[j, q_point] = Ferrite.dothelper(tmp_values.dNdξ[j, q_point], Jinv)
+    end
 end
 
-function Ferrite.reinit!(bcv::BezierCellValues, bc::BezierCoords)
-    set_bezier_operator!(bcv, bc.beo[], bc.w)
-
-    _reinit_nurbs!(
-        bcv.cv_tmp, bcv.cv_bezier,
-        bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
-        bc.xb, bc.wb, 1) 
-    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bc.beo[], bcv.current_w, 1)
-    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], bcv.current_w, 1)
+function Ferrite.calculate_mapping(geo_mapping::Ferrite.GeometryMapping{1}, q_point, x::Vector{Vec{dim,T}}, w::Vector{T}) where {dim,T}
+    
+    W = zero(T)
+    dWdξ = zero(Vec{dim,T})
+    #d²Wdξ² = zero(Tensor{2,dim,T})
+    for j in 1:Ferrite.getngeobasefunctions(geo_mapping)
+        W      += w[j]*geo_mapping.M[j, q_point]
+        dWdξ   += w[j]*geo_mapping.dMdξ[j, q_point]
+    end
+    
+    fecv_J = zero(Tensor{2,dim,T})
+    for j in 1:Ferrite.getngeobasefunctions(geo_mapping)
+        dRdξ = (geo_mapping.dMdξ[j, q_point]*W - geo_mapping.M[j, q_point]*dWdξ)/W^2
+        fecv_J += x[j] ⊗ (w[j]*dRdξ)
+    end
+    return Ferrite.MappingValues(fecv_J, nothing)
 end
-
-function Ferrite.reinit!(bcv::BezierFaceValues, bc::BezierCoords, faceid::Int)
-    set_bezier_operator!(bcv, bc.beo[], bc.w)
-    bcv.cv_bezier.current_face[] = faceid
-    bcv.cv_nurbs.current_face[] = faceid
-
-    _reinit_nurbs!(
-        bcv.cv_tmp, bcv.cv_bezier,
-        bcv.d²Bdξ²_geom, bcv.d²Bdξ²_func, bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, 
-        bc.xb, bc.wb, faceid) 
-    _cellvalues_bezier_extraction!(bcv.cv_nurbs, bcv.cv_tmp, bc.beo[], bc.w, faceid)
-    _cellvalues_bezier_extraction_higher_order!(bcv.d²Ndξ², bcv.d²NdX², bcv.d²Ndξ²_tmp, bcv.d²NdX²_tmp, bcv.current_beo[], nothing, 1)
-end
-
 
 """
 Ferrite.reinit!(cv::Ferrite.CellVectorValues{dim}, xᴮ::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}) where {dim,T}
@@ -473,7 +392,7 @@ Similar to Ferrite's reinit method, but in IGA with NURBS, the weights is also n
     `xᴮ` - Bezier coordinates
     `w`  - weights for nurbs mesh (not bezier weights)
 """
-function _reinit_nurbs!(
+#=function _reinit_nurbs!(
     cv_nurbs::Ferrite.AbstractValues, cv_bezier::Ferrite.AbstractValues, 
     d²Bdξ²_geom, d²Bdξ²_func, d²Ndξ²_nurbs, d²NdX²_nurbs,
     xᴮ::AbstractVector{Vec{dim,T}}, w::AbstractVector{T}, cb::Int = 1) where {dim,T}
@@ -586,6 +505,7 @@ function _reinit_nurbs!(
         end
     end
 end
+=#
 
 function Base.show(io::IO, m::MIME"text/plain", fv::BezierFaceValues)
     println(io, "BezierFaceValues with")
@@ -601,9 +521,11 @@ function Base.show(io::IO, m::MIME"text/plain", fv::BezierFaceValues)
 end
 
 function Base.show(io::IO, m::MIME"text/plain", cv::BezierCellValues)
+    fip = Ferrite.function_interpolation(cv)
+    gip = Ferrite.function_interpolation(cv)
     println(io, "BezierCellValues with")
     println(io, "- Quadrature rule with ", getnquadpoints(cv), " points")
-    print(io, "- Function interpolation: "); show(io, m, cv.cv_bezier.ip)
+    print(io, "- Function interpolation: "); show(io, m, fip)
     println(io)
-    print(io, "- Geometric interpolation: "); show(io, m, cv.cv_bezier.gip)
+    print(io, "- Geometric interpolation: "); show(io, m, gip)
 end
