@@ -160,11 +160,11 @@ end
 
 =#
 
-function Ferrite.shape_value(ip::Bernstein, _ξ::Vec, i::Int)
+function Ferrite.shape_value(ip::Bernstein{refshape,order}, _ξ::Vec{dim}, i::Int) where {dim,refshape<:Ferrite.AbstractRefShape{dim},order}
     _compute_bezier_shape_value(ip,_ξ, i)
 end
 
-function _compute_bezier_shape_value(ip::Bernstein{shape,order}, ξ::Vec{dim,T}, i::Int) where {shape,dim,order,T} 
+function _compute_bezier_shape_value(ip::Bernstein{shape,order}, ξ::Vec{dim,T}, i::Int) where {dim,shape<:Ferrite.AbstractRefShape{dim},order,T} 
     _n = ntuple(i->order+1, dim)
     ordering = _bernstein_ordering(ip)
     basefunction_indeces = CartesianIndices(_n)[ordering[i]]

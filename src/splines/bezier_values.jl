@@ -40,8 +40,10 @@ BezierCellAndFaceValues{T,CV} = Union{BezierCellValues{T,CV}, BezierFaceValues{T
 
 Ferrite.nfaces(fv::BezierFaceValues) = length(fv.geo_mapping)
 Ferrite.getnormal(fv::BezierFaceValues, iqp::Int) = fv.normals[iqp]
-Ferrite.function_interpolation(cv::BezierCellAndFaceValues) = Ferrite.function_interpolation(cv.bezier_values)
-Ferrite.geometric_interpolation(cv::BezierCellAndFaceValues) = Ferrite.geometric_interpolation(cv.geo_mapping)
+Ferrite.function_interpolation(cv::BezierCellValues) = Ferrite.function_interpolation(cv.bezier_values)
+Ferrite.geometric_interpolation(cv::BezierCellValues) = Ferrite.geometric_interpolation(cv.geo_mapping)
+Ferrite.function_interpolation(cv::BezierFaceValues) = Ferrite.function_interpolation(cv.bezier_values[1])
+Ferrite.geometric_interpolation(cv::BezierFaceValues) = Ferrite.geometric_interpolation(cv.geo_mapping[1])
 
 function BezierCellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
     update_gradients::Bool = true, update_detJdV::Bool = true) where T 
@@ -82,7 +84,7 @@ function BezierFaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolat
         fun_values, 
         deepcopy(fun_values), 
         deepcopy(fun_values), 
-        geo_mapping, qr, detJdV, normals, undef_beo, undef_w, Ferrite.ScalarWrapper(1))
+        geo_mapping, fqr, detJdV, normals, undef_beo, undef_w, Ferrite.ScalarWrapper(1))
 end
 
 #Intercept construction of CellValues called with IGAInterpolation
@@ -511,20 +513,22 @@ end
 
 function Base.show(io::IO, m::MIME"text/plain", fv::BezierFaceValues)
     println(io, "BezierFaceValues with")
-    nqp = getnquadpoints.(fv.cv_bezier.qr.face_rules)
+    nqp = getnquadpoints.(fv.qr.face_rules)
+    fip = Ferrite.function_interpolation(fv)
+    gip = Ferrite.geometric_interpolation(fv)
     if all(n==first(nqp) for n in nqp)
         println(io, "- Quadrature rule with ", first(nqp), " points per face")
     else
         println(io, "- Quadrature rule with ", tuple(nqp...), " points on each face")
     end
-    print(io, "- Function interpolation: "); show(io, m, fv.cv_bezier.func_interp)
+    print(io, "- Function interpolation: "); show(io, m, fip)
     println(io)
-    print(io, "- Geometric interpolation: "); show(io, m, fv.cv_bezier.geo_interp)
+    print(io, "- Geometric interpolation: "); show(io, m, gip)
 end
 
 function Base.show(io::IO, m::MIME"text/plain", cv::BezierCellValues)
     fip = Ferrite.function_interpolation(cv)
-    gip = Ferrite.function_interpolation(cv)
+    gip = Ferrite.geometric_interpolation(cv)
     println(io, "BezierCellValues with")
     println(io, "- Quadrature rule with ", getnquadpoints(cv), " points")
     print(io, "- Function interpolation: "); show(io, m, fip)
