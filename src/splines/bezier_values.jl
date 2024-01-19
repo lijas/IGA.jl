@@ -24,7 +24,7 @@ struct BezierFaceValues{FV, GM, FQR, dim, T, V_FV<:AbstractVector{FV}, V_GM<:Abs
     tmp_values::V_FV    # FunctionValues
     nurbs_values::V_FV  # FunctionValues
     geo_mapping::V_GM   # GeometryMapping
-    qr::QR            # QuadratureRule
+    qr::FQR            # QuadratureRule
     detJdV::Vector{T}
     normals::Vector{Vec{dim,T}}
 
@@ -41,7 +41,7 @@ BezierCellAndFaceValues{T,CV} = Union{BezierCellValues{T,CV}, BezierFaceValues{T
 Ferrite.nfaces(fv::BezierFaceValues) = length(fv.geo_mapping)
 Ferrite.getnormal(fv::BezierFaceValues, iqp::Int) = fv.normals[iqp]
 Ferrite.function_interpolation(cv::BezierCellAndFaceValues) = Ferrite.function_interpolation(cv.bezier_values)
-Ferrite.geometric_interpolation(cv::BezierCellAndFaceValues) = Ferrite.geometric_interpolation(cv.bezier_values)
+Ferrite.geometric_interpolation(cv::BezierCellAndFaceValues) = Ferrite.geometric_interpolation(cv.geo_mapping)
 
 function BezierCellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
     update_gradients::Bool = true, update_detJdV::Bool = true) where T 
@@ -77,7 +77,7 @@ function BezierFaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolat
     detJdV  = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
-    undef_w   = NaN .* zeros(Float64, Ferrite.getngeobasefunctions(geo_mapping))
+    undef_w   = NaN .* zeros(Float64, Ferrite.getngeobasefunctions(first(geo_mapping)))
     return BezierFaceValues(
         fun_values, 
         deepcopy(fun_values), 
