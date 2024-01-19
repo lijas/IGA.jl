@@ -111,6 +111,7 @@ include("splines/bezier_values.jl")
 include("splines/bsplines.jl")
 include("VTK.jl")
 include("iterators.jl")
+include("iterators_future.jl")
 #include("L2_projection.jl")
 
 Ferrite._mass_qr(::IGAInterpolation{shape,order}) where {shape,order}= Ferrite._mass_qr(Bernstein{shape, order}())

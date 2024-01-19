@@ -53,7 +53,7 @@ function BezierGrid(grid::Ferrite.Grid{dim,C,T}) where {dim,C,T}
 		push!(extraction_operator, beo)
 	end
 
-	return BezierGrid{dim,C,T}(grid, weights, extraction_operator, facesets = grid.facesets, nodesets = grid.nodesets, edgesets = grid.edgesets, vertexsets = grid.vertexsets)
+	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
 end
 
 function Base.getproperty(m::BezierGrid, s::Symbol)
@@ -108,6 +108,9 @@ function Ferrite.getweights(grid::BezierGrid, ic::Int)
 	nodeids = collect(grid.cells[ic].nodes)
 	return grid.weights[nodeids]
 end
+
+#Note: This is needed in order to get some stuff to work nicely in Ferrite.
+Ferrite.get_coordinate_type(::BezierGrid{dim,C,T}) where {dim,C,T} = Vec{dim,T} 
 
 function Ferrite.getcoordinates!(bc::BezierCoords{dim,T}, grid::BezierGrid, ic::Int) where {dim,T}
 	get_bezier_coordinates!(bc.xb, bc.wb, bc.x, bc.w, grid, ic)
