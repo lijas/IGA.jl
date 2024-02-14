@@ -45,3 +45,35 @@ Ferrite.getnodes(cc::IGACellCache) = cc.nodes
 Ferrite.getcoordinates(cc::IGACellCache) = cc.bezier_cell_data
 Ferrite.celldofs(cc::IGACellCache) = cc.dofs
 Ferrite.cellid(cc::IGACellCache) = cc.cellid[]
+
+
+#
+# Copy FaceCache from ferrite
+struct IGAFaceCache{CC}
+    cc::CC  # const for julia > 1.8
+    dofs::Vector{Int} # aliasing cc.dofs
+    current_faceid::Ferrite.ScalarWrapper{Int}
+end
+
+function IGAFaceCache(args...)
+    cc = IGACellCache(args...)
+    IGAFaceCache(cc, cc.dofs, Ferrite.ScalarWrapper(0))
+end
+
+function Ferrite.reinit!(fc::IGAFaceCache, face::FaceIndex)
+    cellid, faceid = face
+    reinit!(fc.cc, cellid)
+    fc.current_faceid[] = faceid
+    return nothing
+end
+
+# Delegate methods to the cell cache
+for op = (:getnodes, :getcoordinates, :cellid, :celldofs)
+    @eval begin
+        function Ferrite.$op(fc::IGAFaceCache, args...)
+            return Ferrite.$op(fc.cc, args...)
+        end
+    end
+end
+# @inline faceid(fc::FaceCache) = fc.current_faceid[]
+@inline Ferrite.celldofs!(v::Vector, fc::IGAFaceCache) = celldofs!(v, fc.cc)

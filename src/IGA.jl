@@ -19,7 +19,7 @@ export BezierExtractionOperator
 export BezierCell
 export BezierCoords
 export VTKIGAFile
-export IGACellCache
+export IGACellCache, IGAFaceCache
 
 const Optional{T} = Union{T, Nothing}
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}

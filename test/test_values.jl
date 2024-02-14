@@ -104,13 +104,13 @@ end
 
     reorder = IGA._bernstein_ordering(bip)
 
-    qr = QuadratureRule{shape}(1)
+    qr = QuadratureRule{shape}(2)
     qr_face = FaceQuadratureRule{shape}(3)
 
-    fv = FaceValues( qr_face, ip, ip )
-    fv_vector = FaceValues( qr_face, ip^dim, ip )
-    cv  = CellValues( qr, ip, ip )
-    cv_vector = CellValues( qr, ip^dim, ip)
+    fv = FaceValues( qr_face, ip, ip; update_hessians = true )
+    fv_vector = FaceValues( qr_face, ip^dim, ip; update_hessians = true )
+    cv  = CellValues( qr, ip, ip; update_hessians = true)
+    cv_vector = CellValues( qr, ip^dim, ip; update_hessians = true)
 
     #Try some different cells
     cellnum = 1
@@ -122,7 +122,7 @@ end
         bc = getcoordinates(grid, cellnum)
         reinit!(cv, bc)
         reinit!(cv_vector, bc)
-        @show cv.current_w
+        
         (; xb, wb, x, w) = bc
 
         iqp = 1
@@ -150,53 +150,50 @@ end
             @test dV_patch ≈ getdetJdV(cv, iqp)
             @test sum(cv.nurbs_values.Nξ[:,iqp]) ≈ 1
             for i in 1:getnbasefunctions(cv)
-                @test shape_value(cv,iqp,i) ≈ R[i]
+                @test shape_value(cv, iqp,i) ≈ R[i]
                 @test shape_gradient(cv, iqp, i) ≈ dRdX[i]
-                @test cv.nurbs_values.dNdξ[i,iqp] ≈ dRdξ[i]
+                @test shape_hessian(cv, iqp, i) ≈ d²RdX²[i]  atol=1e-12
+                
+                @test cv.nurbs_values.dNdξ[  i,iqp] ≈ dRdξ[i]  atol=1e-12
+                @test cv.nurbs_values.d2Ndξ2[i,iqp] ≈ d²Rdξ²[i]  atol=1e-12
             end
-            @test cv.d²Ndξ²[:,iqp] ≈ d²Rdξ² atol=1e-14
-            @test cv.d²NdX²[:,iqp] ≈ d²RdX²  atol=1e-14
 
             #Check if VectorValues is same as ScalarValues
             basefunc_count = 1
+            i = 1
+            comp = 1
             for i in 1:nb_per_cell
                 for comp in 1:dim
                     N_comp = zeros(Float64, dim)
-                    N_comp[comp] = cv.cv_nurbs.N[i, iqp]
+                    N_comp[comp] = shape_value(cv, iqp, i)
                     _N = Vec{dim,Float64}((N_comp...,))
                     
-                    @test cv_vector.cv_nurbs.N[basefunc_count, iqp] ≈ _N atol = 1e-15
+                    @test shape_value(cv_vector,iqp,basefunc_count) ≈ _N atol=1e-15
                     
-                    dN_comp = zeros(Float64, dim, dim)
-                    dN_comp[comp, :] = cv.cv_nurbs.dNdξ[i, iqp]
-                    _dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
-                    
-                    @test cv_vector.cv_nurbs.dNdξ[basefunc_count, iqp] ≈ _dNdξ atol = 1e-15
+                    #dN_comp = zeros(Float64, dim, dim)
+                    #dN_comp[comp, :] = cv.cv_nurbs.dNdξ[i, iqp]
+                    #_dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
+                    #@test cv_vector.cv_nurbs.dNdξ[basefunc_count, iqp] ≈ _dNdξ atol = 1e-15
 
                     dN_comp = zeros(Float64, dim, dim)
-                    dN_comp[comp, :] = cv.cv_nurbs.dNdx[i, iqp]
+                    dN_comp[comp, :] = shape_gradient(cv,iqp,i)
                     _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
-                    
-                    @test cv_vector.cv_nurbs.dNdx[basefunc_count, iqp] ≈ _dNdx atol = 1e-15
+                    @test shape_gradient(cv_vector,iqp,basefunc_count) ≈ _dNdx atol = 1e-15
 
                     basefunc_count += 1
                 end
             end
-
         end
     end
     
     addfaceset!(grid, "face1", (x)-> x[1] == -4.0)
     for (cellnum, faceidx) in getfaceset(grid, "face1")
 
-        Xb, wb = get_bezier_coordinates(grid, cellnum)
-        C = get_extraction_operator(grid, cellnum)
-        X = get_nurbs_coordinates(grid, cellnum)
-        w = Ferrite.getweights(grid, cellnum)
-
         bc = getcoordinates(grid, cellnum)
         reinit!(fv, bc, faceidx)
         reinit!(fv_vector, bc, faceidx)
+
+        (; xb, wb, x, w) = bc
 
         for iqp in 1:getnquadpoints(fv)
 
@@ -206,11 +203,9 @@ end
             #Calculate the value of the NURBS from the nurbs patch
             R, dRdξ, d²Rdξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
 
-            #Calculate the value of the NURBS from the nurbs patch
-            R, dRdξ, d²Rdξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
-
             J = sum(x .⊗ dRdξ)
             H = sum(x .⊗ d²Rdξ²)
+            wn = Ferrite.weighted_normal(J, shape, faceidx)
             dV_patch = norm(Ferrite.weighted_normal(J, shape, faceidx))*qrw
 
             dRdX = similar(dRdξ)
@@ -224,35 +219,36 @@ end
                 d²RdX²[i] = inv(J)' ⋅ d²Rdξ²[i] ⋅ inv(J) - inv(J)' ⋅ FF ⋅ inv(J)
             end 
 
-            @test dV_patch ≈ getdetJdV(cv, iqp)
-            @test sum(fv.cv_nurbs.N[:,iqp]) ≈ 1
-            @test fv.cv_nurbs.N[:,iqp] ≈ R
-            @test fv.cv_nurbs.dNdξ[:,iqp] ≈ dRdξ
-            @test fv.cv_nurbs.dNdx[:,iqp] ≈ dRdX
-            @test fv.d²Ndξ²[:,iqp] ≈ d²Rdξ² atol=1e-14
-            @test fv.d²NdX²[:,iqp] ≈ d²RdX²  atol=1e-14
+            @test getnormal(fv, iqp) ≈ Vec((-1.0, 0.0))
+            @test dV_patch ≈ getdetJdV(fv, iqp)
+            @test sum(fv.nurbs_values[faceidx].Nξ[:,iqp]) ≈ 1
+            for i in 1:getnbasefunctions(fv)
+                @test shape_value(fv, iqp,i) ≈ R[i]
+                @test shape_gradient(fv, iqp, i) ≈ dRdX[i]
+                @test shape_hessian(fv, iqp, i) ≈ d²RdX²[i]  atol=1e-11
+                
+                @test fv.nurbs_values[faceidx].dNdξ[  i,iqp] ≈ dRdξ[i]  atol=1e-11
+                @test fv.nurbs_values[faceidx].d2Ndξ2[i,iqp] ≈ d²Rdξ²[i]  atol=1e-11
+            end
 
             #Check if VectorValues is same as ScalarValues
             basefunc_count = 1
             for i in 1:nb_per_cell
                 for comp in 1:dim
                     N_comp = zeros(Float64, dim)
-                    N_comp[comp] = fv.cv_nurbs.N[i, iqp, faceidx]
+                    N_comp[comp] = shape_value(fv,iqp,i)
                     _N = Vec{dim,Float64}((N_comp...,))
+                    @test shape_value(fv_vector,iqp,basefunc_count) ≈ _N atol = 1e-15
                     
-                    @test fv_vector.cv_nurbs.N[basefunc_count, iqp, faceidx] ≈ _N
-                    
-                    dN_comp = zeros(Float64, dim, dim)
-                    dN_comp[comp, :] = fv.cv_nurbs.dNdξ[i, iqp, faceidx]
-                    _dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
-                    
-                    @test fv_vector.cv_nurbs.dNdξ[basefunc_count, iqp, faceidx] ≈ _dNdξ
+                    #dN_comp = zeros(Float64, dim, dim)
+                    #dN_comp[comp, :] = fv.cv_nurbs.dNdξ[i, iqp, faceidx]
+                    #_dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
+                    #@test fv_vector.cv_nurbs.dNdξ[basefunc_count, iqp, faceidx] ≈ _dNdξ
 
                     dN_comp = zeros(Float64, dim, dim)
-                    dN_comp[comp, :] = fv.cv_nurbs.dNdx[i, iqp, faceidx]
+                    dN_comp[comp, :] = shape_gradient(fv,iqp,i)
                     _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
-                    
-                    @test fv_vector.cv_nurbs.dNdx[basefunc_count, iqp, faceidx] ≈ _dNdx
+                    @test shape_gradient(fv_vector,iqp,basefunc_count) ≈ _dNdx atol = 1e-15
 
                     basefunc_count += 1
                 end
