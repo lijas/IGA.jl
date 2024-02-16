@@ -14,10 +14,10 @@ end
 function IGACellCache(dh::DofHandler{dim,G}, flags::UpdateFlags=UpdateFlags()) where {dim,G}
     grid = Ferrite.get_grid(dh)
     T = Ferrite.get_coordinate_eltype(grid)
-    N = Ferrite.nnodes_per_cell(grid)
+    N = Ferrite.nnodes_per_cell(grid, 1)
     nodes    = zeros(Int, N)
     coords   = zero_bezier_coord(dim,T,N)
-    n        = ndofs_per_cell(dh)
+    n        = ndofs_per_cell(dh, 1)
     celldofs = zeros(Int, n)
 
     return IGACellCache(flags, grid, Ferrite.ScalarWrapper(-1), nodes, coords, dh, celldofs)
