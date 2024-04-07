@@ -70,7 +70,7 @@ function BezierGrid(grid::Ferrite.Grid{dim,C,T}) where {dim,C,T}
 		push!(extraction_operator, beo)
 	end
 
-	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
+	return BezierGrid(grid, weights, extraction_operator)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::BezierGrid)
@@ -99,7 +99,7 @@ Base.@propagate_inbounds function getweights!(w::Vector, grid::BezierGrid, cell:
 	nnodes = length(node_ids)
 	@boundscheck checkbounds(Bool, w, 1:nnodes)
     @inbounds for i in 1:nnodes
-        w[i] = grid.weights[i]
+        w[i] = grid.weights[node_ids[i]]
     end
 end
 
