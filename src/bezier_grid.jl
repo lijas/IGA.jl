@@ -4,6 +4,23 @@ struct BezierGrid{dim,C<:Ferrite.AbstractCell,T<:Real} <: Ferrite.AbstractGrid{d
 	grid    ::Ferrite.Grid{dim,C,T}
 	weights ::Vector{Float64}
 	beo     ::Vector{BezierExtractionOperator{Float64}}
+
+	#Alias from grid
+	cells::Vector{C}
+    nodes::Vector{Node{dim,T}}
+    cellsets::Dict{String,Set{Int}}
+    nodesets::Dict{String,Set{Int}}
+    facesets::Dict{String,Set{FaceIndex}}
+    edgesets::Dict{String,Set{EdgeIndex}}
+    vertexsets::Dict{String,Set{VertexIndex}}
+    boundary_matrix::Ferrite.SparseMatrixCSC{Bool,Int}
+
+	function BezierGrid(grid::Ferrite.Grid{dim,C,T}, weights::Vector{T}, beo::Vector{BezierExtractionOperator{T}}) where {dim,C,T}
+		return new{dim,C,T}(
+			grid, weights, beo,
+			grid.cells, grid.nodes, grid.cellsets, grid.nodesets, grid.facesets, grid.edgesets, grid.vertexsets, grid.boundary_matrix
+		)
+	end
 end
 
 function BezierGrid(cells::Vector{C},
@@ -18,9 +35,9 @@ function BezierGrid(cells::Vector{C},
 		boundary_matrix::SparseArrays.SparseMatrixCSC{Bool,Int}  = SparseArrays.spzeros(Bool, 0, 0)) where {dim,C,T}
 
 	
-	grid = Ferrite.Grid(cells, nodes; nodesets, cellsets, facesets, vertexsets, boundary_matrix)
+	grid = Ferrite.Grid(cells, nodes; nodesets, cellsets, facesets, edgesets, vertexsets, boundary_matrix)
 
-	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
+	return BezierGrid(grid, weights, extraction_operator)
 end
 
 function BezierGrid(mesh::NURBSMesh{pdim,sdim}) where {pdim,sdim}
@@ -56,26 +73,6 @@ function BezierGrid(grid::Ferrite.Grid{dim,C,T}) where {dim,C,T}
 	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
 end
 
-function Base.getproperty(m::BezierGrid, s::Symbol)
-    if s === :nodes
-        return getfield(m.grid, :nodes)
-    elseif s === :cells
-		return getfield(m.grid, :cells)
-    elseif s === :cellsets
-		return getfield(m.grid, :cellsets)
-    elseif s === :nodesets
-		return getfield(m.grid, :nodesets)
-    elseif s === :facesets
-		return getfield(m.grid, :facesets)
-	elseif s === :edgesets
-		return getfield(m.grid, :edgesets)
-	elseif s === :vertexsets
-        return getfield(m.grid, :vertexsets)
-    else 
-        return getfield(m, s)
-    end
-end
-
 function Base.show(io::IO, ::MIME"text/plain", grid::BezierGrid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")
     if isconcretetype(eltype(grid.cells))
@@ -92,16 +89,18 @@ end
 
 Returns the weights (for the nurbs interpolation) for cell with id `cellid`.
 """
-@inline function getweights!(w::Vector{T}, grid::BezierGrid, cellid::Int) where {T} 
+Base.@propagate_inbounds function getweights!(w::Vector, grid::BezierGrid, cellid::Int)
     cell = grid.cells[cellid]
     getweights!(w, grid, cell)
 end
 
-@inline function getweights!(w::Vector{T}, grid::BezierGrid, cell::Ferrite.AbstractCell) where {T}
-    for i in 1:length(w)
-        w[i] = grid.weights[cell.nodes[i]]
+Base.@propagate_inbounds function getweights!(w::Vector, grid::BezierGrid, cell::Ferrite.AbstractCell) 
+	node_ids = Ferrite.get_node_ids(cell)
+	nnodes = length(node_ids)
+	@boundscheck checkbounds(Bool, w, 1:nnodes)
+    @inbounds for i in 1:nnodes
+        w[i] = grid.weights[i]
     end
-    return w
 end
 
 function Ferrite.getweights(grid::BezierGrid, ic::Int)
