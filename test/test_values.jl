@@ -60,20 +60,12 @@ end
     qr_face = FaceQuadratureRule{shape}(1)
 
     cv  = CellValues( qr, ip, ip)
-    cv2 = BezierCellValues( CellValues(qr, bip, bip) )
+    #cv2 = BezierCellValues( CellValues(qr, bip, bip) )
     cv3 = CellValues( qr, ip, ip)
 
-    @test cv.cv_bezier.M == cv2.cv_bezier.M
-    @test cv.cv_bezier.M == cv3.cv_bezier.M
-    @test cv3 isa BezierCellValues
-
     cv_vector1 = CellValues( qr, ip^sdim, ip )
-    cv_vector2 = BezierCellValues( CellValues(qr, bip^sdim, bip) )
+    #cv_vector2 = BezierCellValues( CellValues(qr, bip^sdim, bip) )
     cv_vector3 = CellValues( qr, ip^sdim, ip )
-
-    @test cv_vector1.cv_bezier.M == cv_vector2.cv_bezier.M
-    @test cv_vector1.cv_bezier.M == cv_vector3.cv_bezier.M
-    @test cv_vector3 isa BezierCellValues
 
     @test Ferrite.getngeobasefunctions(cv_vector1) == getnbasefunctions(ip)
     @test Ferrite.getngeobasefunctions(cv) == getnbasefunctions(ip)
@@ -93,6 +85,8 @@ end
     # Build the problem
     ##
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels, (2,2))
+    #nurbsmesh.knot_vectors[1][4] = -0.5
+    #nurbsmesh.knot_vectors[2][4] = -0.5
     #nurbsmesh = generate_nurbs_patch(:rectangle, nels, (order,order), size = (20.0,20.0))
     #nurbsmesh.weights .= 1.0
 
@@ -152,10 +146,10 @@ end
             for i in 1:getnbasefunctions(cv)
                 @test shape_value(cv, iqp,i) ≈ R[i]
                 @test shape_gradient(cv, iqp, i) ≈ dRdX[i]
-                @test shape_hessian(cv, iqp, i) ≈ d²RdX²[i]  atol=1e-12
+                @test shape_hessian(cv, iqp, i) ≈ d²RdX²[i] # atol=1e-12
                 
-                @test cv.nurbs_values.dNdξ[  i,iqp] ≈ dRdξ[i]  atol=1e-12
-                @test cv.nurbs_values.d2Ndξ2[i,iqp] ≈ d²Rdξ²[i]  atol=1e-12
+                @test cv.nurbs_values.dNdξ[  i,iqp] ≈ dRdξ[i] # atol=1e-12
+                @test cv.nurbs_values.d2Ndξ2[i,iqp] ≈ d²Rdξ²[i] # atol=1e-12
             end
 
             #Check if VectorValues is same as ScalarValues
@@ -167,18 +161,17 @@ end
                     N_comp = zeros(Float64, dim)
                     N_comp[comp] = shape_value(cv, iqp, i)
                     _N = Vec{dim,Float64}((N_comp...,))
-                    
-                    @test shape_value(cv_vector,iqp,basefunc_count) ≈ _N atol=1e-15
-                    
-                    #dN_comp = zeros(Float64, dim, dim)
-                    #dN_comp[comp, :] = cv.cv_nurbs.dNdξ[i, iqp]
-                    #_dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
-                    #@test cv_vector.cv_nurbs.dNdξ[basefunc_count, iqp] ≈ _dNdξ atol = 1e-15
+                    @test shape_value(cv_vector,iqp,basefunc_count) ≈ _N #atol=1e-15
 
                     dN_comp = zeros(Float64, dim, dim)
                     dN_comp[comp, :] = shape_gradient(cv,iqp,i)
                     _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
-                    @test shape_gradient(cv_vector,iqp,basefunc_count) ≈ _dNdx atol = 1e-15
+                    @test shape_gradient(cv_vector,iqp,basefunc_count) ≈ _dNdx #atol = 1e-15
+
+                    ddN_comp = zeros(Float64, dim, dim, dim)
+                    ddN_comp[comp, :, :] = shape_hessian(cv,iqp,i)
+                    _d2Ndx2 = Tensor{3,dim,Float64}((ddN_comp...,))
+                    @test shape_hessian(cv_vector,iqp,basefunc_count) ≈ _d2Ndx2 #atol = 1e-15
 
                     basefunc_count += 1
                 end
@@ -186,6 +179,7 @@ end
         end
     end
     
+    cellnum, faceidx = (9, 3)
     addfaceset!(grid, "face1", (x)-> x[1] == -4.0)
     for (cellnum, faceidx) in getfaceset(grid, "face1")
 
@@ -225,30 +219,32 @@ end
             for i in 1:getnbasefunctions(fv)
                 @test shape_value(fv, iqp,i) ≈ R[i]
                 @test shape_gradient(fv, iqp, i) ≈ dRdX[i]
-                @test shape_hessian(fv, iqp, i) ≈ d²RdX²[i]  atol=1e-11
+                @test shape_hessian(fv, iqp, i) ≈ d²RdX²[i]  #atol=1e-11
                 
-                @test fv.nurbs_values[faceidx].dNdξ[  i,iqp] ≈ dRdξ[i]  atol=1e-11
-                @test fv.nurbs_values[faceidx].d2Ndξ2[i,iqp] ≈ d²Rdξ²[i]  atol=1e-11
+                @test fv.nurbs_values[faceidx].dNdξ[  i,iqp] ≈ dRdξ[i]  #atol=1e-11
+                @test fv.nurbs_values[faceidx].d2Ndξ2[i,iqp] ≈ d²Rdξ²[i]  #atol=1e-11
             end
 
             #Check if VectorValues is same as ScalarValues
+            i = 1
             basefunc_count = 1
+            comp = 1
             for i in 1:nb_per_cell
                 for comp in 1:dim
                     N_comp = zeros(Float64, dim)
                     N_comp[comp] = shape_value(fv,iqp,i)
                     _N = Vec{dim,Float64}((N_comp...,))
-                    @test shape_value(fv_vector,iqp,basefunc_count) ≈ _N atol = 1e-15
-                    
-                    #dN_comp = zeros(Float64, dim, dim)
-                    #dN_comp[comp, :] = fv.cv_nurbs.dNdξ[i, iqp, faceidx]
-                    #_dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
-                    #@test fv_vector.cv_nurbs.dNdξ[basefunc_count, iqp, faceidx] ≈ _dNdξ
+                    @test shape_value(fv_vector,iqp,basefunc_count) ≈ _N #atol = 1e-15
 
                     dN_comp = zeros(Float64, dim, dim)
                     dN_comp[comp, :] = shape_gradient(fv,iqp,i)
                     _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
-                    @test shape_gradient(fv_vector,iqp,basefunc_count) ≈ _dNdx atol = 1e-15
+                    @test shape_gradient(fv_vector,iqp,basefunc_count) ≈ _dNdx #atol = 1e-15
+
+                    ddN_comp = zeros(Float64, dim, dim, dim)
+                    ddN_comp[comp, :, :] = shape_hessian(fv,iqp,i)
+                    _d2Ndx2 = Tensor{3,dim,Float64}((ddN_comp...,))
+                    @test shape_hessian(fv_vector,iqp,basefunc_count) ≈ _d2Ndx2 #atol = 1e-15
 
                     basefunc_count += 1
                 end

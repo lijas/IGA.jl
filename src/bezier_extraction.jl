@@ -65,6 +65,7 @@ function compute_bezier_points!(bezier_points::Vector{T2}, Ce::BezierExtractionO
 
 	return nothing
 end
+#const bezier_extraction! = compute_bezier_points!
 
 """
 	compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1)

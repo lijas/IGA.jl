@@ -231,11 +231,11 @@ end
     test_cylinder_sector_3d()
 end
 
-@testset "test grid_generator"
+@testset "test grid_generator" begin
     #Check that it is possible to generate gird with ferrite-api:
     #TODO: What to test?
     generate_grid(BezierCell{RefQuadrilateral, 2}, (2,2))
-    generate_grid(BezierCell{RefQuadrilateral, 2}, (2,2), left = Vec((0.0,0.0)), right = Vec((1.0,1.0)))
+    generate_grid(BezierCell{RefQuadrilateral, 2}, (2,2), Vec((0.0,0.0)),  Vec((1.0,1.0)))
     generate_grid(BezierCell{RefHexahedron, 2}, (2,2,2))
-    generate_grid(BezierCell{RefHexahedron, 2}, (2,2,2), left = Vec((0.0,0.0)), right = Vec((1.0,1.0)))
+    generate_grid(BezierCell{RefHexahedron, 2}, (2,2,2),  Vec((0.0,0.0,0.0)),  Vec((1.0,1.0,1.0)))
 end

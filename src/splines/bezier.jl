@@ -377,15 +377,15 @@ function _bernstein_ordering(::Bernstein{RefHexahedron, order}) where {order}
 end
 
 #Almost the same orderign as _bernstein_ordering, but some changes for faces and edges
-function _vtk_ordering(c::BezierCell{RefLine})
+function _vtk_ordering(c::Type{<:BezierCell{RefLine}})
     _bernstein_ordering(c)
 end
 
-function _vtk_ordering(c::BezierCell{RefQuadrilateral}) 
+function _vtk_ordering(c::Type{<:BezierCell{RefQuadrilateral}}) 
     _bernstein_ordering(c)
 end
 
-function _vtk_ordering(::BezierCell{RefHexahedron, order}) where {order}
+function _vtk_ordering(::Type{<:BezierCell{RefHexahedron, order}}) where {order}
     orders = (order, order, order)
 
     ind = reshape(1:prod(orders .+ 1), (orders .+ 1)...)

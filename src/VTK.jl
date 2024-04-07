@@ -138,9 +138,9 @@ function #=Ferrite.=#write_solution(vtk::VTKIGAFile, dh::DofHandler, a, suffix="
 	end
 end
 
-function #=Ferrite.=#write_projection(vtk::VTKIGAFile, proj::L2Projector, vals, name)
-    data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
-    @assert size(data, 2) == getnnodes(get_grid(proj.dh))
+function #=Ferrite.=#write_projected(vtk::VTKIGAFile, proj::L2Projector, vals, name)
+    data = Ferrite._evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
+    @assert size(data, 2) == getnnodes(Ferrite.get_grid(proj.dh))
     vtk_node_data(vtk.vtk, data, name; component_names=Ferrite.component_names(eltype(vals)))
     return vtk
 end
@@ -198,7 +198,8 @@ function _evaluate_at_geometry_nodes!(
     return data
 end
 
-
+is_scalar_interpolaiton(::BezierCellValues{<:Ferrite.FunctionValues{DiffOrder, <:Ferrite.VectorInterpolation}}) where DiffOrder = false
+is_scalar_interpolaiton(::BezierCellValues{<:Ferrite.FunctionValues{DiffOrder, <:Ferrite.ScalarInterpolation}}) where DiffOrder = true
 function _evaluate_at_geometry_nodes!(data, sdh, a::Vector{T}, cv, drange, cellset, ::Type{RT}) where {T, RT}
 
 	dh = sdh.dh
@@ -209,7 +210,7 @@ function _evaluate_at_geometry_nodes!(data, sdh, a::Vector{T}, cv, drange, cells
 	ue = zeros(eltype(a), ncelldofs)
 
 	# TODO: Remove this hack when embedding works...
-    if RT <: Vec && cv isa BezierCellValues{T, <:CellValues{<:ScalarInterpolation}}
+    if RT <: Vec && is_scalar_interpolaiton(cv)
         uer = reinterpret(RT, ue)
     else
         uer = ue
@@ -219,9 +220,9 @@ function _evaluate_at_geometry_nodes!(data, sdh, a::Vector{T}, cv, drange, cells
 	bcoords = getcoordinates(dh.grid, first(cellset))
     offset = 0
     for cellid in cellset
-
         getcoordinates!(bcoords, dh.grid, cellid)
-        reinit!(cv, bcoords)
+
+		reinit_values!(cv, bcoords)
 
         celldofs!(dofs, sdh, cellid)
 		for (i, I) in pairs(drange)
