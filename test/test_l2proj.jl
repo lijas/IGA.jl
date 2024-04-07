@@ -49,7 +49,7 @@ function test_projection()
     elseif order == 2
         # For a quadratic approximation the analytical solution is recovered
         ae = zeros(length(point_vars))
-        apply_analytical!(ae, proj.dh, :_, f)
+        apply_analytical_iga!(ae, proj.dh, :_, f)
     end
 
 
@@ -74,7 +74,7 @@ function test_projection()
         ae = [Vec{1,Float64}((f_approx(j),)) for j in 1:4]
     elseif order == 2
         ae = zeros(length(point_vars))
-        apply_analytical!(ae, proj.dh, :_, x -> f_vector(x)[1])
+        apply_analytical_iga!(ae, proj.dh, :_, x -> f_vector(x)[1])
         ae = reinterpret(Vec{1,Float64}, ae)
     end
     @test point_vars ≈ ae
@@ -90,7 +90,7 @@ function test_projection()
     elseif order == 2
         ae = zeros(4, length(point_vars))
         for i in 1:4
-            apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f_tensor(x)[i])
+            apply_analytical_iga!(@view(ae[i, :]), proj.dh, :_, x -> f_tensor(x)[i])
         end
         ae = reinterpret(reshape, Tensor{2,2,Float64,4}, ae)
     end
@@ -107,7 +107,7 @@ function test_projection()
     elseif order == 2
         ae = zeros(3, length(point_vars))
         for i in 1:3
-            apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f_stensor(x).data[i])
+            apply_analytical_iga!(@view(ae[i, :]), proj.dh, :_, x -> f_stensor(x).data[i])
         end
         ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
     end
