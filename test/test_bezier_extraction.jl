@@ -15,10 +15,10 @@
     @test all(C[4] .≈ Float64[1/6 0 0 0; 7/12 1/2 0 0; 1/4 1/2 1 0; 0 0 0 1][ordering,ordering])
 
     #Test multivariate extraction operator
-    orders = (2,2)
+    order = 2
     knots = (Float64[0,0,0,1/3,2/3,1,1,1], Float64[0,0,0,1/3,2/3,1,1,1])
-    C,nbe = IGA.compute_bezier_extraction_operators(orders, knots)
-    ordering = IGA._bernstein_ordering(Bernstein{RefQuadrilateral, orders}())
+    C,nbe = IGA.compute_bezier_extraction_operators((order,order), knots)
+    ordering = IGA._bernstein_ordering(Bernstein{RefQuadrilateral, order}())
     @test nbe == 9
     @test length(C) == 9
     @test all(C[1] .≈ kron( [1 0 0; 0 1 1/2; 0 0 1/2], [1 0 0; 0 1 1/2; 0 0 1/2])[ordering,ordering])

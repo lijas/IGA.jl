@@ -72,7 +72,7 @@ end
 
 BezierCellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = BezierCellValues(Float64, qr, ip, args...; kwargs...)
 
-function BezierFaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
+function BezierFaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = Ferrite.default_geometric_interpolation(ip_fun); 
     update_hessians::Bool = false, update_gradients::Bool = true) where {T,sdim} 
 
     FunDiffOrder  = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
@@ -140,7 +140,6 @@ Ferrite.geometric_value(fv::BezierFaceValues, q_point::Int, i::Int) = Ferrite.ge
 Ferrite.shape_hessian(fv::BezierFaceValues, q_point::Int, i::Int) = shape_hessian(fv.nurbs_values[Ferrite.getcurrentface(fv)], q_point, i)
 Ferrite.shape_hessian(cv::BezierCellValues, q_point::Int, i::Int) = shape_hessian(cv.nurbs_values, q_point, i)
 
-Ferrite.nfaces(fv::BezierFaceValues) = length(fv.geo_mapping)
 Ferrite.getcurrentface(fv::BezierFaceValues) = fv.current_face[]
 function Ferrite.set_current_face!(fv::BezierFaceValues, face_nr::Int)
     checkbounds(Bool, 1:Ferrite.nfaces(fv), face_nr) || throw(ArgumentError("Face index out of range."))
@@ -323,6 +322,27 @@ function Ferrite.reinit!(cv::BezierCellValues, (x,w)::CoordsAndWeight)
     return nothing
 end
 
+function reinit_values!(cv::BezierCellValues, bc::BezierCoords)
+    set_bezier_operator!(cv, bc.beo[], bc.w)
+    x, w = (bc.xb, bc.wb)
+
+    n_geom_basefuncs = Ferrite.getngeobasefunctions(cv.geo_mapping)
+    @assert isa(Ferrite.mapping_type(cv.bezier_values), Ferrite.IdentityMapping)
+    @assert checkbounds(Bool, x, 1:n_geom_basefuncs)
+    @assert checkbounds(Bool, w, 1:n_geom_basefuncs)
+
+    for (q_point, gauss_w) in enumerate(Ferrite.getweights(cv.qr))
+        #mapping = Ferrite.calculate_mapping(cv.geo_mapping, q_point, x, w)
+        #detJ = Ferrite.calculate_detJ(Ferrite.getjacobian(mapping))
+        #cv.detJdV[q_point] = detJ * gauss_w
+        _compute_intermidiate!(cv.tmp_values, cv.bezier_values, cv.geo_mapping, q_point, w)
+        #Ferrite.apply_mapping!(cv.tmp_values, q_point, mapping)
+        _bezier_transform(cv.nurbs_values, cv.tmp_values, q_point, cv.current_beo[], cv.current_w)
+        #detJ > 0.0 || Ferrite.throw_detJ_not_pos(detJ)
+    end
+    return nothing
+end
+
 function Ferrite.reinit!(cv::BezierFaceValues, bc::BezierCoords, face_nr::Int)
     set_bezier_operator!(cv, bc.beo[], bc.w)
     return reinit!(cv, (bc.xb, bc.wb), face_nr)
@@ -368,26 +388,30 @@ function _bezier_transform(nurbs::FunctionValues{DIFFORDER}, bezier::FunctionVal
     dBdξ   = bezier.dNdξ
     B      = bezier.Nξ
 
-    is_scalar_valued = !(Ferrite.shape_value_type(nurbs) <: Tensor)
-    dim_s = Ferrite.sdim_from_gradtype(Ferrite.shape_gradient_type(nurbs))
+    is_scalar_valued = Ferrite.shape_value_type(nurbs) <: AbstractFloat
+    vdim = length(first(B))#Ferrite.sdim_from_gradtype(Ferrite.shape_gradient_type(nurbs))
 
     for ib in 1:N
         if is_scalar_valued
             nurbs.Nξ[ib, iq] = zero(eltype(nurbs.Nξ))
-            nurbs.dNdξ[ib, iq] = zero(eltype(nurbs.dNdξ))
-            nurbs.dNdx[ib, iq] = zero(eltype(nurbs.dNdx))
-            if DIFFORDER == 2
+            if DIFFORDER > 0
+                nurbs.dNdξ[ib, iq] = zero(eltype(nurbs.dNdξ))
+                nurbs.dNdx[ib, iq] = zero(eltype(nurbs.dNdx))
+            end
+            if DIFFORDER > 1
                 nurbs.d2Ndx2[ib, iq] = zero(eltype(nurbs.d2Ndx2))
                 nurbs.d2Ndξ2[ib, iq] = zero(eltype(nurbs.d2Ndξ2))
             end
         else 
-            for d in 1:dim_s
-                nurbs.Nξ[(ib-1)*dim_s+d, iq] = zero(eltype(nurbs.Nξ))
-                nurbs.dNdξ[(ib-1)*dim_s+d, iq] = zero(eltype(nurbs.dNdξ))
-                nurbs.dNdx[(ib-1)*dim_s+d, iq] = zero(eltype(nurbs.dNdx))
-                if DIFFORDER == 2
-                    nurbs.d2Ndx2[(ib-1)*dim_s+d, iq] = zero(eltype(nurbs.d2Ndx2))
-                    nurbs.d2Ndξ2[(ib-1)*dim_s+d, iq] = zero(eltype(nurbs.d2Ndξ2))
+            for d in 1:vdim
+                nurbs.Nξ[(ib-1)*vdim+d, iq] = zero(eltype(nurbs.Nξ))
+                if DIFFORDER > 0
+                    nurbs.dNdξ[(ib-1)*vdim+d, iq] = zero(eltype(nurbs.dNdξ))
+                    nurbs.dNdx[(ib-1)*vdim+d, iq] = zero(eltype(nurbs.dNdx))
+                end
+                if DIFFORDER > 1
+                    nurbs.d2Ndx2[(ib-1)*vdim+d, iq] = zero(eltype(nurbs.d2Ndx2))
+                    nurbs.d2Ndξ2[(ib-1)*vdim+d, iq] = zero(eltype(nurbs.d2Ndξ2))
                 end
             end
         end
@@ -401,20 +425,24 @@ function _bezier_transform(nurbs::FunctionValues{DIFFORDER}, bezier::FunctionVal
             end
             if is_scalar_valued
                 nurbs.Nξ[ib, iq]   += val*   B[nz_ind, iq]
-                nurbs.dNdξ[ib, iq] += val*dBdξ[nz_ind, iq]
-                nurbs.dNdx[ib, iq] += val*dBdx[nz_ind, iq]
-                if DIFFORDER == 2
+                if DIFFORDER > 0
+                    nurbs.dNdξ[ib, iq] += val*dBdξ[nz_ind, iq]
+                    nurbs.dNdx[ib, iq] += val*dBdx[nz_ind, iq]
+                end
+                if DIFFORDER > 1
                     nurbs.d2Ndξ2[ib, iq] += val*d2Bdξ2[nz_ind, iq]
                     nurbs.d2Ndx2[ib, iq] += val*d2Bdx2[nz_ind, iq]
                 end
             else 
-                for d in 1:dim_s
-                      nurbs.Nξ[(ib-1)*dim_s + d, iq] += val*   B[(nz_ind-1)*dim_s + d, iq]
-                    nurbs.dNdξ[(ib-1)*dim_s + d, iq] += val*dBdξ[(nz_ind-1)*dim_s + d, iq]
-                    nurbs.dNdx[(ib-1)*dim_s + d, iq] += val*dBdx[(nz_ind-1)*dim_s + d, iq]
-                    if DIFFORDER == 2
-                        nurbs.d2Ndξ2[(ib-1)*dim_s + d, iq] += val*d2Bdξ2[(nz_ind-1)*dim_s + d, iq]
-                        nurbs.d2Ndx2[(ib-1)*dim_s + d, iq] += val*d2Bdx2[(nz_ind-1)*dim_s + d, iq]
+                for d in 1:vdim
+                      nurbs.Nξ[(ib-1)*vdim + d, iq] += val*   B[(nz_ind-1)*vdim + d, iq]
+                    if DIFFORDER > 0
+                        nurbs.dNdξ[(ib-1)*vdim + d, iq] += val*dBdξ[(nz_ind-1)*vdim + d, iq]
+                        nurbs.dNdx[(ib-1)*vdim + d, iq] += val*dBdx[(nz_ind-1)*vdim + d, iq]
+                    end
+                    if DIFFORDER > 1
+                        nurbs.d2Ndξ2[(ib-1)*vdim + d, iq] += val*d2Bdξ2[(nz_ind-1)*vdim + d, iq]
+                        nurbs.d2Ndx2[(ib-1)*vdim + d, iq] += val*d2Bdx2[(nz_ind-1)*vdim + d, iq]
                     end
                 end
             end
@@ -423,6 +451,17 @@ function _bezier_transform(nurbs::FunctionValues{DIFFORDER}, bezier::FunctionVal
 end
 
 Ferrite.otimes_helper(x::Number, dMdξ::Vec{dim}) where dim = x * dMdξ
+
+
+function _compute_intermidiate!(tmp_values::FunctionValues{0}, bezier_values::FunctionValues{0}, geom_values::GeometryMapping, q_point::Int, w::Vector{T}) where {T}
+    W = zero(T)
+    for j in 1:Ferrite.getngeobasefunctions(geom_values)
+        W += w[j]*geom_values.M[j, q_point]
+    end
+    for j in 1:getnbasefunctions(tmp_values)
+        tmp_values.Nξ[j,q_point] = bezier_values.Nξ[j, q_point]/W
+    end
+end
 
 function _compute_intermidiate!(tmp_values::FunctionValues{DIFFORDER}, bezier_values::FunctionValues{DIFFORDER}, geom_values::GeometryMapping, q_point::Int, w::Vector{T}) where {T,DIFFORDER}
     dim = Ferrite.sdim_from_gradtype(Ferrite.shape_gradient_type(tmp_values))
@@ -433,16 +472,20 @@ function _compute_intermidiate!(tmp_values::FunctionValues{DIFFORDER}, bezier_va
     d2Wdξ2 = zero(Tensor{2,dim,T})
     for j in 1:Ferrite.getngeobasefunctions(geom_values)
         W      += w[j]*geom_values.M[j, q_point]
-        dWdξ   += w[j]*geom_values.dMdξ[j, q_point]
-        if DIFFORDER == 2
+        if DIFFORDER > 0
+            dWdξ   += w[j]*geom_values.dMdξ[j, q_point]
+        end
+        if DIFFORDER > 1
             d2Wdξ2 += w[j]*geom_values.d2Mdξ2[j, q_point]
         end
     end
     for j in 1:getnbasefunctions(tmp_values)
-        tmp_values.dNdξ[j, q_point] = ( bezier_values.dNdξ[j, q_point]*W - Ferrite.otimes_helper(bezier_values.Nξ[j, q_point], dWdξ) ) / W^2
         tmp_values.Nξ[j,q_point] = bezier_values.Nξ[j, q_point]/W
+        if DIFFORDER > 0
+            tmp_values.dNdξ[j, q_point] = ( bezier_values.dNdξ[j, q_point]*W - Ferrite.otimes_helper(bezier_values.Nξ[j, q_point], dWdξ) ) / W^2
+        end
 
-        if DIFFORDER == 2
+        if DIFFORDER > 1
             is_vector_valued = (first(tmp_values.Nξ) isa Vec)
             if is_vector_valued
                 _B      = bezier_values.Nξ[j, q_point]
@@ -483,7 +526,6 @@ end=#
 function Ferrite.calculate_mapping(geo_mapping::Ferrite.GeometryMapping{1}, q_point, x::Vector{Vec{dim,T}}, w::Vector{T}) where {dim,T}
     W = zero(T)
     dWdξ = zero(Vec{dim,T})
-    #d²Wdξ² = zero(Tensor{2,dim,T})
     for j in 1:Ferrite.getngeobasefunctions(geo_mapping)
         W      += w[j]*geo_mapping.M[j, q_point]
         dWdξ   += w[j]*geo_mapping.dMdξ[j, q_point]

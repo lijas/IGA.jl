@@ -62,7 +62,7 @@ Ferrite.shape_value(::IGAInterpolation{shape, order}, ξ::Vec, i::Int) where {sh
 Ferrite.reference_coordinates(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.reference_coordinates(Bernstein{shape, order}())
 Ferrite.getnbasefunctions(::IGAInterpolation{shape, order}) where {shape, order} = getnbasefunctions(Bernstein{shape, order}())
 
-#Ferrite.nvertices(ip::IGAInterpolation) = getnbasefunctions(ip)
+Ferrite.nvertices(ip::IGAInterpolation) = getnbasefunctions(ip)
 Ferrite.vertexdof_indices(ip::IGAInterpolation) = ntuple(i->i, getnbasefunctions(ip))
 
 #Remove dofs on edges and faces such that dofhandler can distribute dofs correctly
@@ -75,7 +75,7 @@ Ferrite.facedof_interior_indices(ip::IGAInterpolation{RefQuadrilateral}) =  ntup
 
 Ferrite.dirichlet_facedof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_facedof_indices(Bernstein{shape, order}())
 Ferrite.dirichlet_edgedof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_edgedof_indices(Bernstein{shape, order}())
-Ferrite.dirichlet_vertexdof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_vertexdof_indices(Bernstein{shape, order}())
+#Ferrite.dirichlet_vertexdof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_vertexdof_indices(Bernstein{shape, order}())
 
 
 
@@ -112,6 +112,7 @@ include("splines/bsplines.jl")
 include("VTK.jl")
 include("iterators.jl")
 include("iterators_future.jl")
+include("apply_analytical_iga.jl")
 #include("L2_projection.jl")
 
 Ferrite._mass_qr(::IGAInterpolation{shape,order}) where {shape,order}= Ferrite._mass_qr(Bernstein{shape, order}())
@@ -129,46 +130,12 @@ function Ferrite.faces(c::BezierCell{shape,order}) where {shape,order}
     return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_facedof_indices(IGAInterpolation{shape,order}() )))
 end
 
-function Ferrite.edges(c::BezierCell{order,RefHexahedron}) where {order}
+function Ferrite.edges(c::BezierCell{RefHexahedron, order}) where {order}
     return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_edgedof_indices(IGAInterpolation{RefHexahedron,order}() )))
 end
 
-
-function Ferrite._apply_analytical!(
-    a::AbstractVector, dh::Ferrite.AbstractDofHandler, celldofinds, field_dim,
-    ip_fun::Interpolation{RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape<:AbstractRefShape{dim}}
-
-    coords = getcoordinates(Ferrite.get_grid(dh), first(cellset))
-    ref_points = Ferrite.reference_coordinates(ip_fun)
-    dummy_weights = zeros(length(ref_points))
-    qr = QuadratureRule{RefShape}(dummy_weights, ref_points)
-    # Note: Passing ip_geo as the function interpolation here, it is just a dummy.
-    cv = CellValues(qr, ip_geo, ip_geo)
-    c_dofs = celldofs(dh, first(cellset))
-    f_dofs = zeros(Int, length(celldofinds))
-
-    # Check f before looping
-    #length(f(first(coords))) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
-
-    for cellnr in cellset
-        getcoordinates!(coords, Ferrite.get_grid(dh), cellnr)
-        celldofs!(c_dofs, dh, cellnr)
-        for (i, celldofind) in enumerate(celldofinds)
-            f_dofs[i] = c_dofs[celldofind]
-        end
-        _apply_analytical2!(a, f_dofs, coords, field_dim, cv, f)
-    end
-    return a
-end
-
-function _apply_analytical2!(a::AbstractVector, dofs::Vector{Int}, coords, field_dim, cv::Ferrite.AbstractCellValues, f)
-    for i_dof in 1:getnquadpoints(cv)
-        x_dof = spatial_coordinate(cv, i_dof, coords)
-        for (idim, icval) in enumerate(f(x_dof))
-            a[dofs[field_dim*(i_dof-1)+idim]] = icval
-        end
-    end
-    return a
+function Ferrite.edges(c::BezierCell{RefQuadrilateral, order}) where {order}
+    return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_edgedof_indices(IGAInterpolation{RefQuadrilateral,order}() )))
 end
 
 end #end module

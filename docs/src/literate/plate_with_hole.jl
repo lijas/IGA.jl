@@ -53,7 +53,7 @@ end;
 function assemble_problem(dh::DofHandler, grid, cv, fv, stiffmat, traction)
 
     f = zeros(ndofs(dh))
-    K = create_sparsity_pattern(dh)
+    K = create_matrix(dh)
     assembler = start_assemble(K, f)
 
     n = getnbasefunctions(cv)
@@ -130,7 +130,7 @@ function calculate_stress(dh, cv::BezierCellValues, C::SymmetricTensor{4,2}, u::
         ue = u[celldofs]
         qp_stresses = SymmetricTensor{2,2,Float64,3}[]
         for qp in 1:getnquadpoints(cv)
-            ɛ = symmetric(function_gradient(cv, qp, ue))
+            ε = symmetric(function_gradient(cv, qp, ue))
             σ = C ⊡ ε
             push!(qp_stresses, σ)
         end
@@ -173,11 +173,11 @@ function solve()
 
     # Distribute dofs as normal
     dh = DofHandler(grid)
-    push!(dh, :u, ip_u)
+    add!(dh, :u, ip_u)
     close!(dh)
 
     ae = zeros(ndofs(dh))
-    apply_analytical!(ae, dh, :u, x->x)
+    IGA.apply_analytical_iga!(ae, dh, :u, x->x)
 
     # Add two symmetry boundary condintions. Bottom face should only be able to move in x-direction, and the right boundary should only be able to move in y-direction
     ch = ConstraintHandler(dh)
@@ -215,7 +215,7 @@ function solve()
 
     IGA.VTKIGAFile("plate_with_hole.vtu", grid, collect(1:getncells(grid))) do vtk
         IGA.write_solution(vtk, dh, u)
-        IGA.write_projected(vtk, dh, u)
+        #IGA.write_projected(vtk, projector, σ_nodes, "σ")
     end
 
 end;

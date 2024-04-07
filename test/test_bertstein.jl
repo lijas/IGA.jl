@@ -4,7 +4,7 @@
     #1d basis function should equal to 2d basis function on the boundary (-1.0)
     b1 = Bernstein{RefQuadrilateral, 2}()
     b2 = Bernstein{RefLine, 2}()
-    @test Ferrite.value(b1, 5, Vec((0.0,-1.0))) == Ferrite.value(b2, 3, Vec((0.0)))
+    @test Ferrite.shape_value(b1, Vec((0.0,-1.0)), 5) == Ferrite.shape_value(b2, Vec((0.0)), 3)
 
     #Sum of shape function should equal 1     
     for bip in (Bernstein{RefLine, 1}(),
