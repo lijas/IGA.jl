@@ -523,23 +523,30 @@ end
     end
 end=#
 
-function Ferrite.calculate_mapping(geo_mapping::Ferrite.GeometryMapping{1}, q_point, x::Vector{Vec{dim,T}}, w::Vector{T}) where {dim,T}
+@inline _getrdim(geomapping::Ferrite.GeometryMapping) = length(first(geomapping.dMdξ))
+function Ferrite.calculate_mapping(geo_mapping::Ferrite.GeometryMapping{1}, q_point, x::Vector{Vec{sdim,T}}, w::Vector{T}) where {sdim,T}
+    rdim = _getrdim(geo_mapping)
+
     W = zero(T)
-    dWdξ = zero(Vec{dim,T})
+    dWdξ = zero(Vec{rdim,T})
     for j in 1:Ferrite.getngeobasefunctions(geo_mapping)
         W      += w[j]*geo_mapping.M[j, q_point]
         dWdξ   += w[j]*geo_mapping.dMdξ[j, q_point]
     end
     
-    fecv_J = zero(Tensor{2,dim,T})
+    fecv_J = Ferrite.otimes_helper(first(x), first(geo_mapping.dMdξ)) |> typeof |> zero
     for j in 1:Ferrite.getngeobasefunctions(geo_mapping)
         dRdξ = (geo_mapping.dMdξ[j, q_point]*W - geo_mapping.M[j, q_point]*dWdξ)/W^2
-        fecv_J += x[j] ⊗ (w[j]*dRdξ)
+        #fecv_J += x[j] ⊗ (w[j]*dRdξ)
+        fecv_J += Ferrite.otimes_helper(x[j], w[j]*dRdξ)
     end
     return Ferrite.MappingValues(fecv_J, nothing)
 end
 
-function Ferrite.calculate_mapping(geo_mapping::Ferrite.GeometryMapping{2}, q_point, x::Vector{Vec{dim,T}}, w::Vector{T}) where {dim,T}
+function Ferrite.calculate_mapping(geo_mapping::Ferrite.GeometryMapping{2}, q_point, x::Vector{Vec{sdim,T}}, w::Vector{T}) where {sdim,T}
+    dim = rdim = _getrdim(geo_mapping)
+    @assert rdim == sdim
+    
     W = zero(T)
     dWdξ = zero(Vec{dim,T})
     d²Wdξ² = zero(Tensor{2,dim,T})
