@@ -10,8 +10,7 @@ struct BSplineBasis{dim,T,order} <: Ferrite.ScalarInterpolation{RefHypercube{dim
 
     function BSplineBasis(knots::NTuple{dim,Vector{T}}, order::NTuple{dim,Int}) where {dim,T} 
         @assert(length(order)==dim)
-        @assert( all( first.(knots) .== T(-1.0)) )
-        @assert( all( last.(knots) .== T(1.0)) )
+        @assert all( issorted.(knots) )
 		return new{dim,T,Tuple(order)}(knots)
     end
 
