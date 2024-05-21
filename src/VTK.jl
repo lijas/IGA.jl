@@ -141,7 +141,7 @@ end
 function #=Ferrite.=#write_projected(vtk::VTKIGAFile, proj::L2Projector, vals, name)
     data = Ferrite._evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
     @assert size(data, 2) == getnnodes(Ferrite.get_grid(proj.dh))
-    vtk_node_data(vtk.vtk, data, name; component_names=Ferrite.component_names(eltype(vals)))
+    vtk_point_data(vtk.vtk, data, name; component_names=Ferrite.component_names(eltype(vals)))
     return vtk
 end
 
