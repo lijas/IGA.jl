@@ -39,8 +39,8 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
     cv = CellValues(qr, bern_ip, bern_ip)
 
     #Face values
-    qr = FaceQuadratureRule{Ferrite.RefHypercube{sdim}}(5)
-    fv = FaceValues(qr, bern_ip, bern_ip)
+    qr = FacetQuadratureRule{Ferrite.RefHypercube{sdim}}(5)
+    fv = FacetValues(qr, bern_ip, bern_ip^sdim)
 
     return grid, cv, fv
 end
@@ -48,9 +48,9 @@ end
 function test_cube()
     grid, cv, fv = _get_problem_data(:cube, (2,2,2), (2,2,2), cornerpos=(-1.0,-2.0,0.0), size=(2.0,3.0,4.0))
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "left", (x)-> x[1]≈-1.0)
-    addfaceset!(grid, "right", (x)->x[1]≈1.0)
-    addfaceset!(grid, "top", (x)->x[3]≈4.0)
+    addfacetset!(grid, "left", (x)-> x[1]≈-1.0)
+    addfacetset!(grid, "right", (x)->x[1]≈1.0)
+    addfacetset!(grid, "top", (x)->x[3]≈4.0)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))
@@ -71,9 +71,9 @@ end
 function test_square()
     grid, cv, fv = _get_problem_data(:hypercube, (1,1,), (2,2,), cornerpos=(-1.0,-1.0), size=(2.0,3.0,))
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "left", (x)-> x[1] ≈ -1.0)
-    addfaceset!(grid, "right", (x)->x[1]≈1.0)
-    addfaceset!(grid, "top", (x)->x[2]≈2.0)
+    addfacetset!(grid, "left", (x)-> x[1] ≈ -1.0)
+    addfacetset!(grid, "right", (x)->x[1]≈1.0)
+    addfacetset!(grid, "top", (x)->x[2]≈2.0)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))
@@ -96,9 +96,9 @@ function test_plate_with_hole()
     L = 4.0
     r = 1.0
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "right", (x)->x[1]≈-4.0)
-    addfaceset!(grid, "top", (x)->x[2]≈4.0)
-    addfaceset!(grid, "circle", (x)-> r*0.9 < norm(x) < r*1.1)
+    addfacetset!(grid, "right", (x)->x[1]≈-4.0)
+    addfacetset!(grid, "top", (x)->x[2]≈4.0)
+    addfacetset!(grid, "circle", (x)-> r*0.9 < norm(x) < r*1.1)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))
@@ -119,9 +119,9 @@ end
 function test_singly_curved_3d()
     grid, cv, fv = _get_problem_data(:singly_curved, (20,2,1), (2,2,2), α = pi/2, R = 100.0, width = 5.0, thickness = 3.0)
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "left", (x)->x[3]≈0.0)
-    addfaceset!(grid, "front", (x)->x[2]≈5.0/2)
-    addfaceset!(grid, "top", (x)-> sqrt(x[1]^2 + x[3]^2) > 100.0 + 3.0/3, all=true)
+    addfacetset!(grid, "left", (x)->x[3]≈0.0)
+    addfacetset!(grid, "front", (x)->x[2]≈5.0/2)
+    addfacetset!(grid, "top", (x)-> sqrt(x[1]^2 + x[3]^2) > 100.0 + 3.0/3, all=true)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))
@@ -142,8 +142,8 @@ end
 function test_singly_curved_2d()
     grid, cv, fv = _get_problem_data(:singly_curved, (20,2), (2,2), α = pi/2, R = 100.0, thickness = 3.0)
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "left", (x)->x[2]≈0.0)
-    addfaceset!(grid, "top", (x)-> sqrt(x[1]^2 + x[2]^2) > 100.0 + 3.0/3, all=true)
+    addfacetset!(grid, "left", (x)->x[2]≈0.0)
+    addfacetset!(grid, "top", (x)-> sqrt(x[1]^2 + x[2]^2) > 100.0 + 3.0/3, all=true)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))
@@ -181,8 +181,8 @@ function test_ring()
         
     end
         
-    grid.facesets["inner"] = Set(inner)#addfaceset!(grid, "inner", Set(inner))
-    grid.facesets["outer"] = Set(outer)#addfaceset!(grid, "outer", Set(outer))
+    grid.facetsets["inner"] = Set(inner)#addfacetset!(grid, "inner", Set(inner))
+    grid.facetsets["outer"] = Set(outer)#addfacetset!(grid, "outer", Set(outer))
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))
@@ -203,8 +203,8 @@ function test_cylinder_sector_3d()
     e1 = basevec(Vec{3}, 1)
     grid, cv, fv = _get_problem_data(:cylinder_sector, (8,10,3), (2,2,2); r, L)
     addcellset!(grid, "all", (x)->true)
-    addfaceset!(grid, "left", (x)->x[1]≈-L/2)
-    addfaceset!(grid, "topsurface", (x) -> (0.95r) <= norm(x - (e1⋅x)*e1) <= (1.05r), all=true)
+    addfacetset!(grid, "left", (x)->x[1]≈-L/2)
+    addfacetset!(grid, "topsurface", (x) -> (0.95r) <= norm(x - (e1⋅x)*e1) <= (1.05r), all=true)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))

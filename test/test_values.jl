@@ -57,7 +57,7 @@ end
     bip = Bernstein{shape, 2}()
 
     qr = QuadratureRule{shape}(1)
-    qr_face = FaceQuadratureRule{shape}(1)
+    qr_face = FacetQuadratureRule{shape}(1)
 
     cv  = CellValues( qr, ip, ip)
     #cv2 = BezierCellValues( CellValues(qr, bip, bip) )
@@ -99,10 +99,10 @@ end
     reorder = IGA._bernstein_ordering(bip)
 
     qr = QuadratureRule{shape}(2)
-    qr_face = FaceQuadratureRule{shape}(3)
+    qr_face = FacetQuadratureRule{shape}(3)
 
-    fv = FaceValues( qr_face, ip, ip; update_hessians = true )
-    fv_vector = FaceValues( qr_face, ip^dim, ip; update_hessians = true )
+    fv = FacetValues( qr_face, ip, ip; update_hessians = true )
+    fv_vector = FacetValues( qr_face, ip^dim, ip; update_hessians = true )
     cv  = CellValues( qr, ip, ip; update_hessians = true)
     cv_vector = CellValues( qr, ip^dim, ip; update_hessians = true)
 
@@ -180,7 +180,7 @@ end
     end
     
     cellnum, faceidx = (9, 3)
-    addfaceset!(grid, "face1", (x)-> x[1] == -4.0)
+    addfacetset!(grid, "face1", (x)-> x[1] == -4.0)
     for (cellnum, faceidx) in getfaceset(grid, "face1")
 
         bc = getcoordinates(grid, cellnum)

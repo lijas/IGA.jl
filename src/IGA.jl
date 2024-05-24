@@ -9,6 +9,9 @@ using Ferrite:
     VectorInterpolation, VectorizedInterpolation,
     FunctionValues, GeometryMapping, MappingValues
 
+using OrderedCollections:
+    OrderedSet
+
 using WriteVTK
 using LinearAlgebra
 using StaticArrays

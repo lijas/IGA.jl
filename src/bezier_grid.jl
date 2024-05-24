@@ -8,17 +8,15 @@ struct BezierGrid{dim,C<:Ferrite.AbstractCell,T<:Real} <: Ferrite.AbstractGrid{d
 	#Alias from grid
 	cells::Vector{C}
     nodes::Vector{Node{dim,T}}
-    cellsets::Dict{String,Set{Int}}
-    nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}}
-    edgesets::Dict{String,Set{EdgeIndex}}
-    vertexsets::Dict{String,Set{VertexIndex}}
-    boundary_matrix::Ferrite.SparseMatrixCSC{Bool,Int}
+    cellsets::Dict{String,OrderedSet{Int}}
+    nodesets::Dict{String,OrderedSet{Int}}
+    facetsets::Dict{String,OrderedSet{FacetIndex}}
+    vertexsets::Dict{String,OrderedSet{VertexIndex}}
 
 	function BezierGrid(grid::Ferrite.Grid{dim,C,T}, weights::Vector{T}, beo::Vector{BezierExtractionOperator{T}}) where {dim,C,T}
 		return new{dim,C,T}(
 			grid, weights, beo,
-			grid.cells, grid.nodes, grid.cellsets, grid.nodesets, grid.facesets, grid.edgesets, grid.vertexsets, grid.boundary_matrix
+			grid.cells, grid.nodes, grid.cellsets, grid.nodesets, grid.facetsets, grid.vertexsets, 
 		)
 	end
 end
@@ -27,15 +25,13 @@ function BezierGrid(cells::Vector{C},
 		nodes::Vector{Ferrite.Node{dim,T}},
 		weights::AbstractVector{T},
 		extraction_operator::AbstractVector{BezierExtractionOperator{T}}; 
-		cellsets::Dict{String,Set{Int}}             =Dict{String,Set{Int}}(),
-		nodesets::Dict{String,Set{Int}}             =Dict{String,Set{Int}}(),
-		facesets::Dict{String,Set{FaceIndex}}       =Dict{String,Set{FaceIndex}}(),
-		edgesets::Dict{String,Set{EdgeIndex}}       =Dict{String,Set{EdgeIndex}}(),
-		vertexsets::Dict{String,Set{VertexIndex}}   =Dict{String,Set{VertexIndex}}(),
-		boundary_matrix::SparseArrays.SparseMatrixCSC{Bool,Int}  = SparseArrays.spzeros(Bool, 0, 0)) where {dim,C,T}
+		cellsets::Dict{String,OrderedSet{Int}}             = Dict{String,OrderedSet{Int}}(),
+		nodesets::Dict{String,OrderedSet{Int}}             = Dict{String,OrderedSet{Int}}(),
+		facetsets::Dict{String,OrderedSet{FacetIndex}}      = Dict{String,OrderedSet{FacetIndex}}(),
+		vertexsets::Dict{String,OrderedSet{VertexIndex}}   = Dict{String,OrderedSet{VertexIndex}}()) where {dim,C,T}
 
 	
-	grid = Ferrite.Grid(cells, nodes; nodesets, cellsets, facesets, edgesets, vertexsets, boundary_matrix)
+	grid = Ferrite.Grid(cells, nodes; nodesets, cellsets, facetsets, vertexsets)
 
 	return BezierGrid(grid, weights, extraction_operator)
 end

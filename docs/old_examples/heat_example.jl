@@ -58,10 +58,10 @@ function goiga(nelx,nely, order, multiplicity)
     
     #@show nurbsmesh.knot_vectors
 
-    addfaceset!(grid, "left",   (x)->x[1]<0.001)
-    addfaceset!(grid, "right",  (x)->x[1]>Lx*0.9999)
-    addfaceset!(grid, "bottom", (x)->x[2]<0.001)
-    addfaceset!(grid, "top",    (x)->x[2]>Ly*0.9999)
+    addfacetset!(grid, "left",   (x)->x[1]<0.001)
+    addfacetset!(grid, "right",  (x)->x[1]>Lx*0.9999)
+    addfacetset!(grid, "bottom", (x)->x[2]<0.001)
+    addfacetset!(grid, "top",    (x)->x[2]>Ly*0.9999)
 
     ip = IGA.Bernstein{dim, (order,order)}()
     qr = QuadratureRule{dim, RefCube}(100)

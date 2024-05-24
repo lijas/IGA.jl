@@ -27,7 +27,7 @@ Ferrite.getnbasefunctions(::Bernstein{RefLine,2}) = 3
 
 Ferrite.vertexdof_indices(::Bernstein{RefLine,2}) = ((1,),(2,))
 Ferrite.facedof_indices(::Bernstein{RefLine,2}) = ((1,), (2,))
-Ferrite.celldof_interior_indices(::Bernstein{RefLine,2}) = (3,)
+Ferrite.volumedof_interior_indices(::Bernstein{RefLine,2}) = (3,)
 
 function Ferrite.shape_value(ip::Bernstein{RefLine,2}, _ξ::Vec{1}, i::Int)
     ξ = 0.5*(_ξ[1] + 1.0)
@@ -45,7 +45,7 @@ Ferrite.getnbasefunctions(::Bernstein{RefQuadrilateral,2}) = 9
 Ferrite.vertexdof_indices(::Bernstein{RefQuadrilateral,2}) = ((1,),(2,),(3,),(4,))
 Ferrite.facedof_indices(::Bernstein{RefQuadrilateral,2}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
 Ferrite.facedof_interior_indices(::Bernstein{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
-Ferrite.celldof_interior_indices(::Bernstein{RefQuadrilateral,2}) = (9,)
+Ferrite.volumedof_interior_indices(::Bernstein{RefQuadrilateral,2}) = (9,)
 
 function Ferrite.shape_value(ip::Bernstein{RefQuadrilateral,2}, _ξ::Vec{2}, i::Int)
     ξ, η = _ξ

@@ -14,7 +14,7 @@ function blabla()
     grid = IGA.BezierGrid(mesh)
     addnodeset!(grid, "left", (x) -> x[1]≈0.0)
     addnodeset!(grid, "top", (x) -> x[2]≈h)
-    addfaceset!(grid, "top", (x) -> x[2]≈h)
+    addfacetset!(grid, "top", (x) -> x[2]≈h)
 
     file = open("beam_order$(order)_nelx$(nelx)_nely$(nely)", "w")
 

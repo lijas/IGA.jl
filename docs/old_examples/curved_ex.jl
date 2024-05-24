@@ -227,9 +227,9 @@ function goiga()
     order = 2
     dim = 2
 
-    addfaceset!(grid, "right",   (x)->x[1] ≈ 0.0)
-    addfaceset!(grid, "left",   (x)->x[1] ≈ -4.0)
-    addfaceset!(grid, "bottom", (x)->x[2] ≈ 0.0)
+    addfacetset!(grid, "right",   (x)->x[1] ≈ 0.0)
+    addfacetset!(grid, "left",   (x)->x[1] ≈ -4.0)
+    addfacetset!(grid, "bottom", (x)->x[2] ≈ 0.0)
 
     ip = IGA.Bernstein{dim,(order, order)}()
 
@@ -237,7 +237,7 @@ function goiga()
     cellvalues = IGA.BezierValues(CellVectorValues(qr, ip))
 
     qr = QuadratureRule{dim-1,RefCube}(4)
-    facevalues = IGA.BezierFaceValues(FaceVectorValues(qr, ip))
+    facevalues = IGA.BezierFacetValues(FaceVectorValues(qr, ip))
 
     go(grid, ip, cellvalues, facevalues)
 end
@@ -248,9 +248,9 @@ function gofem()
     order = 2
     dim = 2
 
-    addfaceset!(grid, "right",   (x)->x[1] ≈ 0.0)
-    addfaceset!(grid, "left",   (x)->x[1] ≈ -4.0)
-    addfaceset!(grid, "bottom", (x)->x[2] ≈ 0.0)
+    addfacetset!(grid, "right",   (x)->x[1] ≈ 0.0)
+    addfacetset!(grid, "left",   (x)->x[1] ≈ -4.0)
+    addfacetset!(grid, "bottom", (x)->x[2] ≈ 0.0)
 
     ip_geom = Lagrange{dim,RefCube,1}()
     ip = Lagrange{dim,RefCube,order}()

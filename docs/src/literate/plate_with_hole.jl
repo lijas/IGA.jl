@@ -157,19 +157,19 @@ function solve()
     # does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
     # use the Ferrite functions below.
     addnodeset!(grid, "right", (x) -> x[1] ≈ -0.0)
-    addfaceset!(grid, "left", (x) -> x[1] ≈ -4.0)
-    addfaceset!(grid, "bot", (x) -> x[2] ≈ 0.0)
-    addfaceset!(grid, "right", (x) -> x[1] ≈ 0.0)
+    addfacetset!(grid, "left", (x) -> x[1] ≈ -4.0)
+    addfacetset!(grid, "bot", (x) -> x[2] ≈ 0.0)
+    addfacetset!(grid, "right", (x) -> x[1] ≈ 0.0)
 
     # Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the 
     # reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
     ip_geo = IGAInterpolation{RefQuadrilateral,order}()
     ip_u = ip_geo^2
     qr_cell = QuadratureRule{RefQuadrilateral}(4)
-    qr_face = FaceQuadratureRule{RefQuadrilateral}(3)
+    qr_face = FacetQuadratureRule{RefQuadrilateral}(3)
 
     cv = CellValues(qr_cell, ip_u, ip_geo)
-    fv = FaceValues(qr_face, ip_u, ip_geo)
+    fv = FacetValues(qr_face, ip_u, ip_geo)
 
     # Distribute dofs as normal
     dh = DofHandler(grid)
