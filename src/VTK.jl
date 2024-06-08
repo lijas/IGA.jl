@@ -175,7 +175,7 @@ function _evaluate_at_geometry_nodes!(
 
     field_idx = Ferrite.find_field(sdh, fieldname)
     field_idx === nothing && error("The field $fieldname does not exist in the subdofhandler")
-	ip_geo = Ferrite.default_interpolation(CT)
+	ip_geo = Ferrite.geometric_interpolation(CT)
     ip     = Ferrite.getfieldinterpolation(sdh, field_idx)
     drange = Ferrite.dof_range(sdh, fieldname)
 	shape  = Ferrite.getrefshape(ip_geo)

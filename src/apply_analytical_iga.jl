@@ -1,7 +1,7 @@
 function _default_interpolations(dh::DofHandler)
     sdhs = dh.subdofhandlers
     getcelltype(i) = typeof(getcells(Ferrite.get_grid(dh), first(sdhs[i].cellset)))
-    ntuple(i -> Ferrite.default_interpolation(getcelltype(i)), length(sdhs))
+    ntuple(i -> Ferrite.geometric_interpolation(getcelltype(i)), length(sdhs))
 end
 
 """

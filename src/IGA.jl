@@ -101,7 +101,7 @@ function BezierCell{refshape,order,N}(nodes::NTuple{N,Int}) where {rdim, order, 
     return BezierCell{refshape,order}(nodes)
 end
 
-Ferrite.default_interpolation(::Type{<:BezierCell{shape,order}}) where {order, shape} = IGAInterpolation{shape, order}()
+Ferrite.geometric_interpolation(::Type{<:BezierCell{shape,order}}) where {order, shape} = IGAInterpolation{shape, order}()
 Ferrite.nnodes(::BezierCell{shape, order, N}) where {order, shape, N} = N
 getorders(::BezierCell{refshape, orders, N}) where {orders,refshape,N} = orders
 
