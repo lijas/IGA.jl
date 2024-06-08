@@ -53,7 +53,7 @@ end;
 function assemble_problem(dh::DofHandler, grid, cv, fv, stiffmat, traction)
 
     f = zeros(ndofs(dh))
-    K = create_matrix(dh)
+    K = create_sparsity_pattern(dh)##create_matrix(dh)
     assembler = start_assemble(K, f)
 
     n = getnbasefunctions(cv)
@@ -85,7 +85,7 @@ function assemble_problem(dh::DofHandler, grid, cv, fv, stiffmat, traction)
     end
 
     ## Assamble external forces
-    for (cellid, faceid) in getfaceset(grid, "left")
+    for (cellid, faceid) in getfacetset(grid, "left")
         fill!(fe, 0.0)
 
         celldofs!(celldofs, dh, cellid)
@@ -181,8 +181,8 @@ function solve()
 
     # Add two symmetry boundary condintions. Bottom face should only be able to move in x-direction, and the right boundary should only be able to move in y-direction
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "bot"), (x, t) -> 0.0, 2)
-    dbc2 = Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.0, 1)
+    dbc1 = Dirichlet(:u, getfacetset(grid, "bot"), (x, t) -> 0.0, 2)
+    dbc2 = Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 0.0, 1)
     add!(ch, dbc1)
     add!(ch, dbc2)
     close!(ch)

@@ -18,7 +18,7 @@
                 #Bernstein{RefHexahedron, 3}()
                 )
 
-        dim = Ferrite.getdim(bip)
+        dim = Ferrite.getrefdim(bip)
         for xi in [rand(Vec{dim,Float64}), rand(Vec{dim,Float64})]
             sum = 0.0
             for i in 1:Ferrite.getnbasefunctions(bip)
@@ -32,7 +32,7 @@
     # ip_list contains interpolation which explicitly been inputed in IGA.jl
     ip_list = ( Bernstein{RefLine, 2}(), Bernstein{RefQuadrilateral, 2}(), Bernstein{RefHexahedron, 2}())
     for bip in ip_list
-        dim = Ferrite.getdim(bip)
+        dim = Ferrite.getrefdim(bip)
         for xi in [rand(Vec{dim,Float64}), rand(Vec{dim,Float64})]
             for i in  1:Ferrite.getnbasefunctions(bip)
                 N_hardcoded = Ferrite.shape_value(bip, xi, i)

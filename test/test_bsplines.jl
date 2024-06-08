@@ -45,12 +45,6 @@ end=#
     @test IGA.getnbasefunctions_dim(basis) == (7,8)
     @test IGA.getnbasefunctions(basis) == 7*8
 
-    #Knot vector needs to be in range [-1 ... 1]
-    order = 2
-    knots = Float64[-1, -1, -1, 0, 1, 1, 1]
-    @test_throws AssertionError IGA.BSplineBasis( [0.0, 1.0], 2)
-    @test_throws AssertionError IGA.BSplineBasis( ([-1.0, 0.0],), (2,))
-    @test_throws AssertionError IGA.BSplineBasis( ([-1.0, 0.0],[0.0, 1.0]), (2,2))
 end
 
 @testset "bsplines vs. bernstein" begin

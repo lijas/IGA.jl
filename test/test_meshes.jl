@@ -57,13 +57,13 @@ function test_cube()
     @test V ≈ prod((2.0,3.0,4.0))
 
     #Area
-    A = _calculate_area(fv, grid, getfaceset(grid, "left"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "left"))
     @test A ≈ prod((3.0,4.0))
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "right"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "right"))
     @test A ≈ prod((3.0,4.0))
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "top"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "top"))
     @test A ≈ prod((3.0,2.0))
 
 end
@@ -80,13 +80,13 @@ function test_square()
     @test V ≈ prod((2.0,3.0))
 
     #Area
-    A = _calculate_area(fv, grid, getfaceset(grid, "left"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "left"))
     @test A ≈ 3.0
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "right"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "right"))
     @test A ≈ 3.0
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "top"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "top"))
     @test A ≈ 2.0
 
 end
@@ -105,13 +105,13 @@ function test_plate_with_hole()
     @test V ≈ L*L - 0.25*pi*r^2
 
     #Area
-    A = _calculate_area(fv, grid, getfaceset(grid, "right"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "right"))
     @test A ≈ L
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "top"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "top"))
     @test A ≈ L
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "circle"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "circle"))
     @test A ≈ 2r*pi/4 #forth of circumfrence
 
 end
@@ -128,13 +128,13 @@ function test_singly_curved_3d()
     @test isapprox(V, pi/2 * 100.0 * 5.0 * 3.0, atol = 10.0)
 
     #Area
-    A = _calculate_area(fv, grid, getfaceset(grid, "left"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "left"))
     @test A ≈ 5.0*3.0
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "front"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "front"))
     @test isapprox(A, pi/2 * 100.0 * 3.0, atol = 2.0)
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "top"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "top"))
     @test isapprox(A, (100+5.0/2)*pi/2 * 5.0, atol = 10.0) 
 
 end
@@ -150,10 +150,10 @@ function test_singly_curved_2d()
     @test isapprox(V, pi/2 * 100.0 * 3.0, atol = 1.0)
 
     #Area
-    A = _calculate_area(fv, grid, getfaceset(grid, "left"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "left"))
     @test A ≈ 3.0
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "top"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "top"))
     @test isapprox(A, (100+5.0/2)*pi/2, atol = 2.0)
     
 end
@@ -165,8 +165,8 @@ function test_ring()
     grid, cv, fv = _get_problem_data(:ring, (4,1), (2,2); ri=ri, ro=ro)
     addcellset!(grid, "all", (x)->true)
 
-    inner = FaceIndex[]
-    outer = FaceIndex[]
+    inner = FacetIndex[]
+    outer = FacetIndex[]
     for cellid in 1:getncells(grid), fid in 1:4
         beziercoords = getcoordinates(grid, cellid)
         reinit!(fv, beziercoords, fid)
@@ -174,25 +174,25 @@ function test_ring()
         x = spatial_coordinate(fv, 1, (xb, wb))
         
         if norm(x) ≈ ri
-            push!(inner, FaceIndex(cellid, fid))
+            push!(inner, FacetIndex(cellid, fid))
         elseif norm(x) ≈ ro
-            push!(outer, FaceIndex(cellid, fid))
+            push!(outer, FacetIndex(cellid, fid))
         end
         
     end
         
-    grid.facetsets["inner"] = Set(inner)#addfacetset!(grid, "inner", Set(inner))
-    grid.facetsets["outer"] = Set(outer)#addfacetset!(grid, "outer", Set(outer))
+    addfacetset!(grid, "inner", inner)
+    addfacetset!(grid, "outer", outer)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))
     @test isapprox(V, pi*(ro^2 - ri^2), atol = 0.01)
 
     #Area
-    A = _calculate_area(fv, grid, getfaceset(grid, "inner"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "inner"))
     @test isapprox(A, 2pi*ri, atol = 0.01)
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "outer"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "outer"))
     @test isapprox(A, 2pi*ro, atol = 0.01)
 end
 
@@ -211,10 +211,10 @@ function test_cylinder_sector_3d()
     @test isapprox(V, pi * r^2 * L / 2.0, atol = 0.0001)
 
     #Area
-    A = _calculate_area(fv, grid, getfaceset(grid, "left"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "left"))
     @test isapprox(A, pi * r^2 / 2, atol = 0.0001)
 
-    A = _calculate_area(fv, grid, getfaceset(grid, "topsurface"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "topsurface"))
     @test isapprox(A, pi*2r/2 * L, atol = 0.0001)
 
 end

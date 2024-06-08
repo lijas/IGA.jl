@@ -36,7 +36,7 @@ function apply_analytical_iga!(
         isnothing(Ferrite._find_field(sdh, fieldname)) && continue
         field_idx = Ferrite.find_field(sdh, fieldname)
         ip_fun = Ferrite.getfieldinterpolation(sdh, field_idx)
-        field_dim = Ferrite.getfielddim(sdh, field_idx)
+        field_dim = Ferrite.n_components(sdh, field_idx)
         celldofinds = Ferrite.dof_range(sdh, fieldname)
         set_intersection = if length(cellset) == length(sdh.cellset) == getncells(Ferrite.get_grid(dh))
             BitSet(1:getncells(Ferrite.get_grid(dh)))

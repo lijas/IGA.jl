@@ -34,14 +34,14 @@ struct BezierFacetValues{FV, GM, FQR, dim, T, V_FV<:AbstractVector{FV}, V_GM<:Ab
 end
 
 Ferrite.shape_value_type(cv::BezierCellValues) = Ferrite.shape_value_type(cv.bezier_values)
-Ferrite.shape_value_type(cv::BezierFacetValues) = Ferrite.shape_value_type(cv.bezier_values[Ferrite.getcurrentface(cv)])
+Ferrite.shape_value_type(cv::BezierFacetValues) = Ferrite.shape_value_type(cv.bezier_values[Ferrite.getcurrentfacet(cv)])
 
-Ferrite.shape_gradient_type(cv::BezierFacetValues) = Ferrite.shape_gradient_type(cv.bezier_values[Ferrite.getcurrentface(cv)])
+Ferrite.shape_gradient_type(cv::BezierFacetValues) = Ferrite.shape_gradient_type(cv.bezier_values[Ferrite.getcurrentfacet(cv)])
 Ferrite.shape_gradient_type(cv::BezierCellValues) = Ferrite.shape_gradient_type(cv.bezier_values)
 
 BezierCellAndFacetValues{T,CV} = Union{BezierCellValues{T,CV}, BezierFacetValues{T,CV}}
 
-Ferrite.nfaces(fv::BezierFacetValues) = length(fv.geo_mapping)
+Ferrite.nfacets(fv::BezierFacetValues) = length(fv.geo_mapping)
 Ferrite.getnormal(fv::BezierFacetValues, iqp::Int) = fv.normals[iqp]
 Ferrite.function_interpolation(cv::BezierCellValues) = Ferrite.function_interpolation(cv.bezier_values)
 Ferrite.geometric_interpolation(cv::BezierCellValues) = Ferrite.geometric_interpolation(cv.geo_mapping)
@@ -119,28 +119,28 @@ function Ferrite.FacetValues(
     return cv
 end
 
-Ferrite.getnbasefunctions(fv::BezierFacetValues)            = getnbasefunctions(fv.nurbs_values[Ferrite.getcurrentface(fv)])
+Ferrite.getnbasefunctions(fv::BezierFacetValues)            = getnbasefunctions(fv.nurbs_values[Ferrite.getcurrentfacet(fv)])
 Ferrite.getnbasefunctions(cv::BezierCellValues)            = getnbasefunctions(cv.nurbs_values)
-Ferrite.getngeobasefunctions(fv::BezierFacetValues)         = Ferrite.getngeobasefunctions(fv.geo_mapping[Ferrite.getcurrentface(fv)])
+Ferrite.getngeobasefunctions(fv::BezierFacetValues)         = Ferrite.getngeobasefunctions(fv.geo_mapping[Ferrite.getcurrentfacet(fv)])
 Ferrite.getngeobasefunctions(cv::BezierCellValues)         = Ferrite.getngeobasefunctions(cv.geo_mapping)
 Ferrite.getnquadpoints(bcv::BezierCellValues)                      = Ferrite.getnquadpoints(bcv.qr)
-Ferrite.getnquadpoints(bcv::BezierFacetValues)                      = Ferrite.getnquadpoints(bcv.qr, Ferrite.getcurrentface(bcv))
+Ferrite.getnquadpoints(bcv::BezierFacetValues)                      = Ferrite.getnquadpoints(bcv.qr, Ferrite.getcurrentfacet(bcv))
 Ferrite.getdetJdV(bv::BezierCellAndFacetValues, q_point::Int)       = bv.detJdV[q_point]
 Ferrite.shape_value(bcv::BezierCellValues, qp::Int, i::Int) = Ferrite.shape_value(bcv.nurbs_values, qp, i)
 Ferrite.shape_gradient(bcv::BezierCellValues, q_point::Int, i::Int) = Ferrite.shape_gradient(bcv.nurbs_values, q_point, i)
 Ferrite.geometric_value(cv::BezierCellValues, q_point::Int, i::Int) = Ferrite.geometric_value(cv.geo_mapping, q_point, i)
 
-Ferrite.shape_value(fv::BezierFacetValues, qp::Int, i::Int)          = shape_value(fv.nurbs_values[Ferrite.getcurrentface(fv)], qp, i)
-Ferrite.shape_gradient(fv::BezierFacetValues, q_point::Int, i::Int)  = shape_gradient(fv.nurbs_values[Ferrite.getcurrentface(fv)], q_point, i)
-Ferrite.geometric_value(fv::BezierFacetValues, q_point::Int, i::Int) = Ferrite.geometric_value(fv.geo_mapping[Ferrite.getcurrentface(fv)], q_point, i)
+Ferrite.shape_value(fv::BezierFacetValues, qp::Int, i::Int)          = shape_value(fv.nurbs_values[Ferrite.getcurrentfacet(fv)], qp, i)
+Ferrite.shape_gradient(fv::BezierFacetValues, q_point::Int, i::Int)  = shape_gradient(fv.nurbs_values[Ferrite.getcurrentfacet(fv)], q_point, i)
+Ferrite.geometric_value(fv::BezierFacetValues, q_point::Int, i::Int) = Ferrite.geometric_value(fv.geo_mapping[Ferrite.getcurrentfacet(fv)], q_point, i)
 
-Ferrite.get_fun_values(fv::BezierFacetValues) = @inbounds fv.nurbs_values[Ferrite.getcurrentface(fv)]
+Ferrite.get_fun_values(fv::BezierFacetValues) = @inbounds fv.nurbs_values[Ferrite.getcurrentfacet(fv)]
 Ferrite.get_fun_values(cv::BezierCellValues) = @inbounds cv.nurbs_values
 
-Ferrite.shape_hessian(fv::BezierFacetValues, q_point::Int, i::Int) = shape_hessian(fv.nurbs_values[Ferrite.getcurrentface(fv)], q_point, i)
+Ferrite.shape_hessian(fv::BezierFacetValues, q_point::Int, i::Int) = shape_hessian(fv.nurbs_values[Ferrite.getcurrentfacet(fv)], q_point, i)
 Ferrite.shape_hessian(cv::BezierCellValues, q_point::Int, i::Int) = shape_hessian(cv.nurbs_values, q_point, i)
 
-Ferrite.getcurrentfacet(fv::BezierFacetValues) = fv.current_face[]
+Ferrite.getcurrentfacet(fv::BezierFacetValues) = fv.current_facet[]
 function Ferrite.set_current_facet!(fv::BezierFacetValues, face_nr::Int)
     checkbounds(Bool, 1:Ferrite.nfacets(fv), face_nr) || throw(ArgumentError("Face index out of range."))
     fv.current_facet[] = face_nr
@@ -349,7 +349,7 @@ function Ferrite.reinit!(cv::BezierFacetValues, bc::BezierCoords, face_nr::Int)
 end
 
 function Ferrite.reinit!(fv::BezierFacetValues, (x,w)::CoordsAndWeight, face_nr::Int)
-    Ferrite.set_current_face!(fv, face_nr) 
+    Ferrite.set_current_facet!(fv, face_nr) 
     geo_mapping   = fv.geo_mapping[face_nr]
     bezier_values = fv.bezier_values[face_nr]
     tmp_values    = fv.tmp_values[face_nr]

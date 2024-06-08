@@ -167,7 +167,7 @@ function _evaluate_at_geometry_nodes!(
 	#
 	CT = getcelltype(dh.grid, first(sdh.cellset))
 
-    field_dim = Ferrite.getfielddim(sdh, fieldname)
+    field_dim = Ferrite.n_components(sdh, fieldname)
     ncomponents = field_dim == 2 ? 3 : field_dim
     
     nviznodes = vtk.vtk.Npts

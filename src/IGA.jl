@@ -133,12 +133,8 @@ function Ferrite.faces(c::BezierCell{shape,order}) where {shape,order}
     return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_facedof_indices(IGAInterpolation{shape,order}() )))
 end
 
-function Ferrite.edges(c::BezierCell{RefHexahedron, order}) where {order}
-    return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_edgedof_indices(IGAInterpolation{RefHexahedron,order}() )))
-end
-
-function Ferrite.edges(c::BezierCell{RefQuadrilateral, order}) where {order}
-    return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_edgedof_indices(IGAInterpolation{RefQuadrilateral,order}() )))
+function Ferrite.edges(c::BezierCell{shape, order}) where {shape,order}
+    return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_edgedof_indices(IGAInterpolation{shape,order}() )))
 end
 
 end #end module

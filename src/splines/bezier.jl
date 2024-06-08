@@ -26,8 +26,7 @@ Ferrite.adjust_dofs_during_distribution(::Bernstein{<:Any, 1}) = false
 Ferrite.getnbasefunctions(::Bernstein{RefLine,2}) = 3
 
 Ferrite.vertexdof_indices(::Bernstein{RefLine,2}) = ((1,),(2,))
-Ferrite.facedof_indices(::Bernstein{RefLine,2}) = ((1,), (2,))
-Ferrite.volumedof_interior_indices(::Bernstein{RefLine,2}) = (3,)
+Ferrite.edgedof_indices(::Bernstein{RefLine,2}) = ((1,2,3),)
 
 function Ferrite.shape_value(ip::Bernstein{RefLine,2}, _ξ::Vec{1}, i::Int)
     ξ = 0.5*(_ξ[1] + 1.0)
@@ -43,9 +42,10 @@ end
 # # #
 Ferrite.getnbasefunctions(::Bernstein{RefQuadrilateral,2}) = 9
 Ferrite.vertexdof_indices(::Bernstein{RefQuadrilateral,2}) = ((1,),(2,),(3,),(4,))
-Ferrite.facedof_indices(::Bernstein{RefQuadrilateral,2}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
-Ferrite.facedof_interior_indices(::Bernstein{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
-Ferrite.volumedof_interior_indices(::Bernstein{RefQuadrilateral,2}) = (9,)
+Ferrite.edgedof_indices(::Bernstein{RefQuadrilateral,2}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
+Ferrite.edgedof_interior_indices(::Bernstein{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
+Ferrite.facedof_indices(::Bernstein{RefQuadrilateral,2}) = ((1,2,3,4,5,6,7,8,9),)
+Ferrite.facedof_interior_indices(::Bernstein{RefQuadrilateral,2}) = (9,)
 
 function Ferrite.shape_value(ip::Bernstein{RefQuadrilateral,2}, _ξ::Vec{2}, i::Int)
     ξ, η = _ξ
@@ -94,6 +94,7 @@ Ferrite.edgedof_indices(::Bernstein{RefHexahedron,2}) = (
 Ferrite.edgedof_interior_indices(::Bernstein{RefHexahedron,2}) = (
     (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
 )
+Ferrite.volumedof_interior_indices(::Bernstein{RefHexahedron,2}) = (27,)
 
 function Ferrite.shape_value(ip::Bernstein{RefHexahedron,2}, _ξ::Vec{3}, i::Int)
     ξ, η, ζ = _ξ
@@ -176,7 +177,7 @@ function _compute_bezier_shape_value(ip::Bernstein{shape,order}, ξ::Vec{dim,T},
     return val
 end
 
-function _compute_facedof_indices(ip::Bernstein{RefQuadrilateral,order}) where {order}
+function _compute_edgedof_indices(ip::Bernstein{RefQuadrilateral,order}) where {order}
     faces = Tuple[]
     orders = (order, order)
 

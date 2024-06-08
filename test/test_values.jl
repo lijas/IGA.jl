@@ -181,7 +181,7 @@ end
     
     cellnum, faceidx = (9, 3)
     addfacetset!(grid, "face1", (x)-> x[1] == -4.0)
-    for (cellnum, faceidx) in getfaceset(grid, "face1")
+    for (cellnum, faceidx) in getfacetset(grid, "face1")
 
         bc = getcoordinates(grid, cellnum)
         reinit!(fv, bc, faceidx)
