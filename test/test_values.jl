@@ -59,19 +59,16 @@ end
     qr = QuadratureRule{shape}(1)
     qr_face = FacetQuadratureRule{shape}(1)
 
-    cv  = CellValues( qr, ip, ip)
-    #cv2 = BezierCellValues( CellValues(qr, bip, bip) )
-    cv3 = CellValues( qr, ip, ip)
+    cv  = BezierCellValues(qr, ip)
+    cv  = BezierCellValues(qr, ip^2)
+    cv  = BezierCellValues(qr, ip, ip^3)
+    cv  = BezierCellValues(qr, ip^2, ip^3)
 
-    cv_vector1 = CellValues( qr, ip^sdim, ip )
-    #cv_vector2 = BezierCellValues( CellValues(qr, bip^sdim, bip) )
-    cv_vector3 = CellValues( qr, ip^sdim, ip )
+    #embedded
+    ip = IGAInterpolation{RefQuadrilateral, 2}()
+    qr = QuadratureRule{RefQuadrilateral}(1)
+    cv  = BezierCellValues(qr, ip^3, ip^3)
 
-    @test Ferrite.getngeobasefunctions(cv_vector1) == getnbasefunctions(ip)
-    @test Ferrite.getngeobasefunctions(cv) == getnbasefunctions(ip)
-
-    @test Ferrite.getnbasefunctions(cv_vector1) == getnbasefunctions(ip)*sdim
-    @test Ferrite.getnbasefunctions(cv) == getnbasefunctions(ip)
 end
 
 @testset "bezier values nurbs" begin
@@ -101,10 +98,10 @@ end
     qr = QuadratureRule{shape}(2)
     qr_face = FacetQuadratureRule{shape}(3)
 
-    fv = FacetValues( qr_face, ip, ip; update_hessians = true )
-    fv_vector = FacetValues( qr_face, ip^dim, ip; update_hessians = true )
-    cv  = CellValues( qr, ip, ip; update_hessians = true)
-    cv_vector = CellValues( qr, ip^dim, ip; update_hessians = true)
+    fv = BezierFacetValues( qr_face, ip, ip^dim; update_hessians = true )
+    fv_vector = BezierFacetValues( qr_face, ip^dim, ip^dim; update_hessians = true )
+    cv  = BezierCellValues( qr, ip, ip^dim; update_hessians = true)
+    cv_vector = BezierCellValues( qr, ip^dim, ip^dim; update_hessians = true)
 
     #Try some different cells
     cellnum = 1

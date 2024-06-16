@@ -36,11 +36,11 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
 
     #Cell values
     qr = Ferrite.QuadratureRule{Ferrite.RefHypercube{sdim}}(5)
-    cv = CellValues(qr, bern_ip, bern_ip)
+    cv = BezierCellValues(qr, bern_ip)
 
     #Face values
     qr = FacetQuadratureRule{Ferrite.RefHypercube{sdim}}(5)
-    fv = FacetValues(qr, bern_ip, bern_ip^sdim)
+    fv = BezierFacetValues(qr, bern_ip)
 
     return grid, cv, fv
 end

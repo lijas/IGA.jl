@@ -3,6 +3,9 @@ export BezierCellValues, BezierFacetValues, set_bezier_operator!
 function Ferrite.default_geometric_interpolation(::IGAInterpolation{shape, order}) where {order, dim, shape <: AbstractRefShape{dim}}
     return VectorizedInterpolation{dim}(IGAInterpolation{shape, order}())
 end
+function Ferrite.default_geometric_interpolation(::VectorizedInterpolation{vdim,shape,order,IGAInterpolation{shape, order}}) where {vdim,order, dim, shape <: AbstractRefShape{dim}}
+    return VectorizedInterpolation{dim}(IGAInterpolation{shape, order}())
+end
 function Ferrite.default_geometric_interpolation(::Bernstein{shape, order}) where {order, dim, shape <: AbstractRefShape{dim}}
     return VectorizedInterpolation{dim}(Bernstein{shape, order}())
 end
@@ -71,8 +74,11 @@ function BezierCellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, 
 end
 
 BezierCellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = BezierCellValues(Float64, qr, ip, args...; kwargs...)
+function BezierCellValues(::Type{T}, qr, ip::Interpolation; kwargs...) where T
+    return BezierCellValues(T, qr, ip, Ferrite.default_geometric_interpolation(ip); kwargs...)
+end
 
-function BezierFacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = Ferrite.default_geometric_interpolation(ip_fun); 
+function BezierFacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}; 
     update_hessians::Bool = false, update_gradients::Bool = true) where {T,sdim} 
 
     FunDiffOrder  = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
@@ -90,6 +96,11 @@ function BezierFacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpol
         deepcopy(fun_values), 
         deepcopy(fun_values), 
         geo_mapping, fqr, detJdV, normals, undef_beo, undef_w, Ferrite.ScalarWrapper(-1))
+end
+
+BezierFacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) = BezierFacetValues(Float64, qr, ip, args...; kwargs...)
+function BezierFacetValues(::Type{T}, qr, ip::Interpolation; kwargs...) where T
+    return BezierFacetValues(T, qr, ip, Ferrite.default_geometric_interpolation(ip); kwargs...)
 end
 
 #Intercept construction of CellValues called with IGAInterpolation
@@ -145,23 +156,6 @@ function Ferrite.set_current_facet!(fv::BezierFacetValues, face_nr::Int)
     checkbounds(Bool, 1:Ferrite.nfacets(fv), face_nr) || throw(ArgumentError("Face index out of range."))
     fv.current_facet[] = face_nr
 end
-
-#=
-function function_hessian(fe_v::Ferrite.AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
-    n_base_funcs = getnbasefunctions(fe_v)
-    length(u) == n_base_funcs || Ferrite.throw_incompatible_dof_length(length(u), n_base_funcs)
-    @boundscheck Ferrite.checkquadpoint(fe_v, q_point)
-    hess = function_hessian_init(fe_v, u)
-    @inbounds for i in 1:n_base_funcs
-        hess += u[i] ⊗ shape_hessian(fe_v, q_point, i)
-    end
-    return hess
-end
-shape_hessian_type(::Union{BezierCellValues{<:Any, <:Any, <:Any, d²NdX²_t}, BezierFacetValues{<:Any, <:Any, <:Any, d²NdX²_t}}) where d²NdX²_t = d²NdX²_t
-function function_hessian_init(cv::Ferrite.AbstractValues, ::AbstractVector{T}) where {T}
-    return zero(shape_hessian_type(cv)) * zero(T)
-end
-=#
 
 function set_bezier_operator!(bcv::BezierCellAndFacetValues, beo::BezierExtractionOperator{T}) where T 
     bcv.current_beo[]=beo
@@ -711,12 +705,17 @@ function Base.show(io::IO, m::MIME"text/plain", fv::BezierFacetValues)
     print(io, "- Geometric interpolation: "); show(io, m, gip)
 end
 
-function Base.show(io::IO, m::MIME"text/plain", cv::BezierCellValues)
-    fip = Ferrite.function_interpolation(cv)
-    gip = Ferrite.geometric_interpolation(cv)
-    println(io, "BezierCellValues with")
-    println(io, "- Quadrature rule with ", getnquadpoints(cv), " points")
-    print(io, "- Function interpolation: "); show(io, m, fip)
-    println(io)
-    print(io, "- Geometric interpolation: "); show(io, m, gip)
+function Base.show(io::IO, d::MIME"text/plain", cv::BezierCellValues)
+    ip_geo = geometric_interpolation(cv)
+    ip_fun = Ferrite.function_interpolation(cv)
+    rdim = Ferrite.getrefdim(ip_geo)
+    vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
+    GradT = Ferrite.shape_gradient_type(cv)
+    sdim = GradT === nothing ? nothing : Ferrite.sdim_from_gradtype(GradT)
+    vstr = vdim==0 ? "scalar" : "vdim=$vdim"
+    print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
+    print(io, getnquadpoints(cv), " quadrature points")
+    print(io, "\n Function interpolation: "); show(io, d, ip_fun)
+    print(io, "\nGeometric interpolation: ");
+    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end
