@@ -116,8 +116,7 @@ include("apply_analytical_iga.jl")
 #include("L2_projection.jl")
 
 Ferrite._mass_qr(::IGAInterpolation{shape,order}) where {shape,order}= Ferrite._mass_qr(Bernstein{shape, order}())
-Ferrite._mass_qr(::Bernstein{RefQuadrilateral, 2}) = QuadratureRule{RefQuadrilateral}(2+1)
-Ferrite._mass_qr(::Bernstein{RefHexahedron, 2}) = QuadratureRule{RefCube}(2+1)
+Ferrite._mass_qr(::Bernstein{refshape, order}) where {rdim,order,refshape<:Ferrite.RefHypercube{rdim}} = QuadratureRule{refshape}(order+1)
 
 #Normaly the verices function should only return the 8 corner nodes of the hexa (or 4 in 2d),
 #but since the cell connectivity in IGA is different compared to normal FE elements,
