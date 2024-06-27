@@ -713,7 +713,7 @@ function Base.show(io::IO, d::MIME"text/plain", cv::BezierCellValues)
     GradT = Ferrite.shape_gradient_type(cv)
     sdim = GradT === nothing ? nothing : Ferrite.sdim_from_gradtype(GradT)
     vstr = vdim==0 ? "scalar" : "vdim=$vdim"
-    print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
+    print(io, "BezierCellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, ip_fun)
     print(io, "\nGeometric interpolation: ");
