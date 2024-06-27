@@ -45,12 +45,15 @@ function _get_problem_data(meshsymbol::Symbol, nels::NTuple{sdim,Int}, orders; m
     return grid, cv, fv
 end
 
-function test_cube()
-    grid, cv, fv = _get_problem_data(:cube, (2,2,2), (2,2,2), cornerpos=(-1.0,-2.0,0.0), size=(2.0,3.0,4.0))
+function test_cube(order::Int)
+    grid, cv, fv = _get_problem_data(:cube, (2,2,2), (order,order,order), cornerpos=(-1.0,-2.0,0.0), size=(2.0,3.0,4.0))
     addcellset!(grid, "all", (x)->true)
     addfacetset!(grid, "left", (x)-> x[1]≈-1.0)
     addfacetset!(grid, "right", (x)->x[1]≈1.0)
     addfacetset!(grid, "top", (x)->x[3]≈4.0)
+    addfacetset!(grid, "bottom", (x)->x[3]≈0.0)
+    addfacetset!(grid, "front", (x)->x[2]≈-2.0)
+    addfacetset!(grid, "back", (x)->x[2]≈1.0)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))
@@ -59,21 +62,55 @@ function test_cube()
     #Area
     A = _calculate_area(fv, grid, getfacetset(grid, "left"))
     @test A ≈ prod((3.0,4.0))
+    @test getnormal(fv, 1) ≈ Vec((-1.0, 0.0, 0.0))
 
     A = _calculate_area(fv, grid, getfacetset(grid, "right"))
     @test A ≈ prod((3.0,4.0))
+    @test getnormal(fv, 1) ≈ Vec((01.0, 0.0, 0.0))
 
     A = _calculate_area(fv, grid, getfacetset(grid, "top"))
     @test A ≈ prod((3.0,2.0))
+    @test getnormal(fv, 1) ≈ Vec((0.0, 0.0, 1.0))
+
+    A = _calculate_area(fv, grid, getfacetset(grid, "bottom"))
+    @test A ≈ prod((3.0,2.0))
+    @test getnormal(fv, 1) ≈ Vec((0.0, 0.0, -1.0))
+
+    A = _calculate_area(fv, grid, getfacetset(grid, "front"))
+    @test A ≈ prod((4.0,2.0))
+    @test getnormal(fv, 1) ≈ Vec((0.0, -1.0, 0.0))
+
+    A = _calculate_area(fv, grid, getfacetset(grid, "back"))
+    @test A ≈ prod((4.0,2.0))
+    @test getnormal(fv, 1) ≈ Vec((0.0, 1.0, 0.0))
 
 end
 
-function test_square()
-    grid, cv, fv = _get_problem_data(:hypercube, (1,1,), (2,2,), cornerpos=(-1.0,-1.0), size=(2.0,3.0,))
+function _create_set2(f::Function, grid::Ferrite.AbstractGrid, ::Type{BI}; all=true) where {BI <: Ferrite.BoundaryIndex}
+    set = Ferrite.OrderedSet{BI}()
+    # Since we loop over the cells in order the resulting set will be sorted
+    # lexicographically based on the (cell_idx, entity_idx) tuple
+    for (cell_idx, cell) in enumerate(getcells(grid))
+        for (entity_idx, entity) in enumerate(Ferrite.boundaryfunction(BI)(cell))
+            @show 
+            pass = all
+            for node_idx in entity
+                v = f(Ferrite.get_node_coordinate(grid, node_idx))
+                all ? (!v && (pass = false; break)) : (v && (pass = true; break))
+            end
+            pass && push!(set, BI(cell_idx, entity_idx))
+        end
+    end
+    return set
+end
+
+function test_square(order::Int)
+    grid, cv, fv = _get_problem_data(:hypercube, (1,1,), (order, order,), cornerpos=(-1.0,-1.0), size=(2.0,3.0,))
     addcellset!(grid, "all", (x)->true)
     addfacetset!(grid, "left", (x)-> x[1] ≈ -1.0)
     addfacetset!(grid, "right", (x)->x[1]≈1.0)
     addfacetset!(grid, "top", (x)->x[2]≈2.0)
+    addfacetset!(grid, "bottom", (x)->x[2]≈-1.0)
 
     #Volume
     V = _calculate_volume(cv, grid, getcellset(grid, "all"))
@@ -82,13 +119,19 @@ function test_square()
     #Area
     A = _calculate_area(fv, grid, getfacetset(grid, "left"))
     @test A ≈ 3.0
+    @test getnormal(fv, 1) ≈ Vec((-1.0, 0.0))
 
     A = _calculate_area(fv, grid, getfacetset(grid, "right"))
     @test A ≈ 3.0
+    @test getnormal(fv, 1) ≈ Vec((1.0, 0.0))
 
     A = _calculate_area(fv, grid, getfacetset(grid, "top"))
     @test A ≈ 2.0
+    @test getnormal(fv, 1) ≈ Vec((0.0, 1.0))
 
+    A = _calculate_area(fv, grid, getfacetset(grid, "bottom"))
+    @test A ≈ 2.0
+    @test getnormal(fv, 1) ≈ Vec((0.0, -1.0))
 end
 
 function test_plate_with_hole()
@@ -96,8 +139,10 @@ function test_plate_with_hole()
     L = 4.0
     r = 1.0
     addcellset!(grid, "all", (x)->true)
-    addfacetset!(grid, "right", (x)->x[1]≈-4.0)
+    addfacetset!(grid, "left", (x)->x[1]≈-4.0)
     addfacetset!(grid, "top", (x)->x[2]≈4.0)
+    addfacetset!(grid, "right", (x)->x[1]≈0.0)
+    addfacetset!(grid, "bottom", (x)->x[2]≈0.0)
     addfacetset!(grid, "circle", (x)-> r*0.9 < norm(x) < r*1.1)
 
     #Volume
@@ -105,11 +150,21 @@ function test_plate_with_hole()
     @test V ≈ L*L - 0.25*pi*r^2
 
     #Area
-    A = _calculate_area(fv, grid, getfacetset(grid, "right"))
+    A = _calculate_area(fv, grid, getfacetset(grid, "left"))
     @test A ≈ L
+    @test getnormal(fv, 1) ≈ Vec((-1.0, 0.0))
 
     A = _calculate_area(fv, grid, getfacetset(grid, "top"))
     @test A ≈ L
+    @test getnormal(fv, 1) ≈ Vec((0.0, 1.0))
+
+    A = _calculate_area(fv, grid, getfacetset(grid, "bottom"))
+    @test A ≈ L-r
+    @test getnormal(fv, 1) ≈ Vec((0.0, -1.0))
+
+    A = _calculate_area(fv, grid, getfacetset(grid, "right"))
+    @test A ≈ L-r
+    @test getnormal(fv, 1) ≈ Vec((1.0, 0.0))
 
     A = _calculate_area(fv, grid, getfacetset(grid, "circle"))
     @test A ≈ 2r*pi/4 #forth of circumfrence
@@ -222,8 +277,12 @@ end
 
 
 @testset "Geometries, vtk-outputing and integration" begin
-    test_cube()
-    test_square()
+    test_cube(1)
+    test_cube(2)
+    test_cube(3)
+    test_square(1)
+    test_square(2)
+    test_square(3)
     test_plate_with_hole()
     test_singly_curved_2d()
     test_singly_curved_3d()

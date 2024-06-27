@@ -20,6 +20,10 @@ Ferrite.adjust_dofs_during_distribution(::Bernstein) = true
 Ferrite.adjust_dofs_during_distribution(::Bernstein{<:Any, 2}) = false
 Ferrite.adjust_dofs_during_distribution(::Bernstein{<:Any, 1}) = false
 
+Ferrite.vertexdof_indices(ip::Bernstein{refshape,order}) where {refshape,order} = _compute_vertexdof_indices(ip)
+Ferrite.edgedof_indices(ip::Bernstein{refshape,order}) where {refshape,order} = _compute_edgedof_indices(ip)
+Ferrite.facedof_indices(ip::Bernstein{refshape,order}) where {refshape,order} = _compute_facedof_indices(ip)
+
 # # #
 #   Bernstein line, order 2
 # # #
@@ -65,7 +69,9 @@ end
 #   Bernstein Hexahedron, order 2
 # # #
 Ferrite.getnbasefunctions(::Bernstein{RefHexahedron,2}) = 27
-
+Ferrite.vertexdof_indices(::Bernstein{RefHexahedron,2}) = (
+    (1,),(2,),(3,),(4,),(5,),(6,),(7,),(8,)
+)
 Ferrite.facedof_indices(::Bernstein{RefHexahedron,2}) = (
     (1,4,3,2, 12,11,10,9, 21),
     (1,2,6,5, 9,18,13,17, 22),
@@ -177,6 +183,10 @@ function _compute_bezier_shape_value(ip::Bernstein{shape,order}, ξ::Vec{dim,T},
     return val
 end
 
+function _compute_vertexdof_indices(::Bernstein{RefQuadrilateral,order}) where order
+    ((1,),(2,),(3,),(4,),)
+end
+
 function _compute_edgedof_indices(ip::Bernstein{RefQuadrilateral,order}) where {order}
     faces = Tuple[]
     orders = (order, order)
@@ -193,6 +203,17 @@ function _compute_edgedof_indices(ip::Bernstein{RefQuadrilateral,order}) where {
     push!(faces, Tuple(ind[1,:][order_1d2]))# left
     
     return Tuple(faces) 
+end
+
+function _compute_volumedof_indices(ip::Bernstein{RefQuadrilateral,order}) where {order}
+    orders = (order, order)
+    ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
+    volumedofs = ind[2:end-1, 2:end-1]
+    return Tuple(volumedofs) 
+end
+
+function _compute_vertexdof_indices(::Bernstein{RefHexahedron,order}) where order
+    ((1,),(2,),(3,),(4,),(5,),(6,),(7,),(8,))
 end
 
 function _compute_facedof_indices(ip::Bernstein{RefHexahedron,order}) where {order}
@@ -244,6 +265,13 @@ function _compute_edgedof_indices(ip::Bernstein{RefHexahedron,order}) where {ord
     return Tuple(edges)
 end
 
+function _compute_volumedof_indices(ip::Bernstein{RefHexahedron,order}) where {order}
+    orders = (order, order, order)
+    ind = reshape([findfirst(i->i==j, _bernstein_ordering(ip)) for j in 1:prod(orders.+1)], (orders.+1)...)
+    volumedofs = ind[2:end-1, 2:end-1, 2:end-1]
+    return Tuple(volumedofs) 
+end
+
 function _bernstein_basis_recursive(p::Int, i::Int, xi::T) where T
 	if i == 1 && p == 0
 		return one(T)
@@ -289,7 +317,6 @@ end
     _bernstein_ordering(::Bernstein)
 
 Return the ordering of the bernstein basis base-functions, from a "CartesianIndices-ordering".
-The ordering is the same as in VTK: https://blog.kitware.com/wp-content/uploads/2020/03/Implementation-of-rational-Be%CC%81zier-cells-into-VTK-Report.pdf.
 """
 function _bernstein_ordering(::Bernstein{RefLine, order}) where {order}
     ind = reshape(1:prod(order+1), order+1)
@@ -378,6 +405,7 @@ function _bernstein_ordering(::Bernstein{RefHexahedron, order}) where {order}
 end
 
 #Almost the same orderign as _bernstein_ordering, but some changes for faces and edges
+#The ordering is the same as in VTK: https://blog.kitware.com/wp-content/uploads/2020/03/Implementation-of-rational-Be%CC%81zier-cells-into-VTK-Report.pdf.
 function _vtk_ordering(c::Type{<:BezierCell{RefLine}})
     _bernstein_ordering(c)
 end

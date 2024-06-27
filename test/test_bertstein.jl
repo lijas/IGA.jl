@@ -12,10 +12,10 @@
                 Bernstein{RefLine, 3}(),
                 Bernstein{RefLine, 4}(),
                 Bernstein{RefQuadrilateral, 2}(),
-                #Bernstein{RefQuadrilateral, 3}(),
                 Bernstein{RefHexahedron, 2}(),
+                IGAInterpolation{RefQuadrilateral, 3}(),
                 IGAInterpolation{RefHexahedron, 2}(),
-                #Bernstein{RefHexahedron, 3}()
+                IGAInterpolation{RefHexahedron, 3}(),
                 )
 
         dim = Ferrite.getrefdim(bip)
@@ -28,9 +28,8 @@
         end
     end
 
-    #Test generated Bernstein values with hardcoded ones
-    # ip_list contains interpolation which explicitly been inputed in IGA.jl
-    ip_list = ( Bernstein{RefLine, 2}(), Bernstein{RefQuadrilateral, 2}(), Bernstein{RefHexahedron, 2}())
+    #Test if generated Bernstein values matches with the hardcoded ones
+    ip_list = (Bernstein{RefLine, 2}(), Bernstein{RefQuadrilateral, 2}(), Bernstein{RefHexahedron, 2}())
     for bip in ip_list
         dim = Ferrite.getrefdim(bip)
         for xi in [rand(Vec{dim,Float64}), rand(Vec{dim,Float64})]
