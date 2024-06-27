@@ -168,8 +168,8 @@ function solve()
     qr_cell = QuadratureRule{RefQuadrilateral}(4)
     qr_face = FacetQuadratureRule{RefQuadrilateral}(3)
 
-    cv = CellValues(qr_cell, ip_u, ip_geo)
-    fv = FacetValues(qr_face, ip_u, ip_geo)
+    cv = BezierCellValues(qr_cell, ip_u, ip_geo^2)
+    fv = BezierFacetValues(qr_face, ip_u, ip_geo^2)
 
     # Distribute dofs as normal
     dh = DofHandler(grid)
@@ -206,7 +206,6 @@ function solve()
     #csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
     projector = L2Projector(ip_u, grid)
     σ_nodes = project(projector, cellstresses, qr_cell)
-    @show σ_nodes
     # Output results to VTK
     #vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
     #vtk_point_data(vtkgrid, dh, u, :u)
