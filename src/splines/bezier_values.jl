@@ -195,8 +195,6 @@ function Ferrite.spatial_coordinate(cv::Ferrite.AbstractValues, iqp::Int, (xb, w
     return x
 end
 
-Ferrite.getnormal(fv::BezierFaceValues, i::Int)= fv.cv_bezier.normals[i]
-
 #Function that computs basefunction values from bezier function values and the extraction operator, N = C*B
 function _cellvalues_bezier_extraction!(cv_nurbs::Ferrite.AbstractValues, cv_bezier::Ferrite.AbstractValues, Cbe::BezierExtractionOperator{T}, w::Optional{Vector{T}}, faceid::Int) where {T}
 
