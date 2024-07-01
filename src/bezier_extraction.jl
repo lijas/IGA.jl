@@ -65,6 +65,7 @@ function compute_bezier_points!(bezier_points::Vector{T2}, Ce::BezierExtractionO
 
 	return nothing
 end
+#const bezier_extraction! = compute_bezier_points!
 
 """
 	compute_bezier_points(Ce::BezierExtractionOperator{T}, control_points::AbstractVector{T2}; dim::Int=1)
@@ -113,7 +114,8 @@ Computes the bezier extraction operator in each parametric direction, and uses t
 
 		#Reorder
 		#
-		ordering = _bernstein_ordering(BernsteinBasis{pdim,orders}())
+		@assert allequal(orders)
+		ordering = _bernstein_ordering(Bernstein{RefHypercube{pdim}, orders[1]}())
 		nel = prod(nels)
 		C_reorder = Vector{eltype(first(Ce))}()
 		for i in 1:nel

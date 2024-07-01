@@ -92,7 +92,7 @@ function solve_2d()
 	
 	Cb, nbe = IGA.compute_bezier_extraction_operators(mesh.orders, mesh.knot_vectors)
 	
-	ip = BernsteinBasis{2,2}()
+	ip = Bernstein{2,2}()
 	qr = QuadratureRule{2,RefCube}(3)
 	
 	#ecp = mesh.control_points[globaldofs]

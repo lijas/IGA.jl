@@ -4,106 +4,137 @@ using Reexport
 
 @reexport using Tensors
 @reexport using Ferrite
-@reexport using WriteVTK
+using Ferrite: 
+    AbstractRefShape, RefHypercube, RefLine, RefQuadrilateral, RefHexahedron, getnbasefunctions,
+    VectorInterpolation, VectorizedInterpolation,
+    FunctionValues, GeometryMapping, MappingValues, ValuesUpdateFlags
 
+using OrderedCollections:
+    OrderedSet
+
+using WriteVTK
 using LinearAlgebra
 using StaticArrays
 import SparseArrays
 
+export IGAInterpolation
 export BezierExtractionOperator
 export BezierCell
 export BezierCoords
+export VTKIGAFile
+export IGACellCache, IGAFaceCache
 
 const Optional{T} = Union{T, Nothing}
 const BezierExtractionOperator{T} = Vector{SparseArrays.SparseVector{T,Int}}
+const CoordsAndWeight{sdim,T} = Tuple{ <: AbstractVector{Vec{sdim,T}}, <: AbstractVector{T}}
 
 struct BezierCoords{dim_s,T} 
     xb   ::Vector{Vec{dim_s,T}}
     wb   ::Vector{T}
     x    ::Vector{Vec{dim_s,T}}
     w    ::Vector{T}
-    beo ::BezierExtractionOperator{T} 
+    beo  ::Base.RefValue{ BezierExtractionOperator{T} }
 end
+
+function resize_bezier_coord!(X::BezierCoords, N::Int)
+    (; xb, wb, x, w) = X
+    resize!(xb, N)
+    resize!(wb, N)
+    resize!(x,  N)
+    resize!(w,  N)
+end
+
+zero_bezier_coord(dim, T, nnodes) = BezierCoords{dim,T}(zeros(Vec{dim,T}, nnodes), zeros(T, nnodes), zeros(Vec{dim,T}, nnodes), zeros(T, nnodes), Base.RefValue(diagonal_beo(1)))
 
 #Base.zero(Type{BezierCoords{dim,T}}) where {dim,T} = BezierCoords
 
 """
-    BezierCell{dim,N,order,M} <: Ferrite.AbstractCell{dim,N,M}
-
-`dim` = spacial dimension
-`N` = number of nodes/controlpoints
-`order` = tuple with order in each parametric dimension (does not need to be equal to `dim`)
-`M` = number of faces (used by Ferrite) (4 in 2d, 6 in 3d)
+    IGAInterpolation{shape, order} <: Ferrite.ScalarInterpolation{shape, order}
 """
-struct BezierCell{dim,N,order,M} <: Ferrite.AbstractCell{dim,N,M}
-    nodes::NTuple{N,Int}
-    function BezierCell{dim,N,order,M}(nodes::NTuple{N,Int}) where {dim,N,order,M} 
-        @assert(order isa Tuple)
-        @assert(prod(order.+1)==N)
-		return new{dim,N,order,M}(nodes)
+
+struct IGAInterpolation{shape, order} <: Ferrite.ScalarInterpolation{shape, order}
+    function IGAInterpolation{shape,order}() where {rdim, shape<:RefHypercube{rdim}, order} 
+        #Check if you can construct a Bernstein basis
+        Bernstein{shape,order}()
+        return new{shape,order}()
     end
 end
 
-BezierCell{dim,N,order}(nodes::NTuple{N,Int}) where {dim,N,order} = 
-    BezierCell{dim,N,order,(2,4,6)[dim]}(nodes)
+Ferrite.adjust_dofs_during_distribution(::IGAInterpolation) = false
+Ferrite.reference_shape_value(::IGAInterpolation{shape, order}, ξ::Vec, i::Int) where {shape, order} = Ferrite.reference_shape_value(Bernstein{shape, order}(), ξ, i)
+Ferrite.reference_coordinates(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.reference_coordinates(Bernstein{shape, order}())
+Ferrite.getnbasefunctions(::IGAInterpolation{shape, order}) where {shape, order} = getnbasefunctions(Bernstein{shape, order}())
 
-getorders(::BezierCell{dim,N,orders}) where {dim,N,orders} = orders
+Ferrite.nvertices(ip::IGAInterpolation) = getnbasefunctions(ip)
+Ferrite.vertexdof_indices(ip::IGAInterpolation) = ntuple(i->i, getnbasefunctions(ip))
 
-include("bezier_extraction.jl")
+#Remove dofs on edges and faces such that dofhandler can distribute dofs correctly
+Ferrite.edgedof_indices(ip::IGAInterpolation{RefHexahedron}) = ntuple(_ -> (), Ferrite.nedges(ip))
+Ferrite.edgedof_interior_indices(ip::IGAInterpolation) = ntuple(_ -> (), Ferrite.nedges(ip))
+Ferrite.facedof_indices(ip::IGAInterpolation{RefHexahedron}) =  ntuple(_ -> (), Ferrite.nfaces(ip))
+Ferrite.facedof_interior_indices(ip::IGAInterpolation{RefHexahedron}) =  ntuple(_ -> (), Ferrite.nfaces(ip))
+Ferrite.facedof_indices(ip::IGAInterpolation{RefQuadrilateral}) =  ntuple(_ -> (), Ferrite.nfaces(ip))
+Ferrite.facedof_interior_indices(ip::IGAInterpolation{RefQuadrilateral}) =  ntuple(_ -> (), Ferrite.nfaces(ip))
+
+Ferrite.dirichlet_facedof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_facedof_indices(Bernstein{shape, order}())
+Ferrite.dirichlet_edgedof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_edgedof_indices(Bernstein{shape, order}())
+#Ferrite.dirichlet_vertexdof_indices(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.dirichlet_vertexdof_indices(Bernstein{shape, order}())
+
+
+
+"""
+    BezierCell{refshape,order,N} <: Ferrite.AbstractCell{refshape}
+
+`N` = number of nodes/controlpoints
+`order` = tuple with order in each parametric dimension (does not need to be equal to `dim`)
+"""
+struct BezierCell{refshape,order,N} <: Ferrite.AbstractCell{refshape}
+    nodes::NTuple{N,Int}
+    function BezierCell{refshape,order}(nodes::NTuple{N,Int}) where {rdim, order, refshape<:RefHypercube{rdim}, N} 
+        @assert(order isa Integer)
+        @assert (order+1)^rdim == N
+		return new{refshape,order,N}(nodes)
+    end
+end
+
+function BezierCell{refshape,order,N}(nodes::NTuple{N,Int}) where {rdim, order, refshape<:RefHypercube{rdim}, N} 
+    return BezierCell{refshape,order}(nodes)
+end
+
+Ferrite.geometric_interpolation(::Type{<:BezierCell{shape,order}}) where {order, shape} = IGAInterpolation{shape, order}()
+Ferrite.nnodes(::BezierCell{shape, order, N}) where {order, shape, N} = N
+getorders(::BezierCell{refshape, orders, N}) where {orders,refshape,N} = orders
+
 include("nurbsmesh.jl")
 include("mesh_generation.jl")
 include("bezier_grid.jl")
 include("splines/bezier.jl")
+include("bezier_extraction.jl")
 include("splines/bezier_values.jl")
 include("splines/bsplines.jl")
 include("VTK.jl")
-include("L2_projection.jl")
+include("iterators.jl")
+include("iterators_future.jl")
+include("apply_analytical_iga.jl")
+#include("L2_projection.jl")
 
-Ferrite._mass_qr(::BernsteinBasis{2, (2, 2)}) = QuadratureRule{2,RefCube}(2+1)
+Ferrite._mass_qr(::IGAInterpolation{shape,order}) where {shape,order}= Ferrite._mass_qr(Bernstein{shape, order}())
+Ferrite._mass_qr(::Bernstein{RefQuadrilateral, 2}) = QuadratureRule{RefQuadrilateral}(2+1)
+Ferrite._mass_qr(::Bernstein{RefHexahedron, 2}) = QuadratureRule{RefCube}(2+1)
 
 #Normaly the verices function should only return the 8 corner nodes of the hexa (or 4 in 2d),
 #but since the cell connectivity in IGA is different compared to normal FE elements,
 #we can only distribute cells on the nodes/controlpoints
 Ferrite.vertices(c::BezierCell) = c.nodes
 
-_bernstein_ordering(::Type{<:BezierCell{dim,N,orders}}) where {dim,N,orders} = _bernstein_ordering(BernsteinBasis{length(orders),orders}())                                        
+_bernstein_ordering(::Type{<:BezierCell{shape,order}}) where {order,shape} = _bernstein_ordering(Bernstein{shape,order}())                                        
 
-#Dim 2
-function Ferrite.faces(c::BezierCell{dim,N,order}) where {dim,N,order}
-    return getindex.(Ref(c.nodes), collect.(Ferrite.faces(BernsteinBasis{length(order),order}() )))
+function Ferrite.faces(c::BezierCell{shape,order}) where {shape,order}
+    return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_facedof_indices(IGAInterpolation{shape,order}() )))
 end
 
-function Ferrite.edges(c::BezierCell{dim,N,order}) where {dim,N,order}
-    return getindex.(Ref(c.nodes), collect.(Ferrite.edges(BernsteinBasis{length(order),order}() )))
-end
-
-Ferrite.default_interpolation(::Type{BezierCell{dim,N,order,M}}) where {dim,N,order,M} = BernsteinBasis{length(order),order}()
-
-#
-function Ferrite.cell_to_vtkcell(::Type{BezierCell{2,N,order,M}}) where {N,order,M}
-    if length(order) == 2
-        return Ferrite.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
-    else
-        return Ferrite.VTKCellTypes.VTK_BEZIER_CURVE
-    end
-end
-
-function Ferrite.cell_to_vtkcell(::Type{BezierCell{3,N,order,M}}) where {N,order,M}
-    if length(order) == 3
-        return Ferrite.VTKCellTypes.VTK_BEZIER_HEXAHEDRON
-    elseif length(order) == 2
-        return Ferrite.VTKCellTypes.VTK_BEZIER_QUADRILATERAL
-    else 
-        return Ferrite.VTKCellTypes.VTK_BEZIER_CURVE
-    end
-end
-
-function Ferrite.cell_to_vtkcell(::Type{BezierCell{1,N,order,M}}) where {N,order,M}
-    if length(order) == 1
-        return Ferrite.VTKCellTypes.VTK_BEZIER_CURVE
-    else
-        error("adsf")
-    end
+function Ferrite.edges(c::BezierCell{shape, order}) where {shape,order}
+    return getindex.(Ref(c.nodes), collect.(Ferrite.dirichlet_edgedof_indices(IGAInterpolation{shape,order}() )))
 end
 
 end #end module

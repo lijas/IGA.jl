@@ -41,6 +41,10 @@ struct NURBSMesh{pdim,sdim,T} #<: Ferrite.AbstractGrid
 
 end
 
+function Base.show(io::IO, ::MIME"text/plain", grid::NURBSMesh)
+    print(io, "NURBSMesh and with order $(grid.orders) and $(getncells(grid)) cells and $(getnnodes(grid)) nodes (control points) ")
+end
+
 Ferrite.getncells(mesh::NURBSMesh) = size(mesh.IEN, 2)
 Ferrite.getnnodes(mesh::NURBSMesh) = maximum(mesh.IEN) 
 const getncontrolponits = Ferrite.getnnodes
@@ -65,7 +69,7 @@ function eval_parametric_coordinate(mesh::NURBSMesh{pdim,sdim}, ξ::Vec{pdim}) w
 
 	x = zero(Vec{sdim,Float64})
 	for i in 1:getnbasefunctions(bspline)
-		N = Ferrite.value(bspline, i, ξ)
+		N = Ferrite.reference_shape_value(bspline, ξ, i)
 		x += N*mesh.control_points[i]
 	end
 

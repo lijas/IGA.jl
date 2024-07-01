@@ -45,29 +45,25 @@ end=#
     @test IGA.getnbasefunctions_dim(basis) == (7,8)
     @test IGA.getnbasefunctions(basis) == 7*8
 
-    #Knot vector needs to be in range [-1 ... 1]
-    order = 2
-    knots = Float64[-1, -1, -1, 0, 1, 1, 1]
-    @test_throws AssertionError IGA.BSplineBasis( [0.0, 1.0], 2)
-    @test_throws AssertionError IGA.BSplineBasis( ([-1.0, 0.0],), (2,))
-    @test_throws AssertionError IGA.BSplineBasis( ([-1.0, 0.0],[0.0, 1.0]), (2,2))
 end
 
 @testset "bsplines vs. bernstein" begin
-    #BsplineBasis is the same as BernsteinBasis in interval -1 to 1 
+    #BsplineBasis is the same as Bernstein in interval -1 to 1 
     T = Float64
     for p in (2,4)
         knot_vector = [(ones(T, p+1)*-1)..., ones(T, p+1)...]
     
         ip1 = BSplineBasis((knot_vector,knot_vector), (p,p))
-        ip2 = BernsteinBasis{2,(p,p)}()
+        ip2 = Bernstein{RefQuadrilateral, p}()
 
         reorder = IGA._bernstein_ordering(ip2)
 
         ξ = Vec((rand(),rand()))
-        N1 = Ferrite.value(ip1, ξ)[reorder]
-        N2 = Ferrite.value(ip2, ξ)
+        for i in 1:getnbasefunctions(ip2)
+            N1 = Ferrite.reference_shape_value(ip1, ξ, reorder[i])
+            N2 = Ferrite.reference_shape_value(ip2, ξ, i)
+            @test N1 ≈ N2
+        end
 
-        @test N1 ≈ N2
     end
 end

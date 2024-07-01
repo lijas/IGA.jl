@@ -4,34 +4,44 @@ struct BezierGrid{dim,C<:Ferrite.AbstractCell,T<:Real} <: Ferrite.AbstractGrid{d
 	grid    ::Ferrite.Grid{dim,C,T}
 	weights ::Vector{Float64}
 	beo     ::Vector{BezierExtractionOperator{Float64}}
+
+	#Alias from grid
+	cells::Vector{C}
+    nodes::Vector{Node{dim,T}}
+    cellsets::Dict{String,OrderedSet{Int}}
+    nodesets::Dict{String,OrderedSet{Int}}
+    facetsets::Dict{String,OrderedSet{FacetIndex}}
+    vertexsets::Dict{String,OrderedSet{VertexIndex}}
+
+	function BezierGrid(grid::Ferrite.Grid{dim,C,T}, weights::Vector{T}, beo::Vector{BezierExtractionOperator{T}}) where {dim,C,T}
+		return new{dim,C,T}(
+			grid, weights, beo,
+			grid.cells, grid.nodes, grid.cellsets, grid.nodesets, grid.facetsets, grid.vertexsets, 
+		)
+	end
 end
-Ferrite.getdim(g::BezierGrid{dim}) where {dim} = dim
-getT(g::BezierGrid) = eltype(first(g.nodes).x)
 
 function BezierGrid(cells::Vector{C},
 		nodes::Vector{Ferrite.Node{dim,T}},
 		weights::AbstractVector{T},
 		extraction_operator::AbstractVector{BezierExtractionOperator{T}}; 
-		cellsets::Dict{String,Set{Int}}             =Dict{String,Set{Int}}(),
-		nodesets::Dict{String,Set{Int}}             =Dict{String,Set{Int}}(),
-		facesets::Dict{String,Set{FaceIndex}}       =Dict{String,Set{FaceIndex}}(),
-		edgesets::Dict{String,Set{EdgeIndex}}       =Dict{String,Set{EdgeIndex}}(),
-		vertexsets::Dict{String,Set{VertexIndex}}   =Dict{String,Set{VertexIndex}}(),
-		boundary_matrix::SparseArrays.SparseMatrixCSC{Bool,Int}  = SparseArrays.spzeros(Bool, 0, 0)) where {dim,C,T}
+		cellsets::Dict{String,OrderedSet{Int}}             = Dict{String,OrderedSet{Int}}(),
+		nodesets::Dict{String,OrderedSet{Int}}             = Dict{String,OrderedSet{Int}}(),
+		facetsets::Dict{String,OrderedSet{FacetIndex}}      = Dict{String,OrderedSet{FacetIndex}}(),
+		vertexsets::Dict{String,OrderedSet{VertexIndex}}   = Dict{String,OrderedSet{VertexIndex}}()) where {dim,C,T}
 
 	
-	grid = Ferrite.Grid(cells, nodes; 
-							cellsets=cellsets, nodesets=nodesets, facesets=facesets,
-							edgesets, vertexsets, boundary_matrix=boundary_matrix)
+	grid = Ferrite.Grid(cells, nodes; nodesets, cellsets, facetsets, vertexsets)
 
-	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
+	return BezierGrid(grid, weights, extraction_operator)
 end
 
 function BezierGrid(mesh::NURBSMesh{pdim,sdim}) where {pdim,sdim}
 
-	N = length(mesh.IEN[:,1])
-	
-    CellType = BezierCell{sdim,N,mesh.orders}
+	@assert allequal(mesh.orders)
+	order = first(mesh.orders)
+	N = size(mesh.IEN, 1)
+    CellType = BezierCell{RefHypercube{pdim},order}
     ordering = _bernstein_ordering(CellType)
 	
 	cells = [CellType(Tuple(mesh.IEN[ordering,ie])) for ie in 1:getncells(mesh)]
@@ -56,27 +66,18 @@ function BezierGrid(grid::Ferrite.Grid{dim,C,T}) where {dim,C,T}
 		push!(extraction_operator, beo)
 	end
 
-	return BezierGrid{dim,C,T}(grid, weights, extraction_operator)
+	return BezierGrid(grid, weights, extraction_operator)
 end
 
-function Base.getproperty(m::BezierGrid, s::Symbol)
-    if s === :nodes
-        return getfield(m.grid, :nodes)
-    elseif s === :cells
-		return getfield(m.grid, :cells)
-    elseif s === :cellsets
-		return getfield(m.grid, :cellsets)
-    elseif s === :nodesets
-		return getfield(m.grid, :nodesets)
-    elseif s === :facesets
-		return getfield(m.grid, :facesets)
-	elseif s === :edgesets
-		return getfield(m.grid, :edgesets)
-	elseif s === :vertexsets
-        return getfield(m.grid, :vertexsets)
-    else 
-        return getfield(m, s)
+function Base.show(io::IO, ::MIME"text/plain", grid::BezierGrid)
+    print(io, "$(typeof(grid)) with $(getncells(grid)) ")
+    if isconcretetype(eltype(grid.cells))
+        typestrs = [repr(eltype(grid.cells))]
+    else
+        typestrs = sort!(repr.(Set(typeof(x) for x in grid.cells)))
     end
+    join(io, typestrs, '/')
+    print(io, " cells and $(getnnodes(grid)) nodes (contorl points)")
 end
 
 """
@@ -84,41 +85,46 @@ end
 
 Returns the weights (for the nurbs interpolation) for cell with id `cellid`.
 """
-@inline function getweights!(w::Vector{T}, grid::BezierGrid, cellid::Int) where {T} 
+Base.@propagate_inbounds function getweights!(w::Vector, grid::BezierGrid, cellid::Int)
     cell = grid.cells[cellid]
     getweights!(w, grid, cell)
 end
 
-@inline function getweights!(w::Vector{T}, grid::BezierGrid, cell::Ferrite.AbstractCell) where {T}
-    @inbounds for i in 1:length(w)
-        w[i] = grid.weights[cell.nodes[i]]
+Base.@propagate_inbounds function getweights!(w::Vector, grid::BezierGrid, cell::Ferrite.AbstractCell) 
+	node_ids = Ferrite.get_node_ids(cell)
+	nnodes = length(node_ids)
+	@boundscheck checkbounds(Bool, w, 1:nnodes)
+    @inbounds for i in 1:nnodes
+        w[i] = grid.weights[node_ids[i]]
     end
-    return w
 end
 
 function Ferrite.getweights(grid::BezierGrid, ic::Int)
-	#TODO, this can be optimzed, but this function should not be called in performance critical code
 	nodeids = collect(grid.cells[ic].nodes)
 	return grid.weights[nodeids]
 end
 
-function Ferrite.getcoordinates(grid::BezierGrid{dim,C,T}, ic::Int) where {dim,C,T}
-    n = Ferrite.nnodes_per_cell(grid, ic)
-    w = zeros(T, n)
-    wb = zeros(T, n)
-    xb = zeros(Vec{dim,T}, n)
-    x = zeros(Vec{dim,T}, n)
-    
-    # copy to avoid reference the extraction operator saved in the grid
-    bc = BezierCoords(xb, wb, x, w, copy(grid.beo[ic]))
+#Note: This is needed in order to get some stuff to work nicely in Ferrite.
+Ferrite.get_coordinate_type(::BezierGrid{dim,C,T}) where {dim,C,T} = Vec{dim,T} 
 
-    return getcoordinates!(bc,grid,ic)
+function Ferrite.getcoordinates!(bc::BezierCoords{dim,T}, grid::BezierGrid, ic::Int) where {dim,T}
+	get_bezier_coordinates!(bc.xb, bc.wb, bc.x, bc.w, grid, ic)
+	bc.beo[] = grid.beo[ic]
+	return bc
 end
 
-function Ferrite.getcoordinates!(bc::BezierCoords, grid::BezierGrid, ic::Int)
-    get_bezier_coordinates!(bc.xb, bc.wb, bc.x, bc.w, grid, ic)
-    copyto!(bc.beo, get_extraction_operator(grid, ic)) 
-    return bc
+function Ferrite.getcoordinates(grid::BezierGrid{dim,C,T}, ic::Int) where {dim,C,T}
+
+	n = Ferrite.nnodes_per_cell(grid, ic)
+	w = zeros(T, n)
+	wb = zeros(T, n)
+	xb = zeros(Vec{dim,T}, n)
+	x = zeros(Vec{dim,T}, n)
+	
+	bc = BezierCoords(xb, wb, x, w, Ref(grid.beo[ic]))
+	getcoordinates!(bc,grid,ic)
+
+	return bc
 end
 
 function get_bezier_coordinates!(xb::AbstractVector{Vec{dim,T}}, 
@@ -149,12 +155,10 @@ function get_bezier_coordinates!(xb::AbstractVector{Vec{dim,T}},
 	end
 	xb ./= wb
 
-	return xb, wb
+	return nothing
 end
 
-function get_bezier_coordinates(grid::BezierGrid, ic::Int)
-
-	dim = Ferrite.getdim(grid); T = getT(grid)
+function get_bezier_coordinates(grid::BezierGrid{dim,C,T}, ic::Int) where {dim,C,T}
 
 	n = Ferrite.nnodes_per_cell(grid, ic)
 	w = zeros(T, n)
@@ -163,39 +167,14 @@ function get_bezier_coordinates(grid::BezierGrid, ic::Int)
 	xb = zeros(Vec{dim,T}, n)
 	
 	get_bezier_coordinates!(xb, wb, x, w, grid, ic)
-	return xb, wb
+	return xb, wb, x, w
 end
 
-function get_nurbs_coordinates(grid::BezierGrid, cell::Int)
-    dim = Ferrite.getdim(grid); T = getT(grid)
+function get_nurbs_coordinates(grid::BezierGrid{dim,C,T}, cell::Int) where {dim,C,T}
     nodeidx = grid.cells[cell].nodes
     return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim,T}}
 end
 
 function get_extraction_operator(grid::BezierGrid, cellid::Int)
 	return grid.beo[cellid]
-end
-
-Ferrite_to_vtk_order(::Type{<:Ferrite.AbstractCell{dim,N,M}}) where {dim,N,M} = 1:N
-
-# Store the Ferrite to vtk order in a cache for specific cell type
-let cache = Dict{Type{<:BezierCell}, Vector{Int}}()
-	global function Ferrite_to_vtk_order(celltype::Type{BezierCell{3,N,order,M}}) where {N,order,M}
-		get!(cache, celltype) do 
-			if length(order) == 3
-				igaorder = _bernstein_ordering(celltype)
-				vtkorder = _vtk_ordering(celltype)
-
-				return [findfirst(ivtk-> ivtk == iiga, vtkorder) for iiga in igaorder]
-			else
-				return 1:N
-			end
-		end
-	end
-end
-
-function Ferrite.MixedDofHandler(grid::BezierGrid{dim,C,T}) where {dim,C,T}
-	#TODO: Remove this function and add method Ferrite.MixedDofHandler(::AbstractGrid) in Ferrite
-	ncells = getncells(grid)
-    Ferrite.MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Ferrite.CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), Ferrite.CellVector(Int[],Int[],Int[]), Ferrite.CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end

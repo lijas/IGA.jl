@@ -113,9 +113,9 @@ end;</code></pre><p>Now we have all the parts needed to solve the problem. We be
     orders = (2,2) # Order in the ξ and η directions .
     nels = (10,10) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)</code></pre><p>Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this we transform the NURBS-patch into a <code>BezierGrid</code>. The <code>BezierGrid</code> is identical to the standard <code>JuAFEM.Grid</code>, but includes the NURBS-weights and bezier extraction operators.</p><pre><code class="language-">    grid = BezierGrid(nurbsmesh)</code></pre><p>Next, create some facesets. This is done in the same way as in normal JuAFEM-code. One thing to note however, is that the nodes/controlpoints, does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to use the JuAFEM functions below.</p><pre><code class="language-">    addnodeset!(grid,&quot;right&quot;, (x) -&gt; x[1] ≈ -0.0)
-    addfaceset!(grid, &quot;left&quot;, (x) -&gt; x[1] ≈ -4.0)
-    addfaceset!(grid, &quot;bot&quot;, (x) -&gt; x[2] ≈ 0.0)
-    addfaceset!(grid, &quot;right&quot;, (x) -&gt; x[1] ≈ 0.0)</code></pre><p>Create the cellvalues storing the shape function values. Note that the <code>CellVectorValues</code>/<code>FaceVectorValues</code> are wrapped in a <code>BezierValues</code>. It is in the reinit-function of the <code>BezierValues</code> that the actual bezier transformation of the shape values is performed.</p><pre><code class="language-">    ip = BernsteinBasis{2,orders}()
+    addfacetset!(grid, &quot;left&quot;, (x) -&gt; x[1] ≈ -4.0)
+    addfacetset!(grid, &quot;bot&quot;, (x) -&gt; x[2] ≈ 0.0)
+    addfacetset!(grid, &quot;right&quot;, (x) -&gt; x[1] ≈ 0.0)</code></pre><p>Create the cellvalues storing the shape function values. Note that the <code>CellVectorValues</code>/<code>FaceVectorValues</code> are wrapped in a <code>BezierValues</code>. It is in the reinit-function of the <code>BezierValues</code> that the actual bezier transformation of the shape values is performed.</p><pre><code class="language-">    ip = BernsteinBasis{2,orders}()
     qr_cell = QuadratureRule{2,RefCube}(3)
     qr_face = QuadratureRule{1,RefCube}(3)
 

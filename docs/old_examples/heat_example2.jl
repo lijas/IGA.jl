@@ -58,12 +58,12 @@ function goiga(nelx, nely, order, multiplicity)
 
     #@show nurbsmesh.knot_vectors
 
-    addfaceset!(grid, "left",   (x)->x[1]<0.001)
-    addfaceset!(grid, "right",  (x)->x[1]>Lx*0.9999)
-    addfaceset!(grid, "bottom", (x)->x[2]<0.001)
-    addfaceset!(grid, "top",    (x)->x[2]>Ly*0.9999)
+    addfacetset!(grid, "left",   (x)->x[1]<0.001)
+    addfacetset!(grid, "right",  (x)->x[1]>Lx*0.9999)
+    addfacetset!(grid, "bottom", (x)->x[2]<0.001)
+    addfacetset!(grid, "top",    (x)->x[2]>Ly*0.9999)
 
-    ip = IGA.BernsteinBasis{dim, (order,order)}()
+    ip = IGA.Bernstein{dim, (order,order)}()
     qr = QuadratureRule{dim, RefCube}(100)
     cellvalues = IGA.BezierCellValues(CellScalarValues(qr, ip))
 
@@ -104,7 +104,7 @@ function goiga(nelx, nely, order, multiplicity)
     @assert(isodd(nely))
     midcell = ceil(Int, nelx*nely*0.5)
     qr = QuadratureRule{dim, RefCube}(1)
-    cellvalues = IGA.BezierFaceValues(CellScalarValues(qr, ip))
+    cellvalues = IGA.BezierFacetValues(CellScalarValues(qr, ip))
     coords = getcoordinates(grid, midcell)
     bcoords = IGA.compute_bezier_points(Cvec[midcell], coords)
     IGA.set_bezier_operator!(cellvalues, Cvec[midcell])

@@ -2,7 +2,7 @@
 
 @testset "test nurbsmesh" begin
     
-    mesh = generate_nurbs_patch(:plate_with_hole, (4,4))
+    mesh = generate_nurbs_patch(:plate_with_hole, (4,4), (2,2))
 
     x = eval_parametric_coordinate(mesh, Vec((-1.0,-1.0)))
     @test x == Vec((-1.0, 0.0))
@@ -15,7 +15,7 @@
 
 end
 
-@testset "Test BezierGrid(grid)" begin
+@testset "Test grid to BezierGrid convertion" begin
     
     grid = Ferrite.generate_grid(QuadraticQuadrilateral, (4,4))
     bgrid = BezierGrid(grid)

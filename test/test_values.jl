@@ -3,184 +3,274 @@
 function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pdim}, reorder) where {pdim,sdim}
 
     Ξ = nurbsmesh.knot_vectors
-
     nbasefuncs = length(nurbsmesh.IEN[:, cellid]) # number of basefunctions per cell
-    B = zeros(Float64, nbasefuncs)
-    dBdξ = zeros(Vec{pdim,Float64}, nbasefuncs)
+
+    R = zeros(Float64, nbasefuncs)
+    dRdξ = zeros(Tensor{1,pdim,Float64}, nbasefuncs)
+    d²Rdξ² = zeros(Tensor{2,pdim,Float64}, nbasefuncs)
+
     for i in 1:nbasefuncs
         global_basefunk = nurbsmesh.IEN[i, cellid]
     
         _ni = nurbsmesh.INN[nurbsmesh.IEN[end,cellid],1:pdim]
-
         ni = nurbsmesh.INN[global_basefunk,:] # Defines the basis functions nurbs coord
-        
-        #Map to parametric domain from parent domain
-        ξηζ = [0.5*((Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]])*xi[d] + (Ξ[d][_ni[d]+1] + Ξ[d][_ni[d]])) for d in 1:pdim]
-        _dξdξᴾ = [0.5*(Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]]) for d in 1:pdim]
-        dξdξᴾ = Tensor{2,pdim}(Tuple((_dξdξᴾ[1], 0.0, 0.0, _dξdξᴾ[2])))
 
-        value = 1.0
-        deriv = ones(Float64, pdim)
-        for d in 1:pdim
-            value *= IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
-            for d2 in 1:pdim
-                if d == d2
-                    deriv[d2] *= gradient( (xi) -> IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], xi), ξηζ[d])
-                else
-                    deriv[d2] *= IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
-                end
+        function __bspline_shape_value__(xi::Vec{pdim,T}, _ni, ni, Ξ, nurbsmesh) where T
+            ξηζ = Vec{pdim}(d->0.5*((Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]])*xi[d] + (Ξ[d][_ni[d]+1] + Ξ[d][_ni[d]])))
+            value = one(T)
+            for d in 1:pdim
+                value *= IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
             end
+            return value
         end
-        B[i] = value
-        dBdξ[i] = Vec(Tuple(deriv)) ⋅ dξdξᴾ
+
+        function __nurbs_shape_value__(xi::Vec{pdim,T}) where T
+            W = zero(T)
+            _Nvec = zeros(T, nbasefuncs)
+            _wvec = zeros(Float64, nbasefuncs)
+            for j in 1:nbasefuncs
+                global_base = nurbsmesh.IEN[j, cellid]
+                local_ni = nurbsmesh.INN[global_base,:] 
+
+                Nj = __bspline_shape_value__(xi, _ni, local_ni, Ξ, nurbsmesh)
+                W += (nurbsmesh.weights[global_base] * Nj)
+                _Nvec[j] = Nj
+                _wvec[j] = nurbsmesh.weights[global_base]
+            end
+            return _Nvec[i]*_wvec[i]/W
+        end
+        
+        _ddR, _dR, _R = Tensors.hessian(x->__nurbs_shape_value__(x), xi, :all)
+
+        d²Rdξ²[i] = _ddR
+        dRdξ[i] = _dR
+        R[i] = _R
     end
-    return B[reorder], dBdξ[reorder]
+    return R[reorder], dRdξ[reorder], d²Rdξ²[reorder]
+end
+
+@testset "bezier values construction" begin
+
+    sdim = 3
+    shape = Ferrite.RefHypercube{sdim}
+    ip = IGAInterpolation{shape, 2}()
+    bip = Bernstein{shape, 2}()
+
+    qr = QuadratureRule{shape}(1)
+    qr_face = FacetQuadratureRule{shape}(1)
+
+    #Cells
+    cv  = BezierCellValues(qr, ip)
+    cv  = BezierCellValues(qr, ip^2)
+    cv  = BezierCellValues(qr, ip^2, ip)
+    cv  = BezierCellValues(qr, ip, ip^3)
+    cv  = BezierCellValues(qr, ip^2, ip^3)
+    cv  = BezierCellValues(qr, ip; update_hessians=true)
+    cv  = BezierCellValues(qr, ip^3; update_hessians=true)
+
+    #Facets
+    cv  = BezierFacetValues(qr_face, ip)
+    cv  = BezierFacetValues(qr_face, ip^2)
+    cv  = BezierFacetValues(qr_face, ip^2, ip)
+    cv  = BezierFacetValues(qr_face, ip, ip^3)
+    cv  = BezierFacetValues(qr_face, ip^2, ip^3)
+    cv  = BezierFacetValues(qr_face, ip; update_hessians=true)
+    cv  = BezierFacetValues(qr_face, ip^3; update_hessians=true)
+
+    #embedded
+    ip = IGAInterpolation{RefQuadrilateral, 2}()
+    qr = QuadratureRule{RefQuadrilateral}(1)
+    cv  = BezierCellValues(qr, ip^3, ip^3)
+
 end
 
 @testset "bezier values nurbs" begin
 
     dim = 2
-    orders = (2,2)
+    order = 2
     nels = (4,3)
-    nb_per_cell = prod(orders.+1)
+    nb_per_cell = (2+1)^dim
 
     ##
     # Build the problem
     ##
-    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
+    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels, (2,2))
+    #nurbsmesh.knot_vectors[1][4] = -0.5
+    #nurbsmesh.knot_vectors[2][4] = -0.5
+    #nurbsmesh = generate_nurbs_patch(:rectangle, nels, (order,order), size = (20.0,20.0))
+    #nurbsmesh.weights .= 1.0
 
     grid = BezierGrid(nurbsmesh)
+    shape = Ferrite.RefHypercube{dim}
 
-    ip = BernsteinBasis{dim, orders}()
+    ip = IGAInterpolation{shape, order}()
+    bip = Bernstein{shape, order}()
 
-    reorder = IGA._bernstein_ordering(ip)
+    reorder = IGA._bernstein_ordering(bip)
 
-    qr = QuadratureRule{dim,RefCube}(3)
-    qr_face = QuadratureRule{dim-1,RefCube}(3)
+    qr = QuadratureRule{shape}(2)
+    qr_face = FacetQuadratureRule{shape}(3)
 
-    fv = BezierFaceValues( FaceScalarValues(qr_face, ip) )
-    cv  = BezierCellValues( CellScalarValues(qr, ip) )
-    cv_vector = BezierCellValues( CellVectorValues(qr, ip) )
+    fv = BezierFacetValues( qr_face, ip, ip^dim; update_hessians = true )
+    fv_vector = BezierFacetValues( qr_face, ip^dim, ip^dim; update_hessians = true )
+    cv  = BezierCellValues( qr, ip, ip^dim; update_hessians = true)
+    cv_vector = BezierCellValues( qr, ip^dim, ip^dim; update_hessians = true)
 
     #Try some different cells
-    for cellnum in [1,4,5]
-        Xb, wb = get_bezier_coordinates(grid, cellnum)
-        C = get_extraction_operator(grid, cellnum)
-        X = get_nurbs_coordinates(grid, cellnum)
-        w = getweights(grid, cellnum)
+    cellnum = 1
+    for cellnum in 1:getncells(grid)#[1,4,5]
+        #C = get_extraction_operator(grid, cellnum)
+        #X = get_nurbs_coordinates(grid, cellnum)
+        #w = Ferrite.getweights(grid, cellnum)
         #set_bezier_operator!(cv, w.*C)
-        bc = BezierCoords(Xb, wb, X, w, C)#getcoordinates(grid, cellnum)
+        bc = getcoordinates(grid, cellnum)
         reinit!(cv, bc)
-
-        #set_bezier_operator!(cv_vector, w.*C)
         reinit!(cv_vector, bc)
+        
+        (; xb, wb, x, w) = bc
 
+        iqp = 1
+        ξ = qr.points[iqp]
         for (iqp, ξ) in enumerate(qr.points)
 
             #Calculate the value of the NURBS from the nurbs patch
-            N, dNdξ = bspline_values(nurbsmesh, cellnum, ξ, reorder)
+            R, dRdξ, d²Rdξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
 
-            Wb = sum(N.*w)
-            dWbdξ = sum(dNdξ.*w)
-            R_patch = w.*N/Wb
-            
-            dRdξ_patch = similar(dNdξ)
-            for i in 1:nb_per_cell
-                dRdξ_patch[i] = w[i]*(1/Wb * dNdξ[i] - inv(Wb^2)*dWbdξ * N[i])
-            end
-
-            J = sum(X .⊗ dRdξ_patch)
+            J = sum(x .⊗ dRdξ)
+            H = sum(x .⊗ d²Rdξ²)
             dV_patch = det(J)*qr.weights[iqp]
 
-            dRdX_patch = similar(dNdξ)
+            dRdX = similar(dRdξ)
             for i in 1:nb_per_cell
-                dRdX_patch[i] = dRdξ_patch[i] ⋅ inv(J)
+                dRdX[i] = dRdξ[i] ⋅ inv(J)
+            end 
+
+            d²RdX² = similar(d²Rdξ²)
+            for i in 1:nb_per_cell
+                FF = dRdX[i] ⋅ H
+                d²RdX²[i] = inv(J)' ⋅ d²Rdξ²[i] ⋅ inv(J) - inv(J)' ⋅ FF ⋅ inv(J)
             end 
 
             @test dV_patch ≈ getdetJdV(cv, iqp)
-            @test sum(cv.cv_store.N[:,iqp]) ≈ 1
-            @test all(cv.cv_store.dNdξ[:,iqp] .≈ dRdξ_patch)
-            @test all(cv.cv_store.dNdx[:,iqp] .≈ dRdX_patch)
+            @test sum(cv.nurbs_values.Nξ[:,iqp]) ≈ 1
+            for i in 1:getnbasefunctions(cv)
+                @test shape_value(cv, iqp,i) ≈ R[i]
+                @test shape_gradient(cv, iqp, i) ≈ dRdX[i]
+                @test shape_hessian(cv, iqp, i) ≈ d²RdX²[i] # atol=1e-12
+                
+                @test cv.nurbs_values.dNdξ[  i,iqp] ≈ dRdξ[i] # atol=1e-12
+                @test cv.nurbs_values.d2Ndξ2[i,iqp] ≈ d²Rdξ²[i] # atol=1e-12
+            end
 
             #Check if VectorValues is same as ScalarValues
             basefunc_count = 1
+            i = 1
+            comp = 1
             for i in 1:nb_per_cell
                 for comp in 1:dim
                     N_comp = zeros(Float64, dim)
-                    N_comp[comp] = cv.cv_store.N[i, iqp]
+                    N_comp[comp] = shape_value(cv, iqp, i)
                     _N = Vec{dim,Float64}((N_comp...,))
-                    
-                    @test all(cv_vector.cv_store.N[basefunc_count, iqp] .≈ _N)
-                    
-                    dN_comp = zeros(Float64, dim, dim)
-                    dN_comp[comp, :] = cv.cv_store.dNdξ[i, iqp]
-                    _dNdξ = Tensor{2,dim,Float64}((dN_comp...,))
-                    
-                    @test all(cv_vector.cv_store.dNdξ[basefunc_count, iqp] .≈ _dNdξ)
+                    @test shape_value(cv_vector,iqp,basefunc_count) ≈ _N #atol=1e-15
 
                     dN_comp = zeros(Float64, dim, dim)
-                    dN_comp[comp, :] = cv.cv_store.dNdx[i, iqp]
+                    dN_comp[comp, :] = shape_gradient(cv,iqp,i)
                     _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
-                    
-                    @test all(cv_vector.cv_store.dNdx[basefunc_count, iqp] .≈ _dNdx)
+                    @test shape_gradient(cv_vector,iqp,basefunc_count) ≈ _dNdx #atol = 1e-15
+
+                    ddN_comp = zeros(Float64, dim, dim, dim)
+                    ddN_comp[comp, :, :] = shape_hessian(cv,iqp,i)
+                    _d2Ndx2 = Tensor{3,dim,Float64}((ddN_comp...,))
+                    @test shape_hessian(cv_vector,iqp,basefunc_count) ≈ _d2Ndx2 #atol = 1e-15
 
                     basefunc_count += 1
                 end
             end
-
         end
     end
     
-    addfaceset!(grid, "face1", (x)-> x[1] == -4.0)
-    for (cellnum, faceidx) in getfaceset(grid, "face1")
+    cellnum, faceidx = (9, 3)
+    addfacetset!(grid, "face1", (x)-> x[1] == -4.0)
+    for (cellnum, faceidx) in getfacetset(grid, "face1")
 
-        Xb, wb = get_bezier_coordinates(grid, cellnum)
-        C = get_extraction_operator(grid, cellnum)
-        X = get_nurbs_coordinates(grid, cellnum)
-        w = getweights(grid, cellnum)
-
-        bc = BezierCoords(Xb, wb, X, w, C.*w) # getcoordinates(grid, cellnum)
+        bc = getcoordinates(grid, cellnum)
         reinit!(fv, bc, faceidx)
+        reinit!(fv_vector, bc, faceidx)
 
-        qr_face_side = Ferrite.create_face_quad_rule(qr_face, ip)[faceidx]
-        for (iqp, ξ) in enumerate(qr_face_side.points)
+        (; xb, wb, x, w) = bc
+
+        for iqp in 1:getnquadpoints(fv)
+
+            ξ = qr_face.face_rules[faceidx].points[iqp]
+            qrw = qr_face.face_rules[faceidx].weights[iqp]
 
             #Calculate the value of the NURBS from the nurbs patch
-            N, dNdξ = bspline_values(nurbsmesh, cellnum, ξ, reorder)
+            R, dRdξ, d²Rdξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
 
-            Wb = sum(N.*w)
-            dWbdξ = sum(dNdξ.*w)
-            R_patch = w.*N/Wb
-            
-            dRdξ_patch = similar(dNdξ)
+            J = sum(x .⊗ dRdξ)
+            H = sum(x .⊗ d²Rdξ²)
+            wn = Ferrite.weighted_normal(J, shape, faceidx)
+            dV_patch = norm(Ferrite.weighted_normal(J, shape, faceidx))*qrw
+
+            dRdX = similar(dRdξ)
             for i in 1:nb_per_cell
-                dRdξ_patch[i] = w[i]*(1/Wb * dNdξ[i] - inv(Wb^2)*dWbdξ * N[i])
-            end
-
-            J = sum(X .⊗ dRdξ_patch)
-            dV_patch = norm(Ferrite.weighted_normal(J, fv, faceidx))*qr_face_side.weights[iqp]
-
-            dRdX_patch = similar(dNdξ)
-            for i in 1:nb_per_cell
-                dRdX_patch[i] = dRdξ_patch[i] ⋅ inv(J)
+                dRdX[i] = dRdξ[i] ⋅ inv(J)
             end 
 
+            d²RdX² = similar(d²Rdξ²)
+            for i in 1:nb_per_cell
+                FF = dRdX[i] ⋅ H
+                d²RdX²[i] = inv(J)' ⋅ d²Rdξ²[i] ⋅ inv(J) - inv(J)' ⋅ FF ⋅ inv(J)
+            end 
+
+            @test getnormal(fv, iqp) ≈ Vec((-1.0, 0.0))
             @test dV_patch ≈ getdetJdV(fv, iqp)
-            @test sum(fv.cv_store.N[:,iqp, faceidx]) ≈ 1
-            @test all(fv.cv_store.dNdξ[:,iqp, faceidx] .≈ dRdξ_patch)
-            @test all(fv.cv_store.dNdx[:,iqp, faceidx] .≈ dRdX_patch)
+            @test sum(fv.nurbs_values[faceidx].Nξ[:,iqp]) ≈ 1
+            for i in 1:getnbasefunctions(fv)
+                @test shape_value(fv, iqp,i) ≈ R[i]
+                @test shape_gradient(fv, iqp, i) ≈ dRdX[i]
+                @test shape_hessian(fv, iqp, i) ≈ d²RdX²[i]  #atol=1e-11
+                
+                @test fv.nurbs_values[faceidx].dNdξ[  i,iqp] ≈ dRdξ[i]  #atol=1e-11
+                @test fv.nurbs_values[faceidx].d2Ndξ2[i,iqp] ≈ d²Rdξ²[i]  #atol=1e-11
+            end
+
+            #Check if VectorValues is same as ScalarValues
+            i = 1
+            basefunc_count = 1
+            comp = 1
+            for i in 1:nb_per_cell
+                for comp in 1:dim
+                    N_comp = zeros(Float64, dim)
+                    N_comp[comp] = shape_value(fv,iqp,i)
+                    _N = Vec{dim,Float64}((N_comp...,))
+                    @test shape_value(fv_vector,iqp,basefunc_count) ≈ _N #atol = 1e-15
+
+                    dN_comp = zeros(Float64, dim, dim)
+                    dN_comp[comp, :] = shape_gradient(fv,iqp,i)
+                    _dNdx = Tensor{2,dim,Float64}((dN_comp...,))
+                    @test shape_gradient(fv_vector,iqp,basefunc_count) ≈ _dNdx #atol = 1e-15
+
+                    ddN_comp = zeros(Float64, dim, dim, dim)
+                    ddN_comp[comp, :, :] = shape_hessian(fv,iqp,i)
+                    _d2Ndx2 = Tensor{3,dim,Float64}((ddN_comp...,))
+                    @test shape_hessian(fv_vector,iqp,basefunc_count) ≈ _d2Ndx2 #atol = 1e-15
+
+                    basefunc_count += 1
+                end
+            end
         end
     end
 
 end
 
-
+#=
 @testset "bezier values give NaN" begin
 
     dim = 2
-    orders = (2,2)
+    order = 2
     nels = (4,3)
-    nb_per_cell = prod(orders.+1)
+    nb_per_cell = (order+1)^dim
 
     ##
     # Build the problem
@@ -188,12 +278,12 @@ end
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
 
     grid = BezierGrid(nurbsmesh)
-    ip = BernsteinBasis{dim, orders}()
-    qr = QuadratureRule{dim, RefCube}(3)
-    cv  = BezierCellValues( CellScalarValues(qr, ip) )
+    ip = Bernstein{Ferrite.RefHypercube{dim}, order}()
+    qr = QuadratureRule{Ferrite.RefHypercube{dim}}(3)
+    cv  = BezierCellValues(CellValues(qr, ip, ip))
 
     Xb, wb = get_bezier_coordinates(grid, 1)
-    w = getweights(grid, 1)
+    w = Ferrite.getweights(grid, 1)
     C = get_extraction_operator(grid, 1)
 
     set_bezier_operator!(cv, C)
@@ -250,3 +340,4 @@ end
         end
     end
 end
+=#

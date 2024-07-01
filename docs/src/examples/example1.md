@@ -203,16 +203,16 @@ use the Ferrite functions below.
 
 ```@example example1
     addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
-    addfaceset!(grid, "left", (x) -> x[1] ≈ -4.0)
-    addfaceset!(grid, "bot", (x) -> x[2] ≈ 0.0)
-    addfaceset!(grid, "right", (x) -> x[1] ≈ 0.0)
+    addfacetset!(grid, "left", (x) -> x[1] ≈ -4.0)
+    addfacetset!(grid, "bot", (x) -> x[2] ≈ 0.0)
+    addfacetset!(grid, "right", (x) -> x[1] ≈ 0.0)
 ```
 
 Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the
 reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed.
 
 ```@example example1
-    ip = BernsteinBasis{2,orders}()
+    ip = Bernstein{2,orders}()
     qr_cell = QuadratureRule{2,RefCube}(3)
     qr_face = QuadratureRule{1,RefCube}(3)
 
