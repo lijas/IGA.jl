@@ -30,7 +30,7 @@ struct VTKIGAFile{VTK<:WriteVTK.DatasetFile}
 	cellset::Vector{Int}
 end
 
-function VTKIGAFile(filename::String, grid::BezierGrid, cellset; kwargs...)
+function VTKIGAFile(filename::String, grid::BezierGrid, cellset=1:getncells(grid); kwargs...)
     vtk = _create_iga_vtk_grid(filename, grid, cellset; kwargs...)
 	cellset = sort(collect(copy(cellset)))
     return VTKIGAFile(vtk, cellset)
@@ -131,14 +131,14 @@ function WriteVTK.vtk_point_data(
     return vtkfile
 end
 
-function #=Ferrite.=#write_solution(vtk::VTKIGAFile, dh::DofHandler, a, suffix="")
+function Ferrite.write_solution(vtk::VTKIGAFile, dh::DofHandler, a, suffix="")
 	for fieldname in Ferrite.getfieldnames(dh)
 		data = _evaluate_at_geometry_nodes!(vtk, dh, a, fieldname)
 		vtk_point_data(vtk.vtk, data, string(fieldname, suffix))
 	end
 end
 
-function #=Ferrite.=#write_projected(vtk::VTKIGAFile, proj::L2Projector, vals, name)
+function Ferrite.write_projection(vtk::VTKIGAFile, proj::L2Projector, vals, name)
     data = Ferrite._evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
     @assert size(data, 2) == getnnodes(Ferrite.get_grid(proj.dh))
     vtk_point_data(vtk.vtk, data, name; component_names=Ferrite.component_names(eltype(vals)))
