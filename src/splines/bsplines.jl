@@ -23,7 +23,7 @@ end
 getnbasefunctions_dim(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = ntuple(i -> length(basis.knot_vector[i]) - order[i] - 1, dim)
 Ferrite.getnbasefunctions(basis::BSplineBasis{dim,T,order}) where {dim,T,order} = prod(getnbasefunctions_dim(basis))
 
-function Ferrite.shape_value(b::BSplineBasis{dim,T,order}, xi::Vec{dim,T2}, i::Int) where {dim,T,T2,order}
+function Ferrite.reference_shape_value(b::BSplineBasis{dim,T,order}, xi::Vec{dim,T2}, i::Int) where {dim,T,T2,order}
     @assert( i <= Ferrite.getnbasefunctions(b))
 
     _n = getnbasefunctions_dim(b)

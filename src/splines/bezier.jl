@@ -32,7 +32,7 @@ Ferrite.getnbasefunctions(::Bernstein{RefLine,2}) = 3
 Ferrite.vertexdof_indices(::Bernstein{RefLine,2}) = ((1,),(2,))
 Ferrite.edgedof_indices(::Bernstein{RefLine,2}) = ((1,2,3),)
 
-function Ferrite.shape_value(ip::Bernstein{RefLine,2}, _ξ::Vec{1}, i::Int)
+function Ferrite.reference_shape_value(ip::Bernstein{RefLine,2}, _ξ::Vec{1}, i::Int)
     ξ = 0.5*(_ξ[1] + 1.0)
     i == 1 && return (1-ξ)^2
     i == 2 && return ξ^2
@@ -51,7 +51,7 @@ Ferrite.edgedof_interior_indices(::Bernstein{RefQuadrilateral,2}) = ((5,), (6,),
 Ferrite.facedof_indices(::Bernstein{RefQuadrilateral,2}) = ((1,2,3,4,5,6,7,8,9),)
 Ferrite.facedof_interior_indices(::Bernstein{RefQuadrilateral,2}) = (9,)
 
-function Ferrite.shape_value(ip::Bernstein{RefQuadrilateral,2}, _ξ::Vec{2}, i::Int)
+function Ferrite.reference_shape_value(ip::Bernstein{RefQuadrilateral,2}, _ξ::Vec{2}, i::Int)
     ξ, η = _ξ
     i == 1 && return 0.0625((1 - η)^2)*((1 - ξ)^2)
     i == 2 && return 0.0625((1 + ξ)^2)*((1 - η)^2)
@@ -102,7 +102,7 @@ Ferrite.edgedof_interior_indices(::Bernstein{RefHexahedron,2}) = (
 )
 Ferrite.volumedof_interior_indices(::Bernstein{RefHexahedron,2}) = (27,)
 
-function Ferrite.shape_value(ip::Bernstein{RefHexahedron,2}, _ξ::Vec{3}, i::Int)
+function Ferrite.reference_shape_value(ip::Bernstein{RefHexahedron,2}, _ξ::Vec{3}, i::Int)
     ξ, η, ζ = _ξ
     i == 1 && return 0.015625((1 - ζ)^2)*((1 - η)^2)*((1 - ξ)^2)
     i == 2 && return 0.015625((1 + ξ)^2)*((1 - ζ)^2)*((1 - η)^2)
@@ -167,11 +167,11 @@ end
 
 =#
 
-function Ferrite.shape_value(ip::Bernstein{refshape,order}, _ξ::Vec{dim}, i::Int) where {dim,refshape<:Ferrite.AbstractRefShape{dim},order}
-    _compute_bezier_shape_value(ip,_ξ, i)
+function Ferrite.reference_shape_value(ip::Bernstein{refshape,order}, _ξ::Vec{dim}, i::Int) where {dim,refshape<:Ferrite.AbstractRefShape{dim},order}
+    _compute_bezier_reference_shape_value(ip,_ξ, i)
 end
 
-function _compute_bezier_shape_value(ip::Bernstein{shape,order}, ξ::Vec{dim,T}, i::Int) where {dim,shape<:Ferrite.AbstractRefShape{dim},order,T} 
+function _compute_bezier_reference_shape_value(ip::Bernstein{shape,order}, ξ::Vec{dim,T}, i::Int) where {dim,shape<:Ferrite.AbstractRefShape{dim},order,T} 
     _n = ntuple(i->order+1, dim)
     ordering = _bernstein_ordering(ip)
     basefunction_indeces = CartesianIndices(_n)[ordering[i]]

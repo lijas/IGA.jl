@@ -61,7 +61,7 @@ struct IGAInterpolation{shape, order} <: Ferrite.ScalarInterpolation{shape, orde
 end
 
 Ferrite.adjust_dofs_during_distribution(::IGAInterpolation) = false
-Ferrite.shape_value(::IGAInterpolation{shape, order}, ξ::Vec, i::Int) where {shape, order} = Ferrite.shape_value(Bernstein{shape, order}(), ξ, i)
+Ferrite.reference_shape_value(::IGAInterpolation{shape, order}, ξ::Vec, i::Int) where {shape, order} = Ferrite.reference_shape_value(Bernstein{shape, order}(), ξ, i)
 Ferrite.reference_coordinates(::IGAInterpolation{shape, order}) where {shape, order} = Ferrite.reference_coordinates(Bernstein{shape, order}())
 Ferrite.getnbasefunctions(::IGAInterpolation{shape, order}) where {shape, order} = getnbasefunctions(Bernstein{shape, order}())
 

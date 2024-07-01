@@ -60,8 +60,8 @@ end
 
         ξ = Vec((rand(),rand()))
         for i in 1:getnbasefunctions(ip2)
-            N1 = Ferrite.shape_value(ip1, ξ, reorder[i])
-            N2 = Ferrite.shape_value(ip2, ξ, i)
+            N1 = Ferrite.reference_shape_value(ip1, ξ, reorder[i])
+            N2 = Ferrite.reference_shape_value(ip2, ξ, i)
             @test N1 ≈ N2
         end
 

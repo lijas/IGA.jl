@@ -69,7 +69,7 @@ function eval_parametric_coordinate(mesh::NURBSMesh{pdim,sdim}, ξ::Vec{pdim}) w
 
 	x = zero(Vec{sdim,Float64})
 	for i in 1:getnbasefunctions(bspline)
-		N = Ferrite.shape_value(bspline, ξ, i)
+		N = Ferrite.reference_shape_value(bspline, ξ, i)
 		x += N*mesh.control_points[i]
 	end
 

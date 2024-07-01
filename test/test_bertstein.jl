@@ -4,7 +4,7 @@
     #1d basis function should equal to 2d basis function on the boundary (-1.0)
     b1 = Bernstein{RefQuadrilateral, 2}()
     b2 = Bernstein{RefLine, 2}()
-    @test Ferrite.shape_value(b1, Vec((0.0,-1.0)), 5) == Ferrite.shape_value(b2, Vec((0.0)), 3)
+    @test Ferrite.reference_shape_value(b1, Vec((0.0,-1.0)), 5) == Ferrite.reference_shape_value(b2, Vec((0.0)), 3)
 
     #Sum of shape function should equal 1     
     for bip in (Bernstein{RefLine, 1}(),
@@ -22,7 +22,7 @@
         for xi in [rand(Vec{dim,Float64}), rand(Vec{dim,Float64})]
             sum = 0.0
             for i in 1:Ferrite.getnbasefunctions(bip)
-                sum += Ferrite.shape_value(bip, xi, i)
+                sum += Ferrite.reference_shape_value(bip, xi, i)
             end
             @test sum ≈ 1.0
         end
@@ -34,7 +34,7 @@
         dim = Ferrite.getrefdim(bip)
         for xi in [rand(Vec{dim,Float64}), rand(Vec{dim,Float64})]
             for i in  1:Ferrite.getnbasefunctions(bip)
-                N_hardcoded = Ferrite.shape_value(bip, xi, i)
+                N_hardcoded = Ferrite.reference_shape_value(bip, xi, i)
                 M_generated = IGA._compute_bezier_shape_value(bip, xi, i)
                 @test M_generated ≈ N_hardcoded
             end
