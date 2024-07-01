@@ -53,7 +53,7 @@ end;
 function assemble_problem(dh::DofHandler, grid, cv, fv, stiffmat, traction)
 
     f = zeros(ndofs(dh))
-    K = create_sparsity_pattern(dh)##create_matrix(dh)
+    K = allocate_matrix(dh)
     assembler = start_assemble(K, f)
 
     n = getnbasefunctions(cv)
@@ -168,8 +168,8 @@ function solve()
     qr_cell = QuadratureRule{RefQuadrilateral}(4)
     qr_face = FacetQuadratureRule{RefQuadrilateral}(3)
 
-    cv = BezierCellValues(qr_cell, ip_u, ip_geo^2)
-    fv = BezierFacetValues(qr_face, ip_u, ip_geo^2)
+    cv = BezierCellValues(qr_cell, ip_u)
+    fv = BezierFacetValues(qr_face, ip_u)
 
     # Distribute dofs as normal
     dh = DofHandler(grid)
@@ -203,18 +203,13 @@ function solve()
 
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
 
-    #csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
-    projector = L2Projector(ip_u, grid)
-    σ_nodes = project(projector, cellstresses, qr_cell)
-    # Output results to VTK
-    #vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
-    #vtk_point_data(vtkgrid, dh, u, :u)
-   # vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
-   # vtk_save(vtkgrid)
+    # L2 projections currently broken for IGA
+    # projector = L2Projector(ip_u, grid)
+    # σ_nodes = project(projector, cellstresses, qr_cell)
 
-    IGA.VTKIGAFile("plate_with_hole.vtu", grid, collect(1:getncells(grid))) do vtk
-        IGA.write_solution(vtk, dh, u)
-        #IGA.write_projected(vtk, projector, σ_nodes, "σ")
+    IGA.VTKIGAFile("plate_with_hole.vtu", grid) do vtk
+        write_solution(vtk, dh, u)
+        #IGA.write_projections(vtk, projector, σ_nodes, "σ")
     end
 
 end;
