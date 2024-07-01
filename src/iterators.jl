@@ -4,7 +4,7 @@ struct IGACellCache{X,G<:Ferrite.AbstractGrid,DH<:Union{Ferrite.AbstractDofHandl
     # Pretty useless to store this since you have it already for the reinit! call, but
     # needed for the CellIterator(...) workflow since the user doesn't necessarily control
     # the loop order in the cell subset.
-    cellid::Ferrite.ScalarWrapper{Int}
+    cellid::Base.RefValue{Int}
     nodes::Vector{Int}
     bezier_cell_data::X
     dh::DH
@@ -20,7 +20,7 @@ function IGACellCache(dh::DofHandler{dim,G}, flags::UpdateFlags=UpdateFlags()) w
     n        = ndofs_per_cell(dh, 1)
     celldofs = zeros(Int, n)
 
-    return IGACellCache(flags, grid, Ferrite.ScalarWrapper(-1), nodes, coords, dh, celldofs)
+    return IGACellCache(flags, grid, Ref(-1), nodes, coords, dh, celldofs)
 end
 
 function Ferrite.reinit!(cc::IGACellCache, i::Int)
@@ -52,12 +52,12 @@ Ferrite.cellid(cc::IGACellCache) = cc.cellid[]
 struct IGAFaceCache{CC}
     cc::CC  # const for julia > 1.8
     dofs::Vector{Int} # aliasing cc.dofs
-    current_faceid::Ferrite.ScalarWrapper{Int}
+    current_faceid::Base.RefValue{Int}
 end
 
 function IGAFaceCache(args...)
     cc = IGACellCache(args...)
-    IGAFaceCache(cc, cc.dofs, Ferrite.ScalarWrapper(0))
+    IGAFaceCache(cc, cc.dofs, Ref(-1))
 end
 
 function Ferrite.reinit!(fc::IGAFaceCache, face::Ferrite.BoundaryIndex)

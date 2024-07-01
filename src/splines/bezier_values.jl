@@ -33,7 +33,7 @@ struct BezierFacetValues{FV, GM, FQR, dim, T, V_FV<:AbstractVector{FV}, V_GM<:Ab
 
     current_beo::Base.RefValue{BezierExtractionOperator{T}}
     current_w::Vector{T}
-    current_facet::Ferrite.ScalarWrapper{Int}
+    current_facet::Base.RefValue{Int}
 end
 
 Ferrite.shape_value_type(cv::BezierCellValues) = Ferrite.shape_value_type(cv.bezier_values)
@@ -92,7 +92,7 @@ function BezierFacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpol
         fun_values, 
         deepcopy(fun_values), 
         deepcopy(fun_values), 
-        geo_mapping, fqr, detJdV, normals, undef_beo, undef_w, Ferrite.ScalarWrapper(-1))
+        geo_mapping, fqr, detJdV, normals, undef_beo, undef_w, Ref(-1))
 end
 
 function BezierFacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) 
