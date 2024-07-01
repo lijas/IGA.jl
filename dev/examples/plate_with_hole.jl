@@ -31,10 +31,10 @@ function integrate_traction_force!(fe::AbstractVector, t::Vec{2}, fv)
     end
 end;
 
-function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
+function assemble_problem(dh::DofHandler, grid, cv, fv, stiffmat, traction)
 
     f = zeros(ndofs(dh))
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     assembler = start_assemble(K, f)
 
     n = getnbasefunctions(cv)
@@ -56,7 +56,6 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
 
         extr = get_extraction_operator(grid, cellid) # Extraction operator
         get_bezier_coordinates!(xb,wb,x,w,grid,cellid) #Nurbs coords
-
         set_bezier_operator!(cv, extr, w)
         reinit!(cv, (xb,wb)) ## Reinit cellvalues by passsing both bezier coords and weights
         integrate_element!(ke, stiffmat, cv)
@@ -65,14 +64,12 @@ function assemble_problem(dh::MixedDofHandler, grid, cv, fv, stiffmat, traction)
     end
 
     # Assamble external forces
-    for (cellid, faceid) in getfaceset(grid, "left")
+    for (cellid, faceid) in getfacetset(grid, "left")
         fill!(fe, 0.0)
 
         celldofs!(celldofs, dh, cellid)
 
         beziercoords = getcoordinates(grid, cellid)
-
-        #set_bezier_operator!(fv, )
         reinit!(fv, beziercoords, faceid)
 
         integrate_traction_force!(fe, traction, fv)
@@ -92,7 +89,7 @@ function get_material(; E, ν)
     return SymmetricTensor{4, 2}(g)
 end;
 
-function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+function calculate_stress(dh, cv::BezierCellValues, C::SymmetricTensor{4,2}, u::Vector{Float64})
 
     celldofs = zeros(Int, ndofs_per_cell(dh))
 
@@ -109,7 +106,7 @@ function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Ve
         ue = u[celldofs]
         qp_stresses = SymmetricTensor{2,2,Float64,3}[]
         for qp in 1:getnquadpoints(cv)
-            ɛ = symmetric(function_gradient(cv, qp, ue))
+            ε = symmetric(function_gradient(cv, qp, ue))
             σ = C ⊡ ε
             push!(qp_stresses, σ)
         end
@@ -120,31 +117,35 @@ function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Ve
 end;
 
 function solve()
-    orders = (2,2) # Order in the ξ and η directions .
+    order = 2 # order of the NURBS
     nels = (20,10) # Number of elements
-    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)
+    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels, order)
 
     grid = BezierGrid(nurbsmesh)
 
-    addnodeset!(grid,"right", (x) -> x[1] ≈ -0.0)
-    addfaceset!(grid, "left", (x) -> x[1] ≈ -4.0)
-    addfaceset!(grid, "bot", (x) -> x[2] ≈ 0.0)
-    addfaceset!(grid, "right", (x) -> x[1] ≈ 0.0)
+    addnodeset!(grid, "right", (x) -> x[1] ≈ -0.0)
+    addfacetset!(grid, "left", (x) -> x[1] ≈ -4.0)
+    addfacetset!(grid, "bot", (x) -> x[2] ≈ 0.0)
+    addfacetset!(grid, "right", (x) -> x[1] ≈ 0.0)
 
-    ip = BernsteinBasis{2,orders}()
-    qr_cell = QuadratureRule{2,RefCube}(4)
-    qr_face = QuadratureRule{1,RefCube}(3)
+    ip_geo = IGAInterpolation{RefQuadrilateral,order}()
+    ip_u = ip_geo^2
+    qr_cell = QuadratureRule{RefQuadrilateral}(4)
+    qr_face = FacetQuadratureRule{RefQuadrilateral}(3)
 
-    cv = BezierCellValues( CellVectorValues(qr_cell, ip) )
-    fv = BezierFaceValues( FaceVectorValues(qr_face, ip) )
+    cv = BezierCellValues(qr_cell, ip_u)
+    fv = BezierFacetValues(qr_face, ip_u)
 
-    dh = MixedDofHandler(grid)
-    push!(dh, :u, 2, ip)
+    dh = DofHandler(grid)
+    add!(dh, :u, ip_u)
     close!(dh)
 
+    ae = zeros(ndofs(dh))
+    IGA.apply_analytical_iga!(ae, dh, :u, x->x)
+
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "bot"), (x, t) -> 0.0, 2)
-    dbc2 = Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.0, 1)
+    dbc1 = Dirichlet(:u, getfacetset(grid, "bot"), (x, t) -> 0.0, 2)
+    dbc2 = Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 0.0, 1)
     add!(ch, dbc1)
     add!(ch, dbc2)
     close!(ch)
@@ -159,14 +160,10 @@ function solve()
 
     cellstresses = calculate_stress(dh, cv, stiffmat, u)
 
-    #csv = BezierCellValues( CellScalarValues(qr_cell, ip) )
-    projector = L2Projector(ip, grid)
-    σ_nodes = IGA.igaproject(projector, cellstresses, qr_cell; project_to_nodes=true)
-
-    vtkgrid = vtk_grid("plate_with_hole.vtu", grid)
-    vtk_point_data(vtkgrid, dh, u, :u)
-    vtk_point_data(vtkgrid, σ_nodes, "sigma", grid)
-    vtk_save(vtkgrid)
+    IGA.VTKIGAFile("plate_with_hole.vtu", grid) do vtk
+        write_solution(vtk, dh, u)
+        #IGA.write_projections(vtk, projector, σ_nodes, "σ")
+    end
 
 end;
 

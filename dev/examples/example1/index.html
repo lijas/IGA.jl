@@ -82,7 +82,7 @@ nothing #hide</code></pre><p>This is a function that returns the elastic stiffne
     g(i,j,k,l) = λ*δ(i,j)*δ(k,l) + μ*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k))
 
     return SymmetricTensor{4, 2}(g)
-end;</code></pre><p>We also create a function that calculates the stress in each quadrature point, given the cell displacement and such...</p><pre><code class="language-julia">function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
+end;</code></pre><p>We also create a function that calculates the stress in each quadrature point, given the cell displacement and such...</p><pre><code class="language-">function calculate_stress(dh, cv::Ferrite.Values, C::SymmetricTensor{4,2}, u::Vector{Float64})
 
     celldofs = zeros(Int, ndofs_per_cell(dh))
 
@@ -109,13 +109,14 @@ end;</code></pre><p>We also create a function that calculates the stress in each
     end
 
     return cellstresses
-end;</code></pre><p>Now we have all the parts needed to solve the problem. We begin by generating the mesh. IGA.jl includes a couple of different functions that can generate different nurbs patches. In this example, we will generate the patch called &quot;plate with hole&quot;. Note, currently this function can only generate the patch with second order basefunctions.</p><pre><code class="language-">function solve()
+end;
+nothing #hide</code></pre><p>Now we have all the parts needed to solve the problem. We begin by generating the mesh. IGA.jl includes a couple of different functions that can generate different nurbs patches. In this example, we will generate the patch called &quot;plate with hole&quot;. Note, currently this function can only generate the patch with second order basefunctions.</p><pre><code class="language-">function solve()
     orders = (2,2) # Order in the ξ and η directions .
     nels = (10,10) # Number of elements
     nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels)</code></pre><p>Performing the computation on a NURBS-patch is possible, but it is much easier to use the bezier-extraction technique. For this we transform the NURBS-patch into a <code>BezierGrid</code>. The <code>BezierGrid</code> is identical to the standard <code>Ferrite.Grid</code>, but includes the NURBS-weights and bezier extraction operators.</p><pre><code class="language-">    grid = BezierGrid(nurbsmesh)</code></pre><p>Next, create some facesets. This is done in the same way as in normal Ferrite-code. One thing to note however, is that the nodes/controlpoints, does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to use the Ferrite functions below.</p><pre><code class="language-">    addnodeset!(grid,&quot;right&quot;, (x) -&gt; x[1] ≈ -0.0)
-    addfaceset!(grid, &quot;left&quot;, (x) -&gt; x[1] ≈ -4.0)
-    addfaceset!(grid, &quot;bot&quot;, (x) -&gt; x[2] ≈ 0.0)
-    addfaceset!(grid, &quot;right&quot;, (x) -&gt; x[1] ≈ 0.0)</code></pre><p>Create the cellvalues storing the shape function values. Note that the <code>CellVectorValues</code>/<code>FaceVectorValues</code> are wrapped in a <code>BezierValues</code>. It is in the reinit-function of the <code>BezierValues</code> that the actual bezier transformation of the shape values is performed.</p><pre><code class="language-">    ip = BernsteinBasis{2,orders}()
+    addfacetset!(grid, &quot;left&quot;, (x) -&gt; x[1] ≈ -4.0)
+    addfacetset!(grid, &quot;bot&quot;, (x) -&gt; x[2] ≈ 0.0)
+    addfacetset!(grid, &quot;right&quot;, (x) -&gt; x[1] ≈ 0.0)</code></pre><p>Create the cellvalues storing the shape function values. Note that the <code>CellVectorValues</code>/<code>FaceVectorValues</code> are wrapped in a <code>BezierValues</code>. It is in the reinit-function of the <code>BezierValues</code> that the actual bezier transformation of the shape values is performed.</p><pre><code class="language-">    ip = Bernstein{2,orders}()
     qr_cell = QuadratureRule{2,RefCube}(3)
     qr_face = QuadratureRule{1,RefCube}(3)
 
@@ -141,4 +142,4 @@ end;</code></pre><p>Now we have all the parts needed to solve the problem. We be
     vtk_save(vtkgrid)
 
 end;
-nothing #hide</code></pre><p>Call the function</p><pre><code class="language-">solve()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Monday 18 September 2023 11:44">Monday 18 September 2023</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+nothing #hide</code></pre><p>Call the function</p><pre><code class="language-">solve()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Monday 1 July 2024 09:44">Monday 1 July 2024</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
