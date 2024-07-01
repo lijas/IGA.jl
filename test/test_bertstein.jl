@@ -35,7 +35,7 @@
         for xi in [rand(Vec{dim,Float64}), rand(Vec{dim,Float64})]
             for i in  1:Ferrite.getnbasefunctions(bip)
                 N_hardcoded = Ferrite.reference_shape_value(bip, xi, i)
-                M_generated = IGA._compute_bezier_shape_value(bip, xi, i)
+                M_generated = IGA._compute_bezier_reference_shape_value(bip, xi, i)
                 @test M_generated ≈ N_hardcoded
             end
         end
