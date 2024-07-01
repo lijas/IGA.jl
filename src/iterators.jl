@@ -60,7 +60,7 @@ function IGAFaceCache(args...)
     IGAFaceCache(cc, cc.dofs, Ferrite.ScalarWrapper(0))
 end
 
-function Ferrite.reinit!(fc::IGAFaceCache, face::FaceIndex)
+function Ferrite.reinit!(fc::IGAFaceCache, face::Ferrite.BoundaryIndex)
     cellid, faceid = face
     reinit!(fc.cc, cellid)
     fc.current_faceid[] = faceid
