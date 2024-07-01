@@ -72,19 +72,15 @@ end
 function BezierCellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) 
     return BezierCellValues(Float64, qr, ip, args...; kwargs...)
 end
-function BezierCellValues(::Type{T}, qr, ip::ScalarInterpolation; kwargs...) where T
+function BezierCellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
     return BezierCellValues(T, qr, ip, Ferrite.default_geometric_interpolation(ip); kwargs...)
 end
 function BezierCellValues(::Type{T}, qr, ip, ip_geo::VectorizedInterpolation = Ferrite.default_geometric_interpolation(ip); kwargs...) where T
     return BezierCellValues(T, qr, ip, ip_geo, Ferrite.ValuesUpdateFlags(ip; kwargs...))
 end
 
-function BezierFacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}; 
-    update_hessians::Bool = false, update_gradients::Bool = true) where {T,sdim} 
-
-    FunDiffOrder  = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
-    FunDiffOrder += convert(Int, update_hessians) # Logic must change when supporting update_hessian kwargs
-    GeoDiffOrder = max(Ferrite.required_geo_diff_order(Ferrite.mapping_type(ip_fun), FunDiffOrder), 1)
+function BezierFacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}, ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}) where {T, sdim, FunDiffOrder, GeoDiffOrder, DetJdV}
+    @assert DetJdV
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
     max_nquadpoints = maximum(qr->length(Ferrite.getweights(qr)), fqr.face_rules)
@@ -99,10 +95,16 @@ function BezierFacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpol
         geo_mapping, fqr, detJdV, normals, undef_beo, undef_w, Ferrite.ScalarWrapper(-1))
 end
 
-BezierFacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) = BezierFacetValues(Float64, qr, ip, args...; kwargs...)
-function BezierFacetValues(::Type{T}, qr, ip::Interpolation; kwargs...) where T
+function BezierFacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) 
+    return BezierFacetValues(Float64, qr, ip, args...; kwargs...)
+end
+function BezierFacetValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
     return BezierFacetValues(T, qr, ip, Ferrite.default_geometric_interpolation(ip); kwargs...)
 end
+function BezierFacetValues(::Type{T}, qr, ip, ip_geo::VectorizedInterpolation = Ferrite.default_geometric_interpolation(ip); kwargs...) where T
+    return BezierFacetValues(T, qr, ip, ip_geo, Ferrite.ValuesUpdateFlags(ip; kwargs...))
+end
+
 
 #Intercept construction of CellValues called with IGAInterpolation
 function Ferrite.CellValues(

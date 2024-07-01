@@ -59,10 +59,23 @@ end
     qr = QuadratureRule{shape}(1)
     qr_face = FacetQuadratureRule{shape}(1)
 
+    #Cells
     cv  = BezierCellValues(qr, ip)
     cv  = BezierCellValues(qr, ip^2)
+    cv  = BezierCellValues(qr, ip^2, ip)
     cv  = BezierCellValues(qr, ip, ip^3)
     cv  = BezierCellValues(qr, ip^2, ip^3)
+    cv  = BezierCellValues(qr, ip; update_hessians=true)
+    cv  = BezierCellValues(qr, ip^3; update_hessians=true)
+
+    #Facets
+    cv  = BezierFacetValues(qr_face, ip)
+    cv  = BezierFacetValues(qr_face, ip^2)
+    cv  = BezierFacetValues(qr_face, ip^2, ip)
+    cv  = BezierFacetValues(qr_face, ip, ip^3)
+    cv  = BezierFacetValues(qr_face, ip^2, ip^3)
+    cv  = BezierFacetValues(qr_face, ip; update_hessians=true)
+    cv  = BezierFacetValues(qr_face, ip^3; update_hessians=true)
 
     #embedded
     ip = IGAInterpolation{RefQuadrilateral, 2}()
