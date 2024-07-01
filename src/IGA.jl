@@ -7,7 +7,7 @@ using Reexport
 using Ferrite: 
     AbstractRefShape, RefHypercube, RefLine, RefQuadrilateral, RefHexahedron, getnbasefunctions,
     VectorInterpolation, VectorizedInterpolation,
-    FunctionValues, GeometryMapping, MappingValues
+    FunctionValues, GeometryMapping, MappingValues, ValuesUpdateFlags
 
 using OrderedCollections:
     OrderedSet
