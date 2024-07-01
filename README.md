@@ -1,6 +1,6 @@
 # IGA.jl
 
-Small toolbox for Isogeometric analysis. Built on top of [Ferrite](https://github.com/KristofferC/Ferrite.jl)
+Small toolbox for Isogeometric analysis. Built on top of [Ferrite](https://github.com/Ferrite-FEM/Ferrite.jl)
 
 ## Documentation
 
