@@ -31,6 +31,7 @@ Ferrite.getnbasefunctions(::Bernstein{RefLine,2}) = 3
 
 Ferrite.vertexdof_indices(::Bernstein{RefLine,2}) = ((1,),(2,))
 Ferrite.edgedof_indices(::Bernstein{RefLine,2}) = ((1,2,3),)
+Ferrite.facedof_indices(::Bernstein{RefLine,2}) = ()
 
 function Ferrite.reference_shape_value(ip::Bernstein{RefLine,2}, _ξ::Vec{1}, i::Int)
     ξ = 0.5*(_ξ[1] + 1.0)
@@ -181,6 +182,19 @@ function _compute_bezier_reference_shape_value(ip::Bernstein{shape,order}, ξ::V
         val *= IGA._bernstein_basis_recursive(order, basefunction_indeces[i], ξ[i])
     end
     return val
+end
+
+function _compute_vertexdof_indices(::Bernstein{RefLine,order}) where order
+    ((1,),(2,))
+end
+
+function _compute_edgedof_indices(ip::Bernstein{RefLine,order}) where {order}
+    ind = ntuple(i-> i, order+1)
+    return (ind,)
+end
+
+function _compute_facedof_indices(ip::Bernstein{RefLine,order}) where {order}
+    ()
 end
 
 function _compute_vertexdof_indices(::Bernstein{RefQuadrilateral,order}) where order
