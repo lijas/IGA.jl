@@ -201,6 +201,11 @@ function _compute_vertexdof_indices(::Bernstein{RefQuadrilateral,order}) where o
     ((1,),(2,),(3,),(4,),)
 end
 
+function _compute_facedof_indices(ip::Bernstein{RefQuadrilateral,order}) where {order}
+    ind = ntuple(i-> i, (order+1)^2)
+    return (ind,)
+end
+
 function _compute_edgedof_indices(ip::Bernstein{RefQuadrilateral,order}) where {order}
     faces = Tuple[]
     orders = (order, order)
