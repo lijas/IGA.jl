@@ -73,7 +73,7 @@ function BezierCellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs
     return BezierCellValues(Float64, qr, ip, args...; kwargs...)
 end
 function BezierCellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
-    return BezierCellValues(T, qr, ip, Ferrite.default_geometric_interpolation(ip); kwargs...)
+    return BezierCellValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
 function BezierCellValues(::Type{T}, qr, ip, ip_geo::VectorizedInterpolation = Ferrite.default_geometric_interpolation(ip); kwargs...) where T
     return BezierCellValues(T, qr, ip, ip_geo, Ferrite.ValuesUpdateFlags(ip; kwargs...))
