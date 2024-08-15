@@ -27,7 +27,7 @@ struct BezierFacetValues{FV, GM, FQR, dim, T, V_FV<:AbstractVector{FV}, V_GM<:Ab
     tmp_values::V_FV    # FunctionValues
     nurbs_values::V_FV  # FunctionValues
     geo_mapping::V_GM   # GeometryMapping
-    qr::FQR            # QuadratureRule
+    fqr::FQR            # QuadratureRule
     detJdV::Vector{T}
     normals::Vector{Vec{dim,T}}
 
@@ -138,7 +138,7 @@ Ferrite.getnbasefunctions(cv::BezierCellValues)            = getnbasefunctions(c
 Ferrite.getngeobasefunctions(fv::BezierFacetValues)         = Ferrite.getngeobasefunctions(fv.geo_mapping[Ferrite.getcurrentfacet(fv)])
 Ferrite.getngeobasefunctions(cv::BezierCellValues)         = Ferrite.getngeobasefunctions(cv.geo_mapping)
 Ferrite.getnquadpoints(bcv::BezierCellValues)                      = Ferrite.getnquadpoints(bcv.qr)
-Ferrite.getnquadpoints(bcv::BezierFacetValues)                      = Ferrite.getnquadpoints(bcv.qr, Ferrite.getcurrentfacet(bcv))
+Ferrite.getnquadpoints(bcv::BezierFacetValues)                      = Ferrite.getnquadpoints(bcv.fqr, Ferrite.getcurrentfacet(bcv))
 Ferrite.getdetJdV(bv::BezierCellAndFacetValues, q_point::Int)       = bv.detJdV[q_point]
 Ferrite.shape_value(bcv::BezierCellValues, qp::Int, i::Int) = Ferrite.shape_value(bcv.nurbs_values, qp, i)
 Ferrite.shape_gradient(bcv::BezierCellValues, q_point::Int, i::Int) = Ferrite.shape_gradient(bcv.nurbs_values, q_point, i)
@@ -355,7 +355,7 @@ function Ferrite.reinit!(fv::BezierFacetValues, (x,w)::CoordsAndWeight, face_nr:
     @assert checkbounds(Bool, x, 1:n_geom_basefuncs)
     @assert checkbounds(Bool, w, 1:n_geom_basefuncs)
 
-    for (q_point, gauss_w) in enumerate(Ferrite.getweights(fv.qr, face_nr))
+    for (q_point, gauss_w) in enumerate(Ferrite.getweights(fv.fqr, face_nr))
         mapping = Ferrite.calculate_mapping(geo_mapping, q_point, x, w)
        
         J = Ferrite.getjacobian(mapping)
@@ -693,7 +693,7 @@ end
 
 function Base.show(io::IO, m::MIME"text/plain", fv::BezierFacetValues)
     println(io, "BezierFacetValues with")
-    nqp = getnquadpoints.(fv.qr.face_rules)
+    nqp = getnquadpoints.(fv.fqr.face_rules)
     fip = Ferrite.function_interpolation(fv)
     gip = Ferrite.geometric_interpolation(fv)
     if all(n==first(nqp) for n in nqp)
