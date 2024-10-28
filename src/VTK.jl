@@ -205,9 +205,9 @@ function _evaluate_at_geometry_nodes!(data, sdh, a::Vector{T}, cv, drange, cells
 	dh = sdh.dh
 	grid = dh.grid
 
+	ncelldofs = ndofs_per_cell(sdh)
 	n_eval_points = Ferrite.getngeobasefunctions(cv)
-	ncelldofs = length(drange)
-	ue = zeros(eltype(a), ncelldofs)
+	ue = zeros(eltype(a), length(drange))
 
 	# TODO: Remove this hack when embedding works...
     if RT <: Vec && is_scalar_interpolaiton(cv)
