@@ -73,8 +73,8 @@ function assemble_problem(dh::DofHandler, grid, cv, fv, stiffmat, traction)
         fill!(ke, 0.0)
         celldofs!(celldofs, dh, cellid)
 
-        # In a normal finite elment code, this is the point where we usually get the coordinates of the element `X = getcoordinates(grid, cellid)`. In this case, however, 
-        # we also require the cell weights, and we need to transform them to the bezier mesh. 
+        ## In a normal finite elment code, this is the point where we usually get the coordinates of the element `X = getcoordinates(grid, cellid)`. In this case, however, 
+        ## we also require the cell weights, and we need to transform them to the bezier mesh. 
         extr = get_extraction_operator(grid, cellid) # Extraction operator
         get_bezier_coordinates!(xb,wb,x,w,grid,cellid) #Nurbs coords
         set_bezier_operator!(cv, extr, w)

@@ -12,7 +12,7 @@
 # ```math
 # u(0) = u(1) = 0
 # ```
-# where $u$ is the displacement field, and $\omega_n$ is n:th eigenmode. 
+# where $u$ is the displacement field, and $\omega_n$ is n:th natural frequency. 
 
 # After discretisation, we formulate the generalised eigenvalue problem, which allows us to solve for the natural frequencies and modes $\boldsymbol{\phi}_n$:
 # ```math
