@@ -39,6 +39,18 @@ function _generate_equidistant_parametrization(knot_vector::Vector{T}, order::In
 	return range(from, stop=to, length=length(knot_vector)-1-order)
 end
 
+function Ferrite.generate_grid(::Type{<:BezierCell{RefLine,order}}, nels::NTuple{1,Int}, LL::Vec{1,T}, UR::Vec{1,T},) where {T,order}
+	
+	#IGnore LR and UL for now
+	patch = generate_nurbs_patch(:line, nels, ntuple(i->order,1); cornerpos = Tuple(LL), size = Tuple(UR-LL))
+	grid = BezierGrid(patch)
+	
+	addfacetset!(grid, "left", x->x[1]≈LL[1])
+	addfacetset!(grid, "right", x->x[1]≈UR[1])
+
+	return grid
+end
+
 function Ferrite.generate_grid(::Type{<:BezierCell{RefQuadrilateral,order}}, nels::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}) where {T,order}
 	
 	#IGnore LR and UL for now
