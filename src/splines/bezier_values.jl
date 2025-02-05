@@ -293,7 +293,9 @@ function _cellvalues_bezier_extraction_higher_order!(
 
 end
 
-function Ferrite.reinit!(cv::BezierCellValues, bc::BezierCoords)
+Ferrite.reinit!(cv::BezierCellValues, bc::BezierCoords) = reinit!(cv, nothing, bc)
+
+function Ferrite.reinit!(cv::BezierCellValues, ::Union{Ferrite.AbstractCell, Nothing}, bc::BezierCoords)
     set_bezier_operator!(cv, bc.beo[], bc.w)
     return reinit!(cv, (bc.xb, bc.wb))
 end
@@ -338,7 +340,9 @@ function reinit_values!(cv::BezierCellValues, bc::BezierCoords)
     return nothing
 end
 
-function Ferrite.reinit!(cv::BezierFacetValues, bc::BezierCoords, face_nr::Int)
+Ferrite.reinit!(fv::BezierFacetValues, bc::BezierCoords, facet_nr::Int) = reinit!(fv, nothing, bc, facet_nr)
+
+function Ferrite.reinit!(cv::BezierFacetValues, _, bc::BezierCoords, face_nr::Int)
     set_bezier_operator!(cv, bc.beo[], bc.w)
     return reinit!(cv, (bc.xb, bc.wb), face_nr)
 end
