@@ -188,6 +188,20 @@ end
             end
         end
     end
+
+    # Test reinit! with the cell given 
+    cell = getcells(grid, 1)
+    bc = getcoordinates(grid, 1)
+    reinit!(cv, bc)
+    ∇N = shape_gradient(cv, 1, 1)
+    reinit!(cv, getcoordinates(grid, 2))
+    reinit!(cv, cell, bc)
+    @test ∇N ≈ shape_gradient(cv, 1, 1)
+    reinit!(fv, bc, 1)
+    ∇N = shape_gradient(fv, 1, 1)
+    reinit!(fv, getcoordinates(grid, 2), 1)
+    reinit!(fv, cell, bc, 1)
+    @test ∇N ≈ shape_gradient(fv, 1, 1)
     
     cellnum, faceidx = (9, 3)
     addfacetset!(grid, "left_facet", (x)-> x[1] ≈ -4.0)
