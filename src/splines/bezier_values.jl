@@ -81,9 +81,9 @@ end
 
 function BezierFacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}, ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}) where {T, sdim, FunDiffOrder, GeoDiffOrder, DetJdV}
     @assert DetJdV
-    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
-    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
-    max_nquadpoints = maximum(qr->length(Ferrite.getweights(qr)), fqr.face_rules)
+    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.facet_rules]
+    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.facet_rules]
+    max_nquadpoints = maximum(qr->length(Ferrite.getweights(qr)), fqr.facet_rules)
     detJdV  = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
     undef_beo = Ref(Vector{SparseArrays.SparseVector{T,Int}}(undef,0))
@@ -693,7 +693,7 @@ end
 
 function Base.show(io::IO, m::MIME"text/plain", fv::BezierFacetValues)
     println(io, "BezierFacetValues with")
-    nqp = getnquadpoints.(fv.fqr.face_rules)
+    nqp = getnquadpoints.(fv.fqr.facet_rules)
     fip = Ferrite.function_interpolation(fv)
     gip = Ferrite.geometric_interpolation(fv)
     if all(n==first(nqp) for n in nqp)
