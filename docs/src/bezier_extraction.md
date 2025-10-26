@@ -1,6 +1,6 @@
 # Bezier extraction
 
-The basefunctions used in IGA (B-splines, NURBS, ...) exist over multiple adjecent elements. This is in contrast to traditional finite element method, where identical shape function are defined withing all elements. This makes it difficult to incorprate IGA in to a standard finite element code. The bezier extraction technique, introduced by [Borden et.al](https://doi.org/10.1002/nme.2968), solves this problem by allowing numerical integration of smooth function to be performed on C0 Bezier elements.
+The basefunctions used in IGA (B-splines, NURBS, etc.) exist over multiple adjecent elements. This is in contrast to traditional finite element method, where identical shape function are defined withing all elements. This makes it difficult to incorprate IGA in to a standard finite element code. The bezier extraction technique, introduced by [Borden et.al](https://doi.org/10.1002/nme.2968), solves this problem by allowing numerical integration of smooth function to be performed on C0 Bezier elements.
 
 The $C^p$-continiuos B-Spline basis functions on an element, $\boldsymbol N^e$ can be computeded from the $C^0$ bernstein polynominals, $\boldsymbol B^e$, as
 
@@ -14,7 +14,7 @@ where $\boldsymbol C^e$ is the bezier extraction operator for the current cell. 
     \boldsymbol R^e = \boldsymbol W^e \frac{ \boldsymbol N^e}{W(\xi)} = \boldsymbol W^e \boldsymbol C^e \frac{\boldsymbol B^e}{W^b(\xi)}
 ```
 
-where $\boldsymbol W^e$ is a diagonal matrix of the rational weights, $w_I, I = 1,2,...,N$, and $W(\xi)$ and $W^b(\xi)$ are the weight functions 
+where $\boldsymbol W^e$ is a diagonal matrix of the rational weights, $w_I, I = 1,2,\dots,N$, and $W(\xi)$ and $W^b(\xi)$ are the weight functions 
 
 ```math
     W(\xi) = W^b(\xi) = \sum_I^N = N(\xi)  w_I = \sum_I^N = B(\xi)  w^b_I . 
@@ -40,7 +40,7 @@ qr_cell = QuadratureRule{2,RefCube}(4)
 
 cv = BezierCellValues( CellVectorValues(qr_cell, ip) )
 
-...
+#...
 
 extr = get_extraction_operator(grid, cellid) # Extraction operator
 X = getcoordinates(grid, cellid) #Nurbs coords

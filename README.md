@@ -8,10 +8,7 @@ Small toolbox for Isogeometric analysis. Built on top of [Ferrite](https://githu
 
 ## Installation
 
-Currently only works on Ferrite master branch
-
 ```
-Pkg.add(url="https://github.com/Ferrite-FEM/Ferrite.jl",rev="master")
 Pkg.add(url="https://github.com/lijas/IGA.jl",rev="master")
 ```
 

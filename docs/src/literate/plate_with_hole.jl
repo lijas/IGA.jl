@@ -143,76 +143,71 @@ end;
 # Now we have all the parts needed to solve the problem.
 # We begin by generating the mesh. IGA.jl includes a couple of different functions that can generate different nurbs patches.
 # In this example, we will generate the patch called "plate with hole". Note, currently this function can only generate the patch with second order basefunctions. 
-function solve()
-    order = 2 # order of the NURBS
-    nels = (20,10) # Number of elements
-    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels, order) 
 
-    # Performing the computation on a NURBS-patch is possible, but it is much easier to using "bezier-extraction". For this 
-    # we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `Ferrite.Grid`, but includes the NURBS-weights and 
-    # bezier extraction operators.
-    grid = BezierGrid(nurbsmesh)
+order = 2 # order of the NURBS
+nels = (20, 10) # Number of elements
+nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels, order);
 
-    # Next, create some facesets. This is done in the same way as in normal Ferrite-code. One thing to note however, is that the nodes/controlpoints, 
-    # does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
-    # use the Ferrite functions below.
-    addnodeset!(grid, "right", (x) -> x[1] ≈ -0.0)
-    addfacetset!(grid, "left", (x) -> x[1] ≈ -4.0)
-    addfacetset!(grid, "bot", (x) -> x[2] ≈ 0.0)
-    addfacetset!(grid, "right", (x) -> x[1] ≈ 0.0)
+# Performing the computation on a NURBS-patch is possible, but it is much easier to using "bezier-extraction". For this 
+# we transform the NURBS-patch into a `BezierGrid`. The `BezierGrid` is identical to the standard `Ferrite.Grid`, but includes the NURBS-weights and 
+# bezier extraction operators.
+grid = BezierGrid(nurbsmesh);
 
-    # Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the 
-    # reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
-    ip_geo = IGAInterpolation{RefQuadrilateral,order}()
-    ip_u = ip_geo^2
-    qr_cell = QuadratureRule{RefQuadrilateral}(4)
-    qr_face = FacetQuadratureRule{RefQuadrilateral}(3)
+# Next, create some facesets. This is done in the same way as in normal Ferrite-code. One thing to note however, is that the nodes/controlpoints, 
+# does not necessary lay exactly on the geometry due to the non-interlapotry nature of NURBS spline functions. However, in most cases they will be close enough to 
+# use the Ferrite functions below.
+addnodeset!(grid, "right", (x) -> x[1] ≈ -0.0)
+addfacetset!(grid, "left", (x) -> x[1] ≈ -4.0)
+addfacetset!(grid, "bot", (x) -> x[2] ≈ 0.0)
+addfacetset!(grid, "right", (x) -> x[1] ≈ 0.0);
 
-    cv = BezierCellValues(qr_cell, ip_u)
-    fv = BezierFacetValues(qr_face, ip_u)
+# Create the cellvalues storing the shape function values. Note that the `CellVectorValues`/`FaceVectorValues` are wrapped in a `BezierValues`. It is in the 
+# reinit-function of the `BezierValues` that the actual bezier transformation of the shape values is performed. 
+ip_geo = IGAInterpolation{RefQuadrilateral,order}()
+ip_u = ip_geo^2
+qr_cell = QuadratureRule{RefQuadrilateral}(4)
+qr_face = FacetQuadratureRule{RefQuadrilateral}(3);
 
-    # Distribute dofs as normal
-    dh = DofHandler(grid)
-    add!(dh, :u, ip_u)
-    close!(dh)
+cv = BezierCellValues(qr_cell, ip_u)
+fv = BezierFacetValues(qr_face, ip_u);
 
-    ae = zeros(ndofs(dh))
-    IGA.apply_analytical_iga!(ae, dh, :u, x->x)
+# Distribute dofs as normal
+dh = DofHandler(grid)
+add!(dh, :u, ip_u)
+close!(dh);
 
-    # Add two symmetry boundary condintions. Bottom face should only be able to move in x-direction, and the right boundary should only be able to move in y-direction
-    ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfacetset(grid, "bot"), (x, t) -> 0.0, 2)
-    dbc2 = Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 0.0, 1)
-    add!(ch, dbc1)
-    add!(ch, dbc2)
-    close!(ch)
-    update!(ch, 0.0)
+ae = zeros(ndofs(dh))
+IGA.apply_analytical_iga!(ae, dh, :u, x -> x);
 
-    # Define stiffness matrix and traction force
-    stiffmat = get_material(E = 100, ν = 0.3)
-    traction = Vec((-10.0, 0.0))
-    K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)
+# Add two symmetry boundary condintions. Bottom face should only be able to move in x-direction, and the right boundary should only be able to move in y-direction
+ch = ConstraintHandler(dh)
+dbc1 = Dirichlet(:u, getfacetset(grid, "bot"), (x, t) -> 0.0, 2)
+dbc2 = Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 0.0, 1)
+add!(ch, dbc1)
+add!(ch, dbc2)
+close!(ch)
+update!(ch, 0.0);
 
-    # Solve
-    apply!(K, f, ch)
-    u = K\f
-    
-    # Now we want to export the results to VTK. So we calculate the stresses in each gauss-point, and project them to 
-    # the nodes using the L2Projector from Ferrite. Node that we need to create new CellValues of type CellScalarValues, since the 
-    # L2Projector only works with scalar fields.  
+# Define stiffness matrix and traction force
+stiffmat = get_material(E=100, ν=0.3)
+traction = Vec((-10.0, 0.0))
+K, f = assemble_problem(dh, grid, cv, fv, stiffmat, traction);
 
-    cellstresses = calculate_stress(dh, cv, stiffmat, u)
+# Solve
+apply!(K, f, ch)
+u = K \ f;
 
-    # L2 projections currently broken for IGA
-    # projector = L2Projector(ip_u, grid)
-    # σ_nodes = project(projector, cellstresses, qr_cell)
+# Now we want to export the results to VTK. So we calculate the stresses in each gauss-point, and project them to 
+# the nodes using the L2Projector from Ferrite. Node that we need to create new CellValues of type CellScalarValues, since the 
+# L2Projector only works with scalar fields.  
 
-    IGA.VTKIGAFile("plate_with_hole.vtu", grid) do vtk
-        write_solution(vtk, dh, u)
-        #IGA.write_projections(vtk, projector, σ_nodes, "σ")
-    end
+cellstresses = calculate_stress(dh, cv, stiffmat, u);
 
+# L2 projections currently broken for IGA
+# projector = L2Projector(ip_u, grid)
+# σ_nodes = project(projector, cellstresses, qr_cell)
+
+IGA.VTKIGAFile("plate_with_hole.vtu", grid) do vtk
+    write_solution(vtk, dh, u)
+    #IGA.write_projections(vtk, projector, σ_nodes, "σ")
 end;
-
-# Call the function
-solve()
