@@ -40,24 +40,28 @@ end
 Algorithm for calculating one basis functions value, using Cox-debor recursion formula
     From NURBS-book, alg2.?
 """
-function _bspline_basis_value_alg1(p::Int, knot::Vector{Float64}, i::Int, xi)
+function _bspline_basis_value_alg1(p::Int, knot::Vector{Float64}, i::Int, xi::T) where {T}
 
+    #TODO: How to handle Dual numbers without importing ForwardDiff?
+    __value(x::Number) = x
+    __value(x::ForwardDiff.Dual) = ForwardDiff.value(x)
+    __value(x::ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual,<:Any}) = ForwardDiff.value(ForwardDiff.value(x))
 	if p>0
 	    _N1_1 = (xi - knot[i])*_bspline_basis_value_alg1(p-1, knot, i, xi)
-	        _N1_2 = (knot[i+p]-knot[i])
+	    _N1_2 = (knot[i+p]-knot[i])
 	     
 
-	    if _N1_2 == 0.0 && _N1_1 == 0.0
-	    	_N1 = 0.0
+	    if __value(_N1_2) == 0.0 && __value(_N1_1) == 0.0
+	    	_N1 = T(0.0)
 	    else
 	    	_N1 = (_N1_1/_N1_2)
 	    end
 
 	    _N2_1 = (knot[i+p+1] - xi)*_bspline_basis_value_alg1(p-1, knot, i+1, xi)
-	        _N2_2 = (knot[i+p+1] - knot[i+1])
+	    _N2_2 = (knot[i+p+1] - knot[i+1])
 	       
-	    if _N2_2 == 0.0 && _N2_1 == 0.0
-	    	_N2 = 0.0
+	    if  __value(_N2_2) == 0.0 &&  __value(_N2_1) == 0.0
+	    	_N2 = T(0.0)
 	    else
 	    	_N2 = (_N2_1/_N2_2)
 	    end
@@ -65,16 +69,16 @@ function _bspline_basis_value_alg1(p::Int, knot::Vector{Float64}, i::Int, xi)
 	else
 		#Special case at end points for some reason
 		if knot[i+1] < knot[end]
-			if knot[i] <= xi && xi < knot[i+1]
-				return 1.0
+			if knot[i] <= __value(xi) && __value(xi) < knot[i+1]
+				return T(1.0)
 			else
-				return 0.0
+				return T(0.0)
 			end
 		else
-			if knot[i] <= xi
-				return 1.0
+			if knot[i] <= __value(xi)
+				return T(1.0)
 			else
-				return 0.0
+				return T(0.0)
 			end
 		end
 	end
