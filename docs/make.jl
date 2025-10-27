@@ -13,7 +13,7 @@ makedocs(
     format = Documenter.HTML(),
     doctest = false,
     #modules = [IGA],
-    strict = false,
+    warnonly = true,
     pages = Any[
         "Home" => "index.md",
         "Manual" => ["bsplines_nurbs.md", "bezier_extraction.md"],
