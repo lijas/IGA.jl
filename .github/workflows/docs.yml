@@ -16,7 +16,7 @@ jobs:
         with:
           version: 1.9
       - name: Install dependencies
-        run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+        run: julia --project --color=yes -e 'using Pkg; Pkg.activate("docs"); Pkg.instantiate();'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
