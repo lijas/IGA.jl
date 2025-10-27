@@ -16,7 +16,7 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
         ni = nurbsmesh.INN[global_basefunk,:] # Defines the basis functions nurbs coord
 
         function __bspline_shape_value__(xi::Vec{pdim,T}, _ni, ni, Ξ, nurbsmesh) where T
-            ξηζ = Vec{pdim}(d->0.5*((Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]])*xi[d] + (Ξ[d][_ni[d]+1] + Ξ[d][_ni[d]])))
+            ξηζ = Vec{pdim,T}(d->0.5*((Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]])*xi[d] + (Ξ[d][_ni[d]+1] + Ξ[d][_ni[d]])))
             value = one(T)
             for d in 1:pdim
                 value *= IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
@@ -220,8 +220,8 @@ end
 
             for iqp in 1:getnquadpoints(fv)
 
-                ξ = qr_face.face_rules[faceidx].points[iqp]
-                qrw = qr_face.face_rules[faceidx].weights[iqp]
+                ξ = qr_face.facet_rules[faceidx].points[iqp]
+                qrw = qr_face.facet_rules[faceidx].weights[iqp]
 
                 #Calculate the value of the NURBS from the nurbs patch
                 R, dRdξ, d²Rdξ² = bspline_values(nurbsmesh, cellnum, ξ, reorder)
