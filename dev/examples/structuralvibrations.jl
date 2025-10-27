@@ -88,4 +88,3 @@ plot!(fig, n_range, normalised_ω_fem, label="Quadratic FEM")
 plot!(fig, n_range, normalised_ω_iga, label="Quadratic IGA")
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
-

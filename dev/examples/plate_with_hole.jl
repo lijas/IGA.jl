@@ -118,58 +118,52 @@ function calculate_stress(dh, cv::BezierCellValues, C::SymmetricTensor{4,2}, u::
     return cellstresses
 end;
 
-function solve()
-    order = 2 # order of the NURBS
-    nels = (20,10) # Number of elements
-    nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels, order)
+order = 2 # order of the NURBS
+nels = (20, 10) # Number of elements
+nurbsmesh = generate_nurbs_patch(:plate_with_hole, nels, order);
 
-    grid = BezierGrid(nurbsmesh)
+grid = BezierGrid(nurbsmesh);
 
-    addnodeset!(grid, "right", (x) -> x[1] ≈ -0.0)
-    addfacetset!(grid, "left", (x) -> x[1] ≈ -4.0)
-    addfacetset!(grid, "bot", (x) -> x[2] ≈ 0.0)
-    addfacetset!(grid, "right", (x) -> x[1] ≈ 0.0)
+addnodeset!(grid, "right", (x) -> x[1] ≈ -0.0)
+addfacetset!(grid, "left", (x) -> x[1] ≈ -4.0)
+addfacetset!(grid, "bot", (x) -> x[2] ≈ 0.0)
+addfacetset!(grid, "right", (x) -> x[1] ≈ 0.0);
 
-    ip_geo = IGAInterpolation{RefQuadrilateral,order}()
-    ip_u = ip_geo^2
-    qr_cell = QuadratureRule{RefQuadrilateral}(4)
-    qr_face = FacetQuadratureRule{RefQuadrilateral}(3)
+ip_geo = IGAInterpolation{RefQuadrilateral,order}()
+ip_u = ip_geo^2
+qr_cell = QuadratureRule{RefQuadrilateral}(4)
+qr_face = FacetQuadratureRule{RefQuadrilateral}(3);
 
-    cv = BezierCellValues(qr_cell, ip_u)
-    fv = BezierFacetValues(qr_face, ip_u)
+cv = BezierCellValues(qr_cell, ip_u)
+fv = BezierFacetValues(qr_face, ip_u);
 
-    dh = DofHandler(grid)
-    add!(dh, :u, ip_u)
-    close!(dh)
+dh = DofHandler(grid)
+add!(dh, :u, ip_u)
+close!(dh);
 
-    ae = zeros(ndofs(dh))
-    IGA.apply_analytical_iga!(ae, dh, :u, x->x)
+ae = zeros(ndofs(dh))
+IGA.apply_analytical_iga!(ae, dh, :u, x -> x);
 
-    ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfacetset(grid, "bot"), (x, t) -> 0.0, 2)
-    dbc2 = Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 0.0, 1)
-    add!(ch, dbc1)
-    add!(ch, dbc2)
-    close!(ch)
-    update!(ch, 0.0)
+ch = ConstraintHandler(dh)
+dbc1 = Dirichlet(:u, getfacetset(grid, "bot"), (x, t) -> 0.0, 2)
+dbc2 = Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 0.0, 1)
+add!(ch, dbc1)
+add!(ch, dbc2)
+close!(ch)
+update!(ch, 0.0);
 
-    stiffmat = get_material(E = 100, ν = 0.3)
-    traction = Vec((-10.0, 0.0))
-    K,f = assemble_problem(dh, grid, cv, fv, stiffmat, traction)
+stiffmat = get_material(E=100, ν=0.3)
+traction = Vec((-10.0, 0.0))
+K, f = assemble_problem(dh, grid, cv, fv, stiffmat, traction);
 
-    apply!(K, f, ch)
-    u = K\f
+apply!(K, f, ch)
+u = K \ f;
 
-    cellstresses = calculate_stress(dh, cv, stiffmat, u)
+cellstresses = calculate_stress(dh, cv, stiffmat, u);
 
-    IGA.VTKIGAFile("plate_with_hole.vtu", grid) do vtk
-        write_solution(vtk, dh, u)
-        #IGA.write_projections(vtk, projector, σ_nodes, "σ")
-    end
-
+IGA.VTKIGAFile("plate_with_hole.vtu", grid) do vtk
+    write_solution(vtk, dh, u)
+    #IGA.write_projections(vtk, projector, σ_nodes, "σ")
 end;
 
-solve()
-
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
-
