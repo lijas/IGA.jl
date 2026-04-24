@@ -117,7 +117,7 @@ include("VTK.jl")
 include("iterators.jl")
 include("iterators_future.jl")
 include("apply_analytical_iga.jl")
-#include("L2_projection.jl")
+include("L2_projection.jl")
 
 Ferrite._mass_qr(::IGAInterpolation{shape,order}) where {shape,order}= Ferrite._mass_qr(Bernstein{shape, order}())
 Ferrite._mass_qr(::Bernstein{RefQuadrilateral, 2}) = QuadratureRule{RefQuadrilateral}(2+1)
