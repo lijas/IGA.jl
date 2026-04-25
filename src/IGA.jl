@@ -16,7 +16,6 @@ using WriteVTK
 using LinearAlgebra
 using StaticArrays
 import SparseArrays
-import ForwardDiff
 
 export IGAInterpolation
 export BezierExtractionOperator

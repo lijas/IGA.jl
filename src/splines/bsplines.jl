@@ -37,51 +37,36 @@ function Ferrite.reference_shape_value(b::BSplineBasis{dim,T,order}, xi::Vec{dim
 end
 
 """
-Algorithm for calculating one basis functions value, using Cox-debor recursion formula
-    From NURBS-book, alg2.?
+Evaluate a single B-spline basis function
 """
-function _bspline_basis_value_alg1(p::Int, knot::Vector{Float64}, i::Int, xi::T) where {T}
+function _bspline_basis_value_alg1(p::Int, knot::AbstractVector{<:Real}, i::Int, xi::T) where {T}
 
-    #TODO: How to handle Dual numbers without importing ForwardDiff?
-    __value(x::Number) = x
-    __value(x::ForwardDiff.Dual) = ForwardDiff.value(x)
-    __value(x::ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual,<:Any}) = ForwardDiff.value(ForwardDiff.value(x))
-	if p>0
-	    _N1_1 = (xi - knot[i])*_bspline_basis_value_alg1(p-1, knot, i, xi)
-	    _N1_2 = (knot[i+p]-knot[i])
-	     
+    if p > 0
+        # First term
+        denom1 = knot[i+p] - knot[i]
+        term1 = if iszero(denom1)
+            zero(T)
+        else
+            (xi - knot[i]) * _bspline_basis_value_alg1(p-1, knot, i, xi) / denom1
+        end
 
-	    if __value(_N1_2) == 0.0 && __value(_N1_1) == 0.0
-	    	_N1 = T(0.0)
-	    else
-	    	_N1 = (_N1_1/_N1_2)
-	    end
+        # Second term
+        denom2 = knot[i+p+1] - knot[i+1]
+        term2 = if iszero(denom2)
+            zero(T)
+        else
+            (knot[i+p+1] - xi) * _bspline_basis_value_alg1(p-1, knot, i+1, xi) / denom2
+        end
 
-	    _N2_1 = (knot[i+p+1] - xi)*_bspline_basis_value_alg1(p-1, knot, i+1, xi)
-	    _N2_2 = (knot[i+p+1] - knot[i+1])
-	       
-	    if  __value(_N2_2) == 0.0 &&  __value(_N2_1) == 0.0
-	    	_N2 = T(0.0)
-	    else
-	    	_N2 = (_N2_1/_N2_2)
-	    end
-	    return _N1+_N2
-	else
-		#Special case at end points for some reason
-		if knot[i+1] < knot[end]
-			if knot[i] <= __value(xi) && __value(xi) < knot[i+1]
-				return T(1.0)
-			else
-				return T(0.0)
-			end
-		else
-			if knot[i] <= __value(xi)
-				return T(1.0)
-			else
-				return T(0.0)
-			end
-		end
-	end
+        return term1 + term2
+    else
+        # Base case (indicator function)
+        if knot[i+1] < knot[end]
+            return (knot[i] <= xi < knot[i+1]) ? one(T) : zero(T)
+        else
+            return (knot[i] <= xi) ? one(T) : zero(T)
+        end
+    end
 end
 
 """
@@ -155,24 +140,3 @@ function _find_span(n::Int ,p::Int,u::T,U::Vector{T}) where T
     return span
 end
 
-"""
-Algorithm that finds non zero basis function for u (xi)
-NURBS book alg2.2.    
-"""    
-function _eval_nonzero_bspline_values!(N, i, u, p, U)
-    error("TODO")
-    N[begin] = 1.0
-    left = similar(N)
-    right = similar(N)
-    for j = 1:p
-        left[begin+j] = u-U[begin+i+1-j]
-        right[begin+j] = U[begin+i+j] - u
-        saved = 0.0
-        for r = 0:(j-1)
-            tmp = N[begin+r]/(right[begin+r+1]+left[begin+j-r])
-            N[begin+r] = saved+right[begin+r+1]*tmp
-            saved = left[begin+j-r]*tmp
-        end
-        N[end] = saved
-    end
-end
