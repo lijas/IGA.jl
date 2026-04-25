@@ -476,7 +476,7 @@ function _compute_intermidiate!(tmp_values::FunctionValues{DIFFORDER}, bezier_va
         end
     end
 
-    #uses tensor products for vector valued shape functions or scalar otherwise
+    #uses tensor products for vector valued spline functions or scalar otherwise
     is_vector_valued = (first(tmp_values.Nξ) isa Vec)
     for j in 1:getnbasefunctions(tmp_values)
         tmp_values.Nξ[j,q_point] = bezier_values.Nξ[j, q_point]/W
