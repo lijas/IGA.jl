@@ -4,3 +4,7 @@ docs/src/examples/
 *.vtk
 Manifest.toml
 #*.png
+
+# Local Ferrite reference checkout (not part of IGA.jl)
+Ferrite.jl-master/
+.gitignore
