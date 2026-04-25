@@ -449,10 +449,6 @@ function _bezier_transform(nurbs::FunctionValues{DIFFORDER}, bezier::FunctionVal
     end
 end
 
-#helpers to make IGA comptabile with new Ferrite otimes
-@inline _otimes_helper(x::Number, dMdξ::Vec) = x * dMdξ
-@inline _otimes_helper(x::Vec, y::Vec) = x ⊗ y
-
 function _compute_intermidiate!(tmp_values::FunctionValues{0}, bezier_values::FunctionValues{0}, geom_values::GeometryMapping, q_point::Int, w::Vector{T}) where {T}
     W = zero(T)
     for j in 1:Ferrite.getngeobasefunctions(geom_values)
@@ -479,14 +475,20 @@ function _compute_intermidiate!(tmp_values::FunctionValues{DIFFORDER}, bezier_va
             d2Wdξ2 += w[j]*geom_values.d2Mdξ2[j, q_point]
         end
     end
+
+    #uses tensor products for vector valued shape functions or scalar otherwise
+    is_vector_valued = (first(tmp_values.Nξ) isa Vec)
     for j in 1:getnbasefunctions(tmp_values)
         tmp_values.Nξ[j,q_point] = bezier_values.Nξ[j, q_point]/W
         if DIFFORDER > 0
-            tmp_values.dNdξ[j, q_point] = ( bezier_values.dNdξ[j, q_point]*W - _otimes_helper(bezier_values.Nξ[j, q_point], dWdξ) ) / W^2
+            if is_vector_valued
+                tmp_values.dNdξ[j, q_point] = (bezier_values.dNdξ[j, q_point] * W - (bezier_values.Nξ[j, q_point] ⊗ dWdξ)) / W^2
+            else
+                tmp_values.dNdξ[j, q_point] = (bezier_values.dNdξ[j, q_point] * W - bezier_values.Nξ[j, q_point] * dWdξ) / W^2
+            end
         end
 
         if DIFFORDER > 1
-            is_vector_valued = (first(tmp_values.Nξ) isa Vec)
             if is_vector_valued
                 _B      = bezier_values.Nξ[j, q_point]
                 _dBdξ   = bezier_values.dNdξ[j, q_point]
@@ -534,11 +536,11 @@ function Ferrite.calculate_mapping(geo_mapping::Ferrite.GeometryMapping{1}, q_po
         dWdξ   += w[j]*geo_mapping.dMdξ[j, q_point]
     end
     
-    fecv_J = _otimes_helper(first(x), first(geo_mapping.dMdξ)) |> typeof |> zero
+    fecv_J = (first(x) ⊗ first(geo_mapping.dMdξ)) |> typeof |> zero
     for j in 1:Ferrite.getngeobasefunctions(geo_mapping)
         dRdξ = (geo_mapping.dMdξ[j, q_point]*W - geo_mapping.M[j, q_point]*dWdξ)/W^2
         #fecv_J += x[j] ⊗ (w[j]*dRdξ)
-        fecv_J += _otimes_helper(x[j], w[j]*dRdξ)
+        fecv_J += x[j] ⊗ (w[j]*dRdξ)
     end
     return Ferrite.MappingValues(fecv_J, nothing)
 end
