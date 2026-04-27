@@ -536,7 +536,7 @@ function Ferrite.calculate_mapping(geo_mapping::Ferrite.GeometryMapping{1}, q_po
         dWdξ   += w[j]*geo_mapping.dMdξ[j, q_point]
     end
     
-    fecv_J = (first(x) ⊗ first(geo_mapping.dMdξ)) |> typeof |> zero
+    fecv_J = zero(Ferrite.otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
     for j in 1:Ferrite.getngeobasefunctions(geo_mapping)
         dRdξ = (geo_mapping.dMdξ[j, q_point]*W - geo_mapping.M[j, q_point]*dWdξ)/W^2
         #fecv_J += x[j] ⊗ (w[j]*dRdξ)
