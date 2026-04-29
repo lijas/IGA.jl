@@ -204,10 +204,10 @@ u = K \ f;
 cellstresses = calculate_stress(dh, cv, stiffmat, u);
 
 # L2 projections currently broken for IGA
-# projector = L2Projector(ip_u, grid)
-# σ_nodes = project(projector, cellstresses, qr_cell)
+projector = L2Projector(ip_u, grid)
+σ_nodes = project(projector, cellstresses, qr_cell)
 
 IGA.VTKIGAFile("plate_with_hole.vtu", grid) do vtk
     write_solution(vtk, dh, u)
-    #IGA.write_projections(vtk, projector, σ_nodes, "σ")
+    write_projection(vtk, projector, σ_nodes, "σ")
 end;

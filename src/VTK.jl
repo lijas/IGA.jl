@@ -139,8 +139,7 @@ function Ferrite.write_solution(vtk::VTKIGAFile, dh::DofHandler, a, suffix="")
 end
 
 function Ferrite.write_projection(vtk::VTKIGAFile, proj::L2Projector, vals, name)
-    data = Ferrite._evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
-    @assert size(data, 2) == getnnodes(Ferrite.get_grid(proj.dh))
+    data = _evaluate_at_grid_nodes_iga(proj, vals, #=vtk=# Val(true), vtk.vtk.Npts)::Matrix
     vtk_point_data(vtk.vtk, data, name; component_names=Ferrite.component_names(eltype(vals)))
     return vtk
 end
@@ -188,9 +187,9 @@ function _evaluate_at_geometry_nodes!(
 	# TODO: Remove this hack when embedding works...
 	RT = ip isa ScalarInterpolation ? T : Vec{Ferrite.n_components(ip),T}
 	if ip isa VectorizedInterpolation
-		cv = CellValues(qr, ip.ip, ip_geo)
+		cv = CellValues(qr, ip.ip, ip_geo; update_detJdV = false, update_gradients = false)
 	else
-		cv = CellValues(qr, ip, ip_geo)
+		cv = CellValues(qr, ip, ip_geo; update_detJdV = false, update_gradients = false)
 	end
 
     _evaluate_at_geometry_nodes!(data, sdh, a, cv, drange, vtk.cellset, RT)
@@ -222,7 +221,7 @@ function _evaluate_at_geometry_nodes!(data, sdh, a::Vector{T}, cv, drange, cells
     for cellid in cellset
         getcoordinates!(bcoords, dh.grid, cellid)
 
-		reinit_values!(cv, bcoords)
+		reinit!(cv, bcoords)
 
         celldofs!(dofs, sdh, cellid)
 		for (i, I) in pairs(drange)
@@ -244,5 +243,69 @@ function _evaluate_at_geometry_nodes!(data, sdh, a::Vector{T}, cv, drange, cells
         offset += n_eval_points
     end
 
+    return data
+end
+
+function _evaluate_at_grid_nodes_iga(
+        proj::L2Projector, vals::AbstractVector{S}, ::Val{vtk}, nviznodes
+    ) where {order, dim, T, M, S <: Union{Tensor{order, dim, T, M}, SymmetricTensor{order, dim, T, M}}, vtk}
+    dh = proj.dh
+    # The internal dofhandler in the projector is a scalar field, but the values in vals
+    # can be any tensor field, however, the number of dofs should always match the length of vals
+    @assert ndofs(dh) == length(vals)
+    if vtk
+        nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
+        data = fill(T(NaN), nout, nviznodes)
+    else
+        data = fill(T(NaN) * zero(S), nviznodes)
+    end
+    for sdh in dh.subdofhandlers
+        ip = only(sdh.field_interpolations)
+        gip = geometric_interpolation(getcelltype(sdh))
+        RefShape = getrefshape(ip)
+        local_node_coords = Ferrite.reference_coordinates(gip)
+        qr = QuadratureRule{RefShape}(zeros(length(local_node_coords)), local_node_coords)
+        cv = BezierCellValues(qr, ip, gip; update_detJdV = false, update_gradients = false)
+        _evaluate_at_grid_nodes_iga!(data, cv, sdh, vals)
+    end
+    return data
+end
+
+
+function _evaluate_at_grid_nodes_iga!(data, cv::BezierCellValues, sdh::SubDofHandler, u::AbstractVector{S}) where {S}
+    ue = zeros(S, getnbasefunctions(cv))
+	bcoords = getcoordinates(sdh.dh.grid, first(sdh.cellset))
+	dofs = zeros(Int, ndofs_per_cell(sdh))
+	offset = 0
+	nnodes = length(bcoords.x)
+    for cellid in sdh.cellset
+        getcoordinates!(bcoords, sdh.dh.grid, cellid)
+		celldofs!(dofs, sdh, cellid)
+		reinit!(cv, bcoords)
+        for (i, I) in pairs(dofs)
+            ue[i] = u[I]
+        end
+
+		cellnodes = (1:nnodes) .+ offset
+
+        for (qp, nodeid) in pairs(cellnodes)
+            # Loop manually over the shape functions since function_value
+            # doesn't like scalar base functions with tensor dofs
+            val = zero(S)
+            for i in 1:getnbasefunctions(cv)
+                val += shape_value(cv, qp, i) * ue[i]
+            end
+
+            if data isa Matrix # VTK
+                dataview = @view data[:, nodeid]
+                fill!(dataview, 0) # purge the NaN
+                Ferrite.toparaview!(dataview, val)
+            else
+                data[nodeid] = val
+            end
+        end
+
+		offset += nnodes
+    end
     return data
 end
