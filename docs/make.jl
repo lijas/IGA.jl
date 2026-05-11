@@ -1,5 +1,5 @@
 using Documenter
-using IGA
+using FerriteIGA
 
 include("generate.jl")
 
@@ -9,10 +9,9 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     )]
 
 makedocs(
-    sitename = "IGA",
+    sitename = "FerriteIGA",
     format = Documenter.HTML(),
     doctest = false,
-    #modules = [IGA],
     warnonly = true,
     pages = Any[
         "Home" => "index.md",
@@ -28,7 +27,7 @@ makedocs(
     repo = "<repository url>"
 )=#
 deploydocs(
-    repo = "github.com/lijas/IGA.jl.git",
+    repo = "github.com/ferrite-fem/FerriteIGA.jl.git",
     push_preview=true,
     devbranch = "master"
 )

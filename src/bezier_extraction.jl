@@ -177,17 +177,17 @@ end
 function diagonal_beo(N::Int)
     beo = BezierExtractionOperator{Float64}(undef, N)
     for i in 1:N
-        V = IGA.SparseArrays.sparsevec([i], [1.0], N)
+        V = SparseArrays.sparsevec([i], [1.0], N)
         beo[i] = V
     end
     return beo
 end
 
-function combine_beo(a::IGA.BezierExtractionOperator{Float64}, b::IGA.BezierExtractionOperator{Float64})
+function combine_beo(a::BezierExtractionOperator{Float64}, b::BezierExtractionOperator{Float64})
     la = length(a)
     lb = length(b)
     ntotal = la+lb
-    beo = IGA.BezierExtractionOperator{Float64}()
+    beo = BezierExtractionOperator{Float64}()
     for i in 1:la
         newrow = SparseArrays.sparsevec(a[i].nzind, a[i].nzval, ntotal)
         push!(beo, newrow)

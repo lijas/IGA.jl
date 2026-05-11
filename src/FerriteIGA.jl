@@ -1,4 +1,4 @@
-module IGA
+module FerriteIGA
 
 using Reexport
 

@@ -2,13 +2,13 @@
     order = 3
     knots = Float64[0,0,0,0, 1,2,3, 4,4,4,4]
 
-    C,nbe = IGA.compute_bezier_extraction_operators((order,), (knots,))
+    C,nbe = FerriteIGA.compute_bezier_extraction_operators((order,), (knots,))
     
     #From article about bezier extraction
     #Test univariate bspline extraction
     @test nbe == 4
     @test length(C) == 4
-    ordering = IGA._bernstein_ordering(Bernstein{RefLine, order}())
+    ordering = FerriteIGA._bernstein_ordering(Bernstein{RefLine, order}())
     @test all(C[1] .≈ Float64[1 0 0 0; 0 1 0.5 1/4; 0 0 1/2 7/12; 0 0 0 1/6][ordering,ordering])
     @test all(C[2] .≈ Float64[1/4 0 0 0; 7/12 2/3 1/3 1/6; 1/6 1/3 2/3 2/3; 0 0 0 1/6][ordering,ordering])
     @test all(C[3] .≈ Float64[1/6 0 0 0; 2/3 2/3 1/3 1/6; 1/6 1/3 2/3 7/12; 0 0 0 1/4][ordering,ordering])
@@ -17,8 +17,8 @@
     #Test multivariate extraction operator
     order = 2
     knots = (Float64[0,0,0,1/3,2/3,1,1,1], Float64[0,0,0,1/3,2/3,1,1,1])
-    C,nbe = IGA.compute_bezier_extraction_operators((order,order), knots)
-    ordering = IGA._bernstein_ordering(Bernstein{RefQuadrilateral, order}())
+    C,nbe = FerriteIGA.compute_bezier_extraction_operators((order,order), knots)
+    ordering = FerriteIGA._bernstein_ordering(Bernstein{RefQuadrilateral, order}())
     @test nbe == 9
     @test length(C) == 9
     @test all(C[1] .≈ kron( [1 0 0; 0 1 1/2; 0 0 1/2], [1 0 0; 0 1 1/2; 0 0 1/2])[ordering,ordering])
@@ -37,7 +37,7 @@ end
 
     grid = BezierGrid(mesh)
     
-    reorder = IGA._bernstein_ordering(Ferrite.getcelltype(grid))
+    reorder = FerriteIGA._bernstein_ordering(Ferrite.getcelltype(grid))
     
     #Element 1
     x_paper = [Vec((0.0, 1.0)), Vec((0.2612, 1.0)), Vec((0.4890, 0.8723)), Vec((0.0, 1.25)), Vec((0.3265, 1.25)), Vec((0.6113, 1.0903)), Vec((0.0, 1.5)), Vec((0.3918, 1.5)), Vec((0.7336, 1.3084))][reorder]
@@ -94,15 +94,15 @@ bc = getcoordinates(grid, 3)
         0.0  0.5  0.5   0.5   0.5  0.0;
         0.0  0.0  0.25  0.25  0.5  1.0]
 
-    Cvec = IGA.bezier_extraction_to_vector(C)
+    Cvec = FerriteIGA.bezier_extraction_to_vector(C)
     answer = [Vec((0.0, -1.0)), Vec((0.0, -0.5)), Vec((0.0, 0.0)), Vec((0.0, 0.0)), Vec((0.0, 0.5)), Vec((0.0, 1.0))]
 
     #Vec form
-    Xnew = IGA.compute_bezier_points(Cvec, X)
+    Xnew = FerriteIGA.compute_bezier_points(Cvec, X)
     @test all(Xnew .≈ answer)
 
     #array form
     XX = collect(reinterpret(Float64,X))
-    Xnew = IGA.compute_bezier_points(Cvec, XX, dim=2)
+    Xnew = FerriteIGA.compute_bezier_points(Cvec, XX, dim=2)
     @test all(Xnew .≈ reinterpret(Float64, answer))
 end

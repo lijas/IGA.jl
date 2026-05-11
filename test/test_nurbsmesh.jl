@@ -27,7 +27,7 @@ end
     @test all(w .== 1.0)
 
     C = get_extraction_operator(bgrid, cellid)
-    @test IGA.beo2matrix(C) == diagm(ones(Float64, nnodes))
+    @test FerriteIGA.beo2matrix(C) == diagm(ones(Float64, nnodes))
 
     @test getncells(bgrid) == getncells(grid)
     @test getnnodes(bgrid) == getnnodes(grid)

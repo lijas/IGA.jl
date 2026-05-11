@@ -135,39 +135,6 @@ function Ferrite.reference_shape_value(ip::Bernstein{RefHexahedron,2}, _ξ::Vec{
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-#=
-# Code for computing higher dim and order Bernstein 
-  polynomials, e.g see function value(::Bernstein{RefQuadrilateral, 2}, ::Int, ξ)
-
-using Symbolics
-
-@variables ξ η ζ
-
-order = (2,2,2)
-ip = Bernstein{RefHexahedron,order}()
-ordering = IGA._bernstein_ordering(ip)
-
-cindex = CartesianIndices(order.+1)
-N = []
-c = 0
-for lindex in ordering
-    i = cindex[lindex][1]
-    j = cindex[lindex][2]
-    k = cindex[lindex][3]
-    
-    Ni = IGA._bernstein_basis_recursive(order[1], i, ξ)
-    Nj = IGA._bernstein_basis_recursive(order[2], j, η)
-    Nk = IGA._bernstein_basis_recursive(order[3], k, ζ)
-
-    _N = simplify(Ni*Nj*Nk)
-
-    c +=1 
-    println("i == $c && return $(_N)")
-    push!(N, _N)
-end
-
-=#
-
 function Ferrite.reference_shape_value(ip::Bernstein{refshape,order}, _ξ::Vec{dim}, i::Int) where {dim,refshape<:Ferrite.AbstractRefShape{dim},order}
     _compute_bezier_reference_shape_value(ip,_ξ, i)
 end
@@ -179,7 +146,7 @@ function _compute_bezier_reference_shape_value(ip::Bernstein{shape,order}, ξ::V
 
     val = one(T)
     for i in 1:dim
-        val *= IGA._bernstein_basis_recursive(order, basefunction_indeces[i], ξ[i])
+        val *= _bernstein_basis_recursive(order, basefunction_indeces[i], ξ[i])
     end
     return val
 end

@@ -1,9 +1,4 @@
 export generate_nurbs_patch
-#To see mesh of generated nurbs geometry:
-# mesh = IGA.generate_doubly_curved_nurbsmesh((20,20), (2,2), r1 = 25.0, r2 = 3.0, α1 = pi/2, α2 = pi)
-# grid = BezierGrid(mesh)
-# vtkfile = IGA.vtk_grid("test_curved2", grid)
-# IGA.vtk_save(vtkfile)
 
 function _create_knotvector(T, nelx, p, m)
 	nbasefunks_x= nelx+p
@@ -128,7 +123,7 @@ function generate_nurbs_patch(::Val{:hypercube}, nel::NTuple{3,Int}, orders::NTu
 		end
 	end
 
-	return IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	return NURBSMesh(Tuple(knot_vectors), orders, control_points)
 end
 
 function generate_nurbs_patch(::Val{:hypercube}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; cornerpos::NTuple{2,T} = (0.0,0.0), size::NTuple{2,T}, multiplicity::NTuple{2,Int}=(1,1), sdim::Int=2) where T
@@ -159,7 +154,7 @@ function generate_nurbs_patch(::Val{:hypercube}, nel::NTuple{2,Int}, orders::NTu
 		end
 	end
 
-	return IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	return NURBSMesh(Tuple(knot_vectors), orders, control_points)
 
 end
 
@@ -181,139 +176,7 @@ function generate_nurbs_patch(::Val{:hypercube}, nel::NTuple{1,Int}, orders::NTu
 		push!(control_points, Vec{sdim,T}(v))
 	end
 
-	return IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
-end
-
-function generate_nurbs_patch(::Val{:hemisphere}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; α1::NTuple{2,T}, α2::NTuple{2,T}, R::T, multiplicity::NTuple{2,Int}=(1,1)) where T
-    @assert(0.0 <= α2[1] &&  α2[2] <= pi/2)
-
-	pdim = 2
-	sdim = 3
-
-	knot_vectors = [_create_knotvector(T, nel[d], orders[d], multiplicity[d]) for d in 1:pdim]
-	nbasefuncs = [(length(knot_vectors[i])-1-orders[i]) for i in 1:pdim]
-    anglesx = _generate_linear_parametrization(knot_vectors[1], orders[1], α1[1], α1[2]) 
-    anglesy = _generate_linear_parametrization(knot_vectors[2], orders[2], α2[1], α2[2]) 
-	
-	control_points = Vec{sdim,T}[]
-	for θ in anglesx
-		for φ in anglesy
-
-            x = r*cos(θ)*sin(φ)
-            y = r*sin(θ)*sin(φ)
-            z = r*cos(φ)
-
-			push!(control_points, Vec{sdim,T}((x,y,z)))
-		end
-	end
-
-	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
-	
-    return mesh
-
-end
-
-function generate_nurbs_patch(::Val{:nasa_specimen}, nel_bend::NTuple{2,Int}, orders::NTuple{2,Int}; L1::T, R::T, w::T, multiplicity::NTuple{2,Int}) where {T}
-
-	pdim = 2
-	sdim = 3
-
-	kv_bend = _create_knotvector(T, nel_bend[1], orders[1], multiplicity[1])
-	nbasefuncs_bend = [(length(kv_bend[i])-1-orders[i]) for i in 1:pdim]
-
-	elbow = collect(_generate_equidistant_parametrization(kv_bend, orders[1], 0.0, π/2))
-	reverse!(elbow)
-
-	cp_inplane = Vec{sdim,T}[]
-	
-	#First create the points inplane, and then extrude it
-	for θ in elbow
-		x = -R*cos(θ) + R
-		z = -R*sin(θ) + R
-		push!(cp_inplane, Vec((x,0.0,z)))
-	end
-	
-	cp_dist = abs(elbow[end÷2] - elbow[(end÷2) - 1]) * R
-	straght = collect((R+cp_dist):cp_dist:(R+L1))
-	
-	for x in (straght)
-		pushfirst!(cp_inplane, Vec((x, 0.0, 0.0)))
-	end
-
-	for z in (straght)
-		push!(cp_inplane, Vec((0.0, 0.0, z)))
-	end
-	
-	#...extrusion
-	kv_y = _create_knotvector(T, nel_bend[2], orders[2], multiplicity[2])
-	width_points = _generate_linear_parametrization(kv_y, orders[2], -w/2, w/2) 
-
-	control_points = Vec{sdim,T}[]
-	for y in width_points
-		for xz in cp_inplane
-			push!(control_points, Vec(xz[1], y, xz[3]))
-		end
-	end
-
-	#Since it is not clear how many elements exist in x-direction, recreate the knotvector along specimen
-	nbasefuncs = length(cp_inplane)
-	nelx = nbasefuncs - orders[1]
-	kv_x = _create_knotvector(T, nelx, orders[1], multiplicity[1])
-
-	#Rotate everything 45 degrees
-	θ = deg2rad(45.0 + 90.0)
-	Rotmat = [cos(θ) 0.0 sin(θ); 0.0 1.0 0.0; -sin(θ) 0.0 cos(θ)] |> Tuple |> Tensor{2,3}
-	for i in eachindex(control_points)
-		control_points[i] = Rotmat ⋅ control_points[i]
-	end
-
-	return IGA.NURBSMesh(Tuple([kv_x,kv_y]), orders, control_points)
-end
-
-function generate_nurbs_patch(::Val{:nasa_specimen}, nel_bend::NTuple{1,Int}, orders::NTuple{1,Int}; L1::T, R::T, multiplicity::NTuple{1,Int}=(1,)) where {T}
-
-	pdim = 1
-	sdim = 2
-
-	kv_bend = _create_knotvector(T, nel_bend[1], orders[1], multiplicity[1])
-	nbasefuncs_bend = [(length(kv_bend[i])-1-orders[i]) for i in 1:pdim]
-
-	elbow = collect(_generate_equidistant_parametrization(kv_bend, orders[1], 0.0, π/2))
-	reverse!(elbow)
-
-	cp_inplane = Vec{sdim,T}[]
-	
-	#First create the points inplane, and then extrude it
-	for θ in elbow
-		x = -R*cos(θ) + R
-		z = -R*sin(θ) + R
-		push!(cp_inplane, Vec((x,z)))
-	end
-	
-	cp_dist = abs(elbow[end÷2] - elbow[(end÷2) - 1]) * R
-	straght = collect((R+cp_dist):cp_dist:(R+L1))
-	
-	for x in (straght)
-		pushfirst!(cp_inplane, Vec((x, 0.0)))
-	end
-
-	for z in (straght)
-		push!(cp_inplane, Vec((0.0, z)))
-	end
-
-	#Since it is not clear how many elements exist in x-direction, recreate the knotvector along specimen
-	nbasefuncs = length(cp_inplane)
-	nelx = nbasefuncs - orders[1]
-	kv_x = _create_knotvector(T, nelx, orders[1], multiplicity[1])
-	
-	#Rotate everything 45 degrees
-	θ = deg2rad(45.0 + 90.0)
-	Rotmat = [cos(θ) sin(θ);-sin(θ) cos(θ)] |> Tuple |> Tensor{2,2}
-	for i in eachindex(cp_inplane)
-		cp_inplane[i] = Rotmat ⋅ cp_inplane[i]
-	end
-
-	return IGA.NURBSMesh((kv_x,), orders, cp_inplane)
+	return NURBSMesh(Tuple(knot_vectors), orders, control_points)
 end
 
 function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{3,Int}, orders::NTuple{3,Int}; α::T, R::T, width::T, thickness::T, multiplicity::NTuple{3,Int}=(1,1,1)) where T
@@ -347,7 +210,7 @@ function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{3,Int}, orders:
 		end
 	end
 
-	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	mesh = NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
     return mesh
 
@@ -376,7 +239,7 @@ function generate_nurbs_patch(::Val{:singly_curved}, nel::NTuple{2,Int}, orders:
 		end
 	end
 
-	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	mesh = NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
     return mesh
 
@@ -409,7 +272,7 @@ function generate_nurbs_patch(::Val{:singly_curved_shell}, nel::NTuple{2,Int}, o
 		end
 	end
 
-	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	mesh = NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
     return mesh
 
@@ -435,7 +298,7 @@ function generate_nurbs_patch(::Val{:singly_curved_beam}, nel::NTuple{1,Int}, or
 		push!(control_points, Vec{sdim,T}((_v...,)))
 	end
 
-	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	mesh = NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
     return mesh
 
@@ -475,7 +338,7 @@ function generate_nurbs_patch(::Val{:doubly_curved}, nel::NTuple{2,Int}, orders:
 		end
 	end
 
-	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points)
+	mesh = NURBSMesh(Tuple(knot_vectors), orders, control_points)
 	
     return mesh
 
@@ -526,47 +389,11 @@ function generate_nurbs_patch(::Val{:doubly_curved_nurbs}, nel::NTuple{2,Int}; r
 		knotinsertion!(knot_vectors, orders, control_points, weigts, η, dir=2)
 	end
 
-	mesh = IGA.NURBSMesh(knot_vectors, orders, control_points, weigts)
+	mesh = NURBSMesh(knot_vectors, orders, control_points, weigts)
 	
     return mesh
 
 end
-
-#=function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int}, orders::NTuple{2,Int}; width::T, radius::T, multiplicity::NTuple{2,Int}=(1,1)) where T
-
-	@assert( orders[1] >=2 && orders[2] >=2 ) 
-
-	kvxi = _create_knotvector(T, nel[1]*2, orders[1], multiplicity[1]) 
-	kveta = _create_knotvector(T, nel[2], orders[2], multiplicity[2]) 
-	nbfxi = length(kvxi)-1-orders[1]
-	nbfeta = length(kveta)-1-orders[2]
-
-
-	coordsx = range(-radius, stop=-width, length=nbfeta)
-	scale = log.(range(0.63, stop = 1.0, length=nbfeta)) .+ 1.0
-
-	control_points = Vec{2,T}[]
-	for (ix,xx) in enumerate(coordsx)
-		diag = abs(xx)
-		coordsy = range(0.0, stop = diag * scale[ix], length = floor(Int,nbfxi/2))
-
-		#Up
-		for yy in coordsy
-			push!(control_points, Vec((xx, yy)))
-		end
-
-		if isodd(nbfxi)
-			push!(control_points, Vec( (diag, diag) ))
-		end
-
-		#Right
-		for yy in reverse(coordsy)
-			push!(control_points, Vec( (-yy, abs(xx))) )
-		end
-	end
-
-	mesh = IGA.NURBSMesh((kvxi, kveta), orders, control_points)
-end=#
 
 function generate_nurbs_patch(::Val{:plate_with_hole}, nel::NTuple{2,Int}, orders::NTuple{2,Int})
 	@assert orders[1]==2 && orders[2]==2
@@ -644,7 +471,7 @@ function generate_nurbs_patch(::Val{:ring}, nel::NTuple{2,Int}, orders::NTuple{2
 	                Float64[-1, -1, -1, 1, 1, 1])
 	
 
-	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, cp, w)
+	mesh = NURBSMesh(Tuple(knot_vectors), orders, cp, w)
 	
     return mesh
 end
@@ -723,43 +550,7 @@ function generate_nurbs_patch(::Val{:cylinder_sector}, nel::NTuple{3,Int}, order
 		end
 	end
 
-	mesh = IGA.NURBSMesh(Tuple(knot_vectors), orders, control_points, weights)
+	mesh = NURBSMesh(Tuple(knot_vectors), orders, control_points, weights)
 	
     return mesh
-end
-
-function get_nurbs_griddata(orders::NTuple{pdim,Int}, knot_vectors::NTuple{pdim,Vector{T}}, control_points::Vector{Vec{sdim,T}}) where {sdim,pdim,T}
-	
-	#get mesh data in CALFEM/Matrix format
-	nbasefuncs = length.(knot_vectors) .- orders .- 1
-	nel, nnp, nen, INN, IEN = generate_nurbs_meshdata(orders, nbasefuncs)
-	
-	@assert(prod(nbasefuncs)==maximum(IEN))
-
-	#Remove elements which are zero length
-	to_remove = Int[]
-	for e in 1:nel
-		nurbs_coords = [INN[IEN[1,e],d] for d in 1:pdim]
-		for d in 1:pdim
-			if knot_vectors[d][nurbs_coords[d]] == knot_vectors[d][nurbs_coords[d]+1]
-				push!(to_remove, e)
-				break
-			end
-		end
-	end
-	to_keep = setdiff(collect(1:nel), to_remove)
-	IEN = IEN[:, to_keep] #IEN = IEN[end:-1:1, to_keep]
-	nel = size(IEN, 2)
-
-	#Create cells and nodes
-	ncontrolpoints = length(IEN[:,1])
-	nodes = [Ferrite.Node(x) for x in control_points]
-
-	@assert allequal(orders)
-	order = first(orders)
-	N = (order+1)^pdim
-	_BezierCell = BezierCell{RefHypercube{pdim},order,N}
-	cells = [_BezierCell(Tuple(reverse(IEN[:,ie]))) for ie in 1:nel]
-
-	return cells, nodes
 end

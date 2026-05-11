@@ -1,4 +1,4 @@
-# IGA.jl
+# FerriteIGA.jl
 
 Small toolbox for Isogeometric analysis. Built on top of [Ferrite](https://github.com/Ferrite-FEM/Ferrite.jl)
 
@@ -9,17 +9,17 @@ Small toolbox for Isogeometric analysis. Built on top of [Ferrite](https://githu
 ## Installation
 
 ```
-Pkg.add(url="https://github.com/lijas/IGA.jl",rev="master")
+Pkg.add(url="https://github.com/Ferrite-FEM/FerriteIGA.jl",rev="master")
 ```
 
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
-[docs-dev-url]: https://lijas.github.io/IGA.jl/dev/
+[docs-dev-url]: https://ferrite-fem.github.io/FerriteIGA.jl/dev/
 
 ## Quick start
 The API is similar to Ferrite.jl:
 
 ```
-using Ferrite, IGA
+using Ferrite, FerriteIGA
 
 order = 2 # second order NURBS
 nels = (20,10) # Number of elements

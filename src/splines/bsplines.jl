@@ -3,7 +3,7 @@ export BSplineBasis
 """
 BSplineBasis{dim,T,order} <: Ferrite.ScalarInterpolation{RefHypercube{dim}, order}
     
-    Not really used in FE-codes. We use it for testing in IGA.jl
+    Not really used in FE-codes. We use it for testing in FerriteIGA.jl
 """
 struct BSplineBasis{dim,T,order} <: Ferrite.ScalarInterpolation{RefHypercube{dim}, order}
 	knot_vector::NTuple{dim,Vector{T}}
@@ -31,7 +31,7 @@ function Ferrite.reference_shape_value(b::BSplineBasis{dim,T,order}, xi::Vec{dim
     indecies = CartesianIndices(_n)[i]
     val = one(T2)
     for i in 1:dim
-        val *= IGA._bspline_basis_value_alg1(order[i], b.knot_vector[i], indecies[i], xi[i])
+        val *= _bspline_basis_value_alg1(order[i], b.knot_vector[i], indecies[i], xi[i])
     end
     return val
 end

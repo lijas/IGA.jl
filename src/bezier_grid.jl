@@ -62,7 +62,7 @@ function BezierGrid(grid::Ferrite.Grid{dim,C,T}) where {dim,C,T}
 	extraction_operator = BezierExtractionOperator{T}[]
 	for cellid in 1:getncells(grid)
 		nnodes = length(grid.cells[cellid].nodes)
-		beo = IGA.diagonal_beo(nnodes)
+		beo = diagonal_beo(nnodes)
 		push!(extraction_operator, beo)
 	end
 

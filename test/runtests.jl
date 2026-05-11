@@ -1,4 +1,4 @@
-using IGA
+using FerriteIGA
 using Ferrite
 using Test
 

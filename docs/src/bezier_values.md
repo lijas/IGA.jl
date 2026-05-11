@@ -1,3 +1,3 @@
 # BezierValues.jl
 
-Documentation for IGA.jl
+Documentation for FerriteIGA.jl

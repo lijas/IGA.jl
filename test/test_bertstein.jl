@@ -35,23 +35,23 @@
         for xi in [rand(Vec{dim,Float64}), rand(Vec{dim,Float64})]
             for i in  1:Ferrite.getnbasefunctions(bip)
                 N_hardcoded = Ferrite.reference_shape_value(bip, xi, i)
-                M_generated = IGA._compute_bezier_reference_shape_value(bip, xi, i)
+                M_generated = FerriteIGA._compute_bezier_reference_shape_value(bip, xi, i)
                 @test M_generated ≈ N_hardcoded
 
                 #= hardcoded = Ferrite.vertexdof_indices(bip)
-                generated = IGA._compute_vertexdof_indices(bip)
+                generated = FerriteIGA._compute_vertexdof_indices(bip)
                 @test hardcoded == generated
 
                 hardcoded = Ferrite.facedof_indices(bip)
-                generated = IGA._compute_facedof_indices(bip)
+                generated = FerriteIGA._compute_facedof_indices(bip)
                 @test hardcoded == generated
 
                 hardcoded = Ferrite.vertexdof_indices(bip)
-                generated = IGA._compute_vertexdof_indices(bip)
+                generated = FerriteIGA._compute_vertexdof_indices(bip)
                 @test hardcoded == generated
 
                 hardcoded = Ferrite.edgedof_indices(bip)
-                generated = IGA._compute_edgedof_indices(bip)
+                generated = FerriteIGA._compute_edgedof_indices(bip)
                 @test hardcoded == generated =#
             end
         end

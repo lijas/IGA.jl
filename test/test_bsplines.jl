@@ -5,9 +5,9 @@
     knot_vector = Float64[0,0,0, 0.5, 1,1,1]
     nbasefunks = length(knot_vector) - order - 1
 
-    span = IGA._find_span(n, order, 0.3, knot_vector)
+    span = FerriteIGA._find_span(n, order, 0.3, knot_vector)
 
-    N_alg1 = [IGA._bspline_basis_value_alg1(order, knot_vector, i, xi) for i in 1:nbasefunks]
+    N_alg1 = [FerriteIGA._bspline_basis_value_alg1(order, knot_vector, i, xi) for i in 1:nbasefunks]
 
     span = _find_span(n[i], p[i], ξ[i], Ξ[i])
     N_alg2 = zeros(Float64, order+1)
@@ -18,32 +18,32 @@ end=#
     order = 2
     knots = Float64[-1, -1, -1, 0, 1, 1, 1]
 
-    basis = IGA.BSplineBasis(knots,order)
-    n = IGA.Ferrite.getnbasefunctions(basis)
+    basis = FerriteIGA.BSplineBasis(knots,order)
+    n = FerriteIGA.Ferrite.getnbasefunctions(basis)
     @test n == 4
-    @test IGA.getnbasefunctions_dim(basis) == (4,)
+    @test FerriteIGA.getnbasefunctions_dim(basis) == (4,)
 
     for xi in [0.0, 0.25, 0.5, 1.0]
         sum1 = 0.0
         sum2 = 0.0
         for i in 1:n
-            sum1 += IGA._bspline_basis_value_alg1(order, knots, i, xi)
-            sum2 += IGA._bspline_basis_value_alg2(order, knots, i, xi)
+            sum1 += FerriteIGA._bspline_basis_value_alg1(order, knots, i, xi)
+            sum2 += FerriteIGA._bspline_basis_value_alg2(order, knots, i, xi)
         end
         @test sum1==1.0
         @test sum2==1.0
     end
 
-    span = IGA._find_span(n, order, 0.3, knots)
+    span = FerriteIGA._find_span(n, order, 0.3, knots)
     @test span == 4
     
     order = 3
     knots = (Float64[-1,-1,-1,-1, -0.3, 0.0, 0.3, 1,1,1,1],
              Float64[-1,-1,-1,-1, -0.3, -0.2, 0.2, 0.3, 1,1,1,1])
     
-    basis = IGA.BSplineBasis(knots, (order, order))
-    @test IGA.getnbasefunctions_dim(basis) == (7,8)
-    @test IGA.getnbasefunctions(basis) == 7*8
+    basis = FerriteIGA.BSplineBasis(knots, (order, order))
+    @test FerriteIGA.getnbasefunctions_dim(basis) == (7,8)
+    @test FerriteIGA.getnbasefunctions(basis) == 7*8
 
 end
 
@@ -56,7 +56,7 @@ end
         ip1 = BSplineBasis((knot_vector,knot_vector), (p,p))
         ip2 = Bernstein{RefQuadrilateral, p}()
 
-        reorder = IGA._bernstein_ordering(ip2)
+        reorder = FerriteIGA._bernstein_ordering(ip2)
 
         ξ = Vec((rand(),rand()))
         for i in 1:getnbasefunctions(ip2)

@@ -1,10 +1,10 @@
-# IGA.jl
+# FerriteIGA.jl
 
-Small toolbox for Isogeometric anlysis. Built on top of [Ferrite](https://github.com/KristofferC/Ferrite.jl)
+Small toolbox for Isogeometric anlysis. Built on top of [Ferrite](https://github.com/ferrite-fem/Ferrite.jl)
 
 ## Installation
 
-pkg> add https://github.com/lijas/IGA.jl.git
+pkg> add https://github.com/ferrite-fem/FerriteIGA.jl.git
 
 ## About IGA
 

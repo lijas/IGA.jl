@@ -19,7 +19,7 @@ function bspline_values(nurbsmesh::NURBSMesh{pdim,sdim}, cellid::Int, xi::Vec{pd
             ξηζ = Vec{pdim,T}(d->0.5*((Ξ[d][_ni[d]+1] - Ξ[d][_ni[d]])*xi[d] + (Ξ[d][_ni[d]+1] + Ξ[d][_ni[d]])))
             value = one(T)
             for d in 1:pdim
-                value *= IGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
+                value *= FerriteIGA._bspline_basis_value_alg1(nurbsmesh.orders[d], Ξ[d], ni[d], ξηζ[d])
             end
             return value
         end
@@ -106,7 +106,7 @@ end
     ip = IGAInterpolation{shape, order}()
     bip = Bernstein{shape, order}()
 
-    reorder = IGA._bernstein_ordering(bip)
+    reorder = FerriteIGA._bernstein_ordering(bip)
 
     qr = QuadratureRule{shape}(5)
     qr_face = FacetQuadratureRule{shape}(5)
