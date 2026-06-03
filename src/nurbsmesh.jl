@@ -203,12 +203,8 @@ function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdi
 		end
 	end
 
-	new_Ξ = copy(Ξ)
-	insert!(new_Ξ, k+1, ξᴺ)
-	resize!(knot_vectors[dir], length(new_Ξ))
-	copy!(knot_vectors[dir], new_Ξ)
-	resize!(control_points, length(new_cps))
-	copy!(control_points, new_cps)
-	resize!(weights, length(new_ws))
-	copy!(weights, new_ws)
+	insert!(knot_vectors[dir], k+1, ξᴺ)
+	copyto!(resize!(control_points, length(new_cps)), new_cps)
+	copyto!(resize!(weights, length(new_ws)), new_ws)
+	return nothing
 end
