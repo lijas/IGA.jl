@@ -156,67 +156,55 @@ function generate_nurbs_meshdata(orders::NTuple{dim,Int}, nbf::NTuple{dim,Int}) 
 	return nel, nnp, nen, INN, IEN
 end
 
-
-#Worlds slowest knot insertion algo.
+#knot insertion algorithm that uses Boehm's algorithm for knot insertion h-refinement
 function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdim,Int}, control_points::Vector{Vec{sdim,T}}, weights::Vector{T}, ξᴺ::T; dir::Int) where {pdim,sdim,T}
 
-	C, new_knot_vector = knotinsertion(knot_vectors[dir], orders[dir], ξᴺ)
-	
-	n = length(knot_vectors[dir]) - 1 - orders[dir] #number of basefunctions
-	m = length(control_points) ÷ n
+	Ξ = knot_vectors[dir]
+	p = orders[dir]
+	n = length(Ξ) - p - 1 
+	n_other = length(control_points) ÷ n 
 
-	
-	new_cps = zeros(Vec{sdim,T}, (n+1)*m)
-	new_ws = zeros(T, (n+1)*m)
-	for r in 1:m
-		indx = (dir==1) ? ((1:n) .+ (r-1)*n) : (r:m:(length(control_points)))
-		cp_row = control_points[indx]
+	#finds the index of the knot span where the new knot will be
+	k = findfirst(>(ξᴺ), Ξ) - 1
+	new_cps = Vector{Vec{sdim,T}}(undef, (n+1)*n_other)
+	new_ws  = Vector{T}(undef, (n+1)*n_other)
 
-		w_row = weights[indx]
-		for i in 1:size(C,1)
-			new_cp = sum(C[i,:] .* (cp_row.*w_row))
-			new_w = sum(C[i,:] .* w_row)
-			
-			indx2 = (dir==1) ? (i + (r-1)*(n+1)) : (r + (i-1)*m)
-		
-					
-			new_cps[indx2] = new_cp/new_w
-			new_ws[indx2] = new_w
+	for r in 1:n_other
+		stride   = dir == 1 ? 1 : n_other
+		old_base = dir == 1 ? (r - 1) * n + 1 : r
+		new_base = dir == 1 ? (r - 1) * (n + 1) + 1 : r
+
+		#changes nothing and only adds to new knot vector when the new knot hasnt been reached yet
+		for i in 1:k-p
+			idx = new_base + (i - 1) * stride
+			src = old_base + (i - 1) * stride
+			new_cps[idx] = control_points[src]
+			new_ws[idx]  = weights[src]
+		end
+
+		# inserts the new knot via NURBS weighted blend
+		for j in 1:p
+			i   = k - p + j
+			α   = (ξᴺ - Ξ[i]) / (Ξ[i+p] - Ξ[i])
+			src = old_base + (i - 1) * stride
+			src_prev = src - stride
+			wi  = α * weights[src] + (1 - α) * weights[src_prev]
+			idx = new_base + (i - 1) * stride
+			new_ws[idx]  = wi
+			new_cps[idx] = (α * weights[src] * control_points[src] + (1 - α) * weights[src_prev] * control_points[src_prev]) / wi
+		end
+
+		# shifts the control points and weights after the insertion span
+		for i in k+1:n+1
+			idx = new_base + (i - 1) * stride
+			src = old_base + (i - 2) * stride
+			new_cps[idx] = control_points[src]
+			new_ws[idx]  = weights[src]
 		end
 	end
-	
-	copy!(knot_vectors[dir], new_knot_vector)
-	copy!(control_points, new_cps)
-	copy!(weights, new_ws)
 
-end
-
-function knotinsertion(Ξ::Vector{T}, p::Int, ξᴺ::T) where { T}
-
-    n = length(Ξ) - p - 1
-    m = n+1
-
-    k = findfirst(ξᵢ -> ξᵢ>ξᴺ, Ξ)-1
-
-    @assert((k>p))
-    C = zeros(T,m,n)
-    C[1,1] = 1
-    for i in 2:m-1
-        
-        local α
-        if i<=k-p
-            α = 1.0
-        elseif k-p+1<=i<=k
-            α = (ξᴺ - Ξ[i])/(Ξ[i+p] - Ξ[i])
-        elseif i>=k+1
-             α = 0.0
-        end
-        C[i,i] = α
-        C[i,i-1] = (1-α)
-    end
-    C[m,n] = 1
-    
-    new_knot_vector = copy(Ξ)
-    insert!(new_knot_vector,k+1,ξᴺ)
-    return C, new_knot_vector
+	insert!(knot_vectors[dir], k+1, ξᴺ)
+	copyto!(resize!(control_points, length(new_cps)), new_cps)
+	copyto!(resize!(weights, length(new_ws)), new_ws)
+	return nothing
 end
