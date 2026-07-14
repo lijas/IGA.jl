@@ -39,6 +39,123 @@ end
     @test manual.knot_vectors == reference.knot_vectors
 end
 
+@testset "orderelevation!" begin
+    coarse = generate_nurbs_patch(:hypercube, (1, 1), (2, 2); cornerpos=(0.0, 0.0), size=(2.0, 3.0))
+    x = eval_parametric_coordinate(coarse, Vec(0.5, 0.75))
+
+    #single span test should elevate from p=2 to p=3
+    kv = (copy(coarse.knot_vectors[1]), copy(coarse.knot_vectors[2]))
+    cp = copy(coarse.control_points)
+    w = copy(coarse.weights)
+    orders = (2, 2)
+    orders = FerriteIGA.orderelevation!(kv, orders, cp, w, dir=1)
+    elevated = NURBSMesh(kv, orders, cp, w)
+    @test eval_parametric_coordinate(elevated, Vec(0.5, 0.75)) ≈ x
+    @test kv[1] == [-1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0]
+
+    #double element patch, so knot vector should change from [-1,-1,-1,0,1,1,1] to [-1,-1,-1,-1,0,0,1,1,1,1]
+    kv = (copy(coarse.knot_vectors[1]), copy(coarse.knot_vectors[2]))
+    cp = copy(coarse.control_points)
+    w = copy(coarse.weights)
+    orders = (2, 2)
+    FerriteIGA.knotinsertion!(kv, orders, cp, w, 0.0, dir=1)
+    orders = FerriteIGA.orderelevation!(kv, orders, cp, w, dir=1)
+    elevated = NURBSMesh(kv, orders, cp, w)
+    @test eval_parametric_coordinate(elevated, Vec(0.5, 0.75)) ≈ x
+    @test getncells(elevated) == 2
+    @test kv[1] == [-1.0, -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+
+    #hypercube test that area and boundary lengths are unchanged after p-refinement
+    mesh = generate_nurbs_patch(:hypercube, (4, 4), (2, 2); cornerpos=(-1.0, -1.0), size=(2.0, 3.0))
+    grid = BezierGrid(mesh)
+    addcellset!(grid, "all", (x) -> true)
+    addfacetset!(grid, "left", (x) -> x[1] ≈ -1.0)
+    addfacetset!(grid, "right", (x) -> x[1] ≈ 1.0)
+    addfacetset!(grid, "top", (x) -> x[2] ≈ 2.0)
+    addfacetset!(grid, "bottom", (x) -> x[2] ≈ -1.0)
+    bern_ip = IGAInterpolation{RefQuadrilateral, 2}()
+    qr = QuadratureRule{RefQuadrilateral}(5)
+    cv = BezierCellValues(qr, bern_ip)
+    fqr = FacetQuadratureRule{RefQuadrilateral}(5)
+    fv = BezierFacetValues(fqr, bern_ip)
+    V0 = _calculate_volume(cv, grid, getcellset(grid, "all"))
+    A0_left = _calculate_area(fv, grid, getfacetset(grid, "left"))
+    A0_right = _calculate_area(fv, grid, getfacetset(grid, "right"))
+    A0_top = _calculate_area(fv, grid, getfacetset(grid, "top"))
+    A0_bottom = _calculate_area(fv, grid, getfacetset(grid, "bottom"))
+
+    kv = (copy(mesh.knot_vectors[1]), copy(mesh.knot_vectors[2]))
+    cp = copy(mesh.control_points)
+    w = copy(mesh.weights)
+    orders = (2, 2)
+    orders = FerriteIGA.orderelevation!(kv, orders, cp, w, dir=1)
+    orders = FerriteIGA.orderelevation!(kv, orders, cp, w, dir=2)
+    elevated = NURBSMesh(kv, orders, cp, w)
+    @test orders == (3, 3)
+
+    grid = BezierGrid(elevated)
+    addcellset!(grid, "all", (x) -> true)
+    addfacetset!(grid, "left", (x) -> x[1] ≈ -1.0)
+    addfacetset!(grid, "right", (x) -> x[1] ≈ 1.0)
+    addfacetset!(grid, "top", (x) -> x[2] ≈ 2.0)
+    addfacetset!(grid, "bottom", (x) -> x[2] ≈ -1.0)
+    bern_ip = IGAInterpolation{RefQuadrilateral, 3}()
+    cv = BezierCellValues(qr, bern_ip)
+    fv = BezierFacetValues(fqr, bern_ip)
+    @test _calculate_volume(cv, grid, getcellset(grid, "all")) ≈ V0
+    @test _calculate_area(fv, grid, getfacetset(grid, "left")) ≈ A0_left
+    @test _calculate_area(fv, grid, getfacetset(grid, "right")) ≈ A0_right
+    @test _calculate_area(fv, grid, getfacetset(grid, "top")) ≈ A0_top
+    @test _calculate_area(fv, grid, getfacetset(grid, "bottom")) ≈ A0_bottom
+
+    #plate with hole test that volume and boundary lengths unchanged after p-refinement
+    L = 4.0
+    r = 1.0
+    mesh = generate_nurbs_patch(:plate_with_hole, (4, 4), (2, 2))
+    grid = BezierGrid(mesh)
+    addcellset!(grid, "all", (x) -> true)
+    addfacetset!(grid, "left", (x) -> x[1] ≈ -L)
+    addfacetset!(grid, "top", (x) -> x[2] ≈ L)
+    addfacetset!(grid, "right", (x) -> x[1] ≈ 0.0)
+    addfacetset!(grid, "bottom", (x) -> x[2] ≈ 0.0)
+    addfacetset!(grid, "circle", (x) -> r * 0.9 < norm(x) < r * 1.1)
+    bern_ip = IGAInterpolation{RefQuadrilateral, 2}()
+    cv = BezierCellValues(qr, bern_ip)
+    fv = BezierFacetValues(fqr, bern_ip)
+    V0 = _calculate_volume(cv, grid, getcellset(grid, "all"))
+    A0_left = _calculate_area(fv, grid, getfacetset(grid, "left"))
+    A0_right = _calculate_area(fv, grid, getfacetset(grid, "right"))
+    A0_top = _calculate_area(fv, grid, getfacetset(grid, "top"))
+    A0_bottom = _calculate_area(fv, grid, getfacetset(grid, "bottom"))
+    A0_circle = _calculate_area(fv, grid, getfacetset(grid, "circle"))
+
+    kv = (copy(mesh.knot_vectors[1]), copy(mesh.knot_vectors[2]))
+    cp = copy(mesh.control_points)
+    w = copy(mesh.weights)
+    orders = (2, 2)
+    orders = FerriteIGA.orderelevation!(kv, orders, cp, w, dir=1)
+    orders = FerriteIGA.orderelevation!(kv, orders, cp, w, dir=2)
+    elevated = NURBSMesh(kv, orders, cp, w)
+    @test orders == (3, 3)
+
+    grid = BezierGrid(elevated)
+    addcellset!(grid, "all", (x) -> true)
+    addfacetset!(grid, "left", (x) -> x[1] ≈ -L)
+    addfacetset!(grid, "top", (x) -> x[2] ≈ L)
+    addfacetset!(grid, "right", (x) -> x[1] ≈ 0.0)
+    addfacetset!(grid, "bottom", (x) -> x[2] ≈ 0.0)
+    addfacetset!(grid, "circle", (x) -> r * 0.9 < norm(x) < r * 1.1)
+    bern_ip = IGAInterpolation{RefQuadrilateral, 3}()
+    cv = BezierCellValues(qr, bern_ip)
+    fv = BezierFacetValues(fqr, bern_ip)
+    @test _calculate_volume(cv, grid, getcellset(grid, "all")) ≈ V0
+    @test _calculate_area(fv, grid, getfacetset(grid, "left")) ≈ A0_left
+    @test _calculate_area(fv, grid, getfacetset(grid, "right")) ≈ A0_right
+    @test _calculate_area(fv, grid, getfacetset(grid, "top")) ≈ A0_top
+    @test _calculate_area(fv, grid, getfacetset(grid, "bottom")) ≈ A0_bottom
+    @test _calculate_area(fv, grid, getfacetset(grid, "circle")) ≈ A0_circle
+end
+
 @testset "Test grid to BezierGrid convertion" begin
     
     grid = Ferrite.generate_grid(QuadraticQuadrilateral, (4,4))
