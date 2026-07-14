@@ -208,3 +208,202 @@ function knotinsertion!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdi
 	copyto!(resize!(weights, length(new_ws)), new_ws)
 	return nothing
 end
+
+#p-refinement: raise degree by one using the algorithm A5.9, Piegl & Tiller in "The NURBS Book"
+function orderelevation!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdim,Int}, control_points::Vector{Vec{sdim,T}}, weights::Vector{T}; dir::Int) where {pdim,sdim,T}
+
+	Ξ = knot_vectors[dir]
+	p = orders[dir]
+	n_ctrl = length(Ξ) - p - 1
+	n_other = length(control_points) ÷ n_ctrl
+	t = 1
+	ph = p + t
+	ph2 = ph ÷ 2
+	dim = sdim + 1
+	m = length(Ξ) - 1
+
+	#binomial coefficients for elevating each bezier segment by one degree
+	bezalfs = zeros(T, ph + 1, p + 1)
+	bezalfs[1, 1] = one(T)
+	bezalfs[ph + 1, p + 1] = one(T)
+	for i in 1:ph2
+		inv = one(T) / T(binomial(ph, i))
+		mpi = min(p, i)
+		for j in max(0, i - t):mpi
+			bezalfs[i + 1, j + 1] = inv * T(binomial(p, j)) * T(binomial(t, i - j))
+		end
+	end
+
+	#uses symmetry to fill the rest of the coefficient table
+	for i in (ph2 + 1):(ph - 1)
+		mpi = min(p, i)
+		for j in max(0, i - t):mpi
+			bezalfs[i + 1, j + 1] = bezalfs[ph - i + 1, p - j + 1]
+		end
+	end
+
+	#buffers reused while walking the knot vector
+	bpts = Vector{Vector{T}}(undef, p + 1)
+	ebpts = Vector{Vector{T}}(undef, ph + 1)
+	Nextbpts = Vector{Vector{T}}(undef, max(p - 1, 0))
+	alfs = Vector{T}(undef, max(p - 1, 0))
+	Qw = Vector{Vector{T}}(undef, n_ctrl * 3)
+	Uh = Vector{T}(undef, length(Ξ) * 3)
+	new_cps = Vector{Vec{sdim,T}}(undef, 0)
+	new_ws = Vector{T}(undef, 0)
+	newΞ = Ξ
+
+	#iterate over the adjacent directions to the elevated direction
+	for r in 1:n_other
+		stride = dir == 1 ? 1 : n_other
+		old_base = dir == 1 ? (r - 1) * n_ctrl + 1 : r
+
+		#load one row as homogeneous control points
+		Pw = Vector{Vector{T}}(undef, n_ctrl)
+		for i in 1:n_ctrl
+			idx = old_base + (i - 1) * stride
+			wi = weights[idx]
+			hw = Vector{T}(undef, dim)
+			for d in 1:sdim
+				hw[d] = wi * control_points[idx][d]
+			end
+			hw[dim] = wi
+			Pw[i] = hw
+		end
+
+		#set up for the first bezier span
+		mh = ph
+		kind = ph + 1
+		rr = -1
+		a = p
+		b = p + 1
+		cind = 2
+		ua = Ξ[1]
+		Qw[1] = Pw[1]
+		Uh[1:(ph + 1)] .= ua
+		bpts .= Pw[1:(p + 1)]
+
+		#walk the knot vector span by span
+		while b < m
+			#find the next knot and its multiplicity
+			i = b
+			while b < m && Ξ[b + 2] == Ξ[b + 1]
+				b += 1
+			end
+			mul = b - i + 1
+			mh = mh + mul + t
+			ub = Ξ[b + 1]
+			oldr = rr
+			rr = p - mul
+			#decide which elevated points to keep from this span
+			lbz = oldr > 0 ? (oldr + 2) ÷ 2 : 1
+			rbz = rr > 0 ? ph - (rr + 1) ÷ 2 : ph
+
+			#extract the span as a bezier via knot insertion
+			if rr > 0
+				numer = ub - ua
+				for k in p:-1:(mul + 1)
+					alfs[k - mul] = numer / (Ξ[a + k + 1] - ua)
+				end
+				for j in 1:rr
+					save = rr - j
+					s = mul + j
+					for k in p:-1:s
+						α = alfs[k - s + 1]
+						bpts[k + 1] = α .* bpts[k + 1] .+ (1 - α) .* bpts[k]
+					end
+					Nextbpts[save + 1] = bpts[p + 1]
+				end
+			end
+
+			#elevate the bezier segment by one degree
+			for ii in lbz:ph
+				ebpts[ii + 1] = zeros(T, dim)
+				mpi = min(p, ii)
+				for j in max(0, ii - t):mpi
+					ebpts[ii + 1] .+= bezalfs[ii + 1, j + 1] .* bpts[j + 1]
+				end
+			end
+
+			#remove the knot when the previous span had repeated knots
+			if oldr > 1
+				first = kind - 2
+				last = kind
+				den = ub - ua
+				bet = (ub - Uh[kind]) / den
+				for tr in 1:(oldr - 1)
+					ii = first
+					jj = last
+					kj = jj - kind + 1
+					while jj - ii > tr
+						if ii < cind
+							alf = (ub - Uh[ii + 1]) / (ua - Uh[ii + 1])
+							Qw[ii + 1] = alf .* Qw[ii + 1] .+ (1 - alf) .* Qw[ii]
+						end
+						if jj >= lbz
+							if jj - tr <= kind - ph + oldr
+								gam = (ub - Uh[jj - tr + 1]) / den
+								ebpts[kj + 1] = gam .* ebpts[kj + 1] .+ (1 - gam) .* ebpts[kj + 2]
+							else
+								ebpts[kj + 1] = bet .* ebpts[kj + 1] .+ (1 - bet) .* ebpts[kj + 2]
+							end
+						end
+						ii += 1
+						jj -= 1
+						kj -= 1
+					end
+					first -= 1
+					last += 1
+				end
+			end
+
+			#load the knot ua into the new knot vector
+			if a != p
+				cnt = ph - oldr
+				Uh[(kind + 1):(kind + cnt)] .= ua
+				kind += cnt
+			end
+			#load the new control points from this span
+			for j in lbz:rbz
+				Qw[cind] = ebpts[j + 1]
+				cind += 1
+			end
+			if b < m
+				#load control points for the next span
+				rr > 0 && (bpts[1:rr] .= Nextbpts[1:rr])
+				bpts[(rr + 1):(p + 1)] .= Pw[(b - p + rr + 1):(b + 1)]
+				a = b
+				b += 1
+				ua = ub
+			else
+				#load the end knot into the new knot vector
+				Uh[(kind + 1):(kind + ph + 1)] .= ub
+			end
+		end
+
+		nh = mh - ph - 1
+		count_cpts = nh + 1
+		if r == 1
+			newΞ = Uh[1:(count_cpts + ph + 1)]
+			resize!(new_cps, count_cpts * n_other)
+			resize!(new_ws, count_cpts * n_other)
+		end
+		
+		#convert back from homogeneous and store this row
+		new_base = dir == 1 ? (r - 1) * count_cpts + 1 : r
+		for i in 1:count_cpts
+			hw = Qw[i]
+			wi = hw[dim]
+			cp = Vec(ntuple(d -> hw[d] / wi, sdim))
+			idx = new_base + (i - 1) * stride
+			new_cps[idx] = cp
+			new_ws[idx] = wi
+		end
+	end
+
+	#updates the elevated knots, cps, and weights for the final elevated ones
+	copyto!(resize!(knot_vectors[dir], length(newΞ)), newΞ)
+	copyto!(resize!(control_points, length(new_cps)), new_cps)
+	copyto!(resize!(weights, length(new_ws)), new_ws)
+	return ntuple(i -> i == dir ? orders[i] + 1 : orders[i], pdim)
+end
