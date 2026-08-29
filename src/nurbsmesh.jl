@@ -407,3 +407,12 @@ function orderelevation!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pd
 	copyto!(resize!(weights, length(new_ws)), new_ws)
 	return ntuple(i -> i == dir ? orders[i] + 1 : orders[i], pdim)
 end
+
+#raises global smoothness by 1 degree, first performs polynomial degree elevation then the corresponding knot insertion
+function smoothnesselevation!(knot_vectors::NTuple{pdim,Vector{T}}, orders::NTuple{pdim,Int}, control_points::Vector{Vec{sdim,T}}, weights::Vector{T}, new_knots::AbstractVector{T}; dir::Int) where {pdim,sdim,T}
+	orders = orderelevation!(knot_vectors, orders, control_points, weights; dir=dir)
+	for ξᴺ in new_knots
+		knotinsertion!(knot_vectors, orders, control_points, weights, ξᴺ; dir=dir)
+	end
+	return orders
+end

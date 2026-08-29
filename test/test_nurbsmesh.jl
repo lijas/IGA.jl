@@ -156,6 +156,47 @@ end
     @test _calculate_area(fv, grid, getfacetset(grid, "circle")) ≈ A0_circle
 end
 
+@testset "smoothnesselevation!" begin
+    coarse = generate_nurbs_patch(:hypercube, (1, 1), (2, 2); cornerpos=(0.0, 0.0), size=(2.0, 3.0))
+    x = eval_parametric_coordinate(coarse, Vec(0.5, 0.75))
+
+    #k-refinement, elevate like p-refinement, insert like h-refinement
+    kv = (copy(coarse.knot_vectors[1]), copy(coarse.knot_vectors[2]))
+    cp = copy(coarse.control_points)
+    w = copy(coarse.weights)
+    orders = (2, 2)
+    orders = FerriteIGA.smoothnesselevation!(kv, orders, cp, w, [0.0]; dir=1)
+    refined = NURBSMesh(kv, orders, cp, w)
+    @test eval_parametric_coordinate(refined, Vec(0.5, 0.75)) ≈ x
+    @test orders == (3, 2)
+    @test getncells(refined) == 2
+    @test kv[1] == [-1.0, -1.0, -1.0, -1.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+
+    #should match calling orderelevation! then knotinsertion! by hand
+    kv_ref = (copy(coarse.knot_vectors[1]), copy(coarse.knot_vectors[2]))
+    cp_ref = copy(coarse.control_points)
+    w_ref = copy(coarse.weights)
+    orders_ref = (2, 2)
+    orders_ref = FerriteIGA.orderelevation!(kv_ref, orders_ref, cp_ref, w_ref; dir=1)
+    FerriteIGA.knotinsertion!(kv_ref, orders_ref, cp_ref, w_ref, 0.0; dir=1)
+    @test orders == orders_ref
+    @test kv == kv_ref
+    @test cp ≈ cp_ref
+    @test w ≈ w_ref
+
+    #smoothness check, the new knot from k-refinement should be one more derivative continuous, while h-then-p raises multiplicity and continuity remains the same
+    @test count(==(0.0), kv[1]) == 1
+    kv_hp = (copy(coarse.knot_vectors[1]), copy(coarse.knot_vectors[2]))
+    cp_hp = copy(coarse.control_points)
+    w_hp = copy(coarse.weights)
+    orders_hp = (2, 2)
+    FerriteIGA.knotinsertion!(kv_hp, orders_hp, cp_hp, w_hp, 0.0; dir=1)
+    orders_hp = FerriteIGA.orderelevation!(kv_hp, orders_hp, cp_hp, w_hp; dir=1)
+    @test orders_hp == (3, 2)
+    @test count(==(0.0), kv_hp[1]) == 2
+    @test kv_hp[1] == [-1.0, -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+end
+
 @testset "Test grid to BezierGrid convertion" begin
     
     grid = Ferrite.generate_grid(QuadraticQuadrilateral, (4,4))
